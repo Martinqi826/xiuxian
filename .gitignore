@@ -1,0 +1,33 @@
+# ===== OS / 系统 =====
+Thumbs.db
+.DS_Store
+desktop.ini
+
+# ===== IDE / 编辑器 =====
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ===== Node / 前端（预留，目前没用）=====
+node_modules/
+dist/
+build/
+*.log
+
+# ===== Python 缓存（xiuxian.py 可能产生）=====
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# ===== 本项目临时 / 生成产物 =====
+generated-images/
+*.bak
+*.tmp
+
+# ===== CodeBuddy 说明 =====
+# .codebuddy/ 整体保留（记录开发过程），但排除运行时缓存：
+.codebuddy/cache/
+.codebuddy/logs/
+.codebuddy/temp/

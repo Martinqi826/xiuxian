@@ -1,0 +1,1535 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>《凡人修仙路》项目白皮书</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+  :root{
+    --bg:#0e1116;
+    --panel:#161a22;
+    --ink:#e8e3d3;
+    --muted:#a89c7c;
+    --gold:#d4b46a;
+    --jade:#7fc7a3;
+    --red:#d96a6a;
+    --blue:#7ab0d4;
+    --line:rgba(212,180,106,.25);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:"Songti SC","STSong","SimSun","Noto Serif SC",serif;line-height:1.8}
+  a{color:var(--gold);text-decoration:none}
+  a:hover{color:#fff}
+  code{background:#0a0d12;color:var(--jade);padding:1px 6px;border-radius:3px;font-size:13px;font-family:Consolas,monospace}
+
+  /* 顶部封面 */
+  .cover{
+    height:340px;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    background:
+      radial-gradient(800px 300px at 50% 30%,rgba(127,199,163,.12),transparent 70%),
+      radial-gradient(900px 400px at 50% 80%,rgba(212,180,106,.1),transparent 70%),
+      linear-gradient(180deg,#0a0d12,#0e1116);
+    border-bottom:1px solid var(--line);
+    position:relative;overflow:hidden;
+  }
+  .cover::before,.cover::after{
+    content:"";position:absolute;inset:0;pointer-events:none;
+    background:radial-gradient(2px 2px at 20% 30%,rgba(255,255,255,.4),transparent),
+               radial-gradient(2px 2px at 80% 60%,rgba(255,255,255,.3),transparent),
+               radial-gradient(1px 1px at 40% 80%,rgba(255,255,255,.4),transparent),
+               radial-gradient(1px 1px at 60% 20%,rgba(255,255,255,.3),transparent);
+  }
+  .cover h1{font-size:54px;letter-spacing:24px;margin:0 0 16px;color:var(--gold);
+    text-shadow:0 0 24px rgba(212,180,106,.4);font-weight:normal}
+  .cover .sub{font-size:16px;letter-spacing:8px;color:var(--muted)}
+  .cover .meta{margin-top:30px;display:flex;gap:30px;font-size:13px;color:var(--muted);letter-spacing:2px}
+  .cover .meta b{color:var(--ink);font-weight:normal;margin-right:6px}
+
+  /* 主布局 */
+  .layout{display:grid;grid-template-columns:240px 1fr;max-width:1200px;margin:0 auto;gap:30px;padding:30px 30px 80px}
+  nav.toc{
+    position:sticky;top:20px;align-self:start;
+    border:1px solid var(--line);border-radius:6px;padding:18px 14px;
+    background:var(--panel);font-size:14px;
+    max-height:calc(100vh - 40px);overflow:auto;
+  }
+  nav.toc .title{color:var(--gold);font-size:13px;letter-spacing:6px;border-bottom:1px solid var(--line);
+    padding-bottom:8px;margin-bottom:10px;text-align:center}
+  nav.toc ol{list-style:none;padding:0;margin:0;counter-reset:sec}
+  nav.toc li{counter-increment:sec;margin:5px 0}
+  nav.toc li::before{content:counter(sec,cjk-ideographic) "、";color:var(--muted);font-size:12px}
+  nav.toc a{color:var(--ink);font-size:13px}
+  nav.toc a:hover{color:var(--gold)}
+
+  main{min-width:0}
+  section{margin-bottom:50px;scroll-margin-top:20px}
+  h2{font-size:24px;color:var(--gold);letter-spacing:6px;border-left:3px solid var(--gold);
+     padding:4px 14px;margin:0 0 18px;font-weight:normal;background:linear-gradient(90deg,rgba(212,180,106,.1),transparent)}
+  h3{font-size:17px;color:var(--jade);letter-spacing:3px;margin:24px 0 10px;font-weight:normal;
+     border-bottom:1px dashed var(--line);padding-bottom:4px}
+  p{margin:8px 0;color:#d8d3c3}
+  .lead{color:var(--muted);font-size:14px;border-left:2px solid var(--line);padding:6px 14px;margin:0 0 14px}
+
+  /* 卡片 */
+  .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px;margin:14px 0}
+  .card{
+    background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:14px 16px;
+    transition:.2s;
+  }
+  .card:hover{border-color:var(--gold);transform:translateY(-2px)}
+  .card .name{color:var(--gold);font-size:15px;letter-spacing:2px}
+  .card .tag{display:inline-block;font-size:11px;background:rgba(212,180,106,.15);color:var(--gold);
+    padding:1px 8px;border-radius:10px;margin-left:6px;letter-spacing:1px}
+  .card .tag.r{background:rgba(217,106,106,.15);color:var(--red)}
+  .card .tag.b{background:rgba(122,176,212,.15);color:var(--blue)}
+  .card .tag.g{background:rgba(127,199,163,.15);color:var(--jade)}
+  .card .desc{color:var(--muted);font-size:12px;margin-top:6px;line-height:1.7}
+  .card dl{margin:8px 0 0;font-size:12px;display:grid;grid-template-columns:auto 1fr;gap:2px 10px}
+  .card dt{color:var(--muted)}
+  .card dd{margin:0;color:var(--ink)}
+
+  /* 表格 */
+  table{width:100%;border-collapse:collapse;margin:10px 0;font-size:13px;background:var(--panel);
+    border:1px solid var(--line);border-radius:6px;overflow:hidden}
+  th,td{padding:8px 12px;text-align:left;border-bottom:1px solid rgba(212,180,106,.1)}
+  th{background:rgba(212,180,106,.08);color:var(--gold);font-weight:normal;letter-spacing:2px;font-size:12px}
+  tr:last-child td{border-bottom:none}
+  tr:hover td{background:rgba(212,180,106,.04)}
+  td.r{color:var(--red)} td.j{color:var(--jade)} td.g{color:var(--gold)} td.b{color:var(--blue)}
+  td.num{font-family:Consolas,monospace;text-align:right}
+
+  /* 流程图 */
+  .flow{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:16px 0;font-size:13px}
+  .flow .node{
+    border:1px solid var(--line);background:var(--panel);padding:8px 14px;border-radius:4px;color:var(--ink);
+    min-width:90px;text-align:center;
+  }
+  .flow .node.gold{border-color:var(--gold);color:var(--gold)}
+  .flow .node.jade{border-color:var(--jade);color:var(--jade)}
+  .flow .arrow{color:var(--muted)}
+
+  /* 高亮信息块 */
+  .info{
+    background:linear-gradient(180deg,rgba(127,199,163,.08),rgba(127,199,163,.02));
+    border:1px solid rgba(127,199,163,.3);border-left:3px solid var(--jade);
+    padding:10px 16px;border-radius:4px;margin:12px 0;font-size:13px;color:#d8d3c3;
+  }
+  .info .h{color:var(--jade);font-size:13px;letter-spacing:3px;margin-bottom:4px}
+  .warn{
+    background:linear-gradient(180deg,rgba(217,106,106,.08),rgba(217,106,106,.02));
+    border:1px solid rgba(217,106,106,.3);border-left:3px solid var(--red);
+    padding:10px 16px;border-radius:4px;margin:12px 0;font-size:13px;color:#d8d3c3;
+  }
+  .warn .h{color:var(--red);font-size:13px;letter-spacing:3px;margin-bottom:4px}
+
+  /* 公式块 */
+  .formula{
+    background:#0a0d12;border:1px solid var(--line);border-radius:4px;
+    padding:12px 16px;font-family:Consolas,monospace;font-size:13px;color:var(--jade);
+    margin:8px 0;letter-spacing:1px;
+  }
+
+  /* 进度条样式（境界） */
+  .realm-list .row{
+    display:grid;grid-template-columns:30px 110px 1fr 90px;gap:10px;align-items:center;
+    padding:6px 10px;border-bottom:1px solid rgba(212,180,106,.08);font-size:13px;
+  }
+  .realm-list .row .idx{color:var(--muted);text-align:right}
+  .realm-list .row .name{color:var(--gold);letter-spacing:2px}
+  .realm-list .row .bar{height:6px;background:rgba(255,255,255,.04);border-radius:3px;overflow:hidden}
+  .realm-list .row .bar i{display:block;height:100%;background:linear-gradient(90deg,var(--jade),var(--gold))}
+  .realm-list .row .num{font-family:Consolas,monospace;color:var(--ink);text-align:right;font-size:12px}
+  .realm-list .group{color:var(--muted);font-size:12px;letter-spacing:4px;margin:14px 0 4px;padding-left:10px;border-left:2px solid var(--line)}
+
+  footer{text-align:center;color:var(--muted);font-size:12px;letter-spacing:4px;
+    padding:30px;border-top:1px solid var(--line)}
+
+  @media(max-width:900px){
+    .layout{grid-template-columns:1fr;padding:20px}
+    nav.toc{position:static;max-height:none}
+    .cover h1{font-size:34px;letter-spacing:14px}
+  }
+</style>
+</head>
+<body>
+
+<header class="cover">
+  <h1>凡 人 修 仙 路</h1>
+  <div class="sub">— 项 目 白 皮 书 · v 2.0 —</div>
+  <div class="meta">
+    <span><b>类型</b>纯文字单机</span>
+    <span><b>平台</b>浏览器</span>
+    <span><b>境界</b>21 阶 · 7 重天劫</span>
+    <span><b>体量</b>单文件 HTML</span>
+  </div>
+</header>
+
+<div class="layout">
+
+  <!-- 目录 -->
+  <nav class="toc">
+    <div class="title">目  录</div>
+    <ol>
+      <li><a href="#overview">项目概览</a></li>
+      <li><a href="#core-loop">核心循环</a></li>
+      <li><a href="#character">角色系统</a></li>
+      <li><a href="#root">灵根体系</a></li>
+      <li><a href="#element">五行相克</a></li>
+      <li><a href="#hidden">隐藏支线</a></li>
+      <li><a href="#realm">境界体系</a></li>
+      <li><a href="#lifespan">寿元体系</a></li>
+      <li><a href="#tribulation">天劫系统</a></li>
+      <li><a href="#tech">功法体系</a></li>
+      <li><a href="#skill">神通术法</a></li>
+      <li><a href="#equip">装备体系</a></li>
+      <li><a href="#relic">本命法宝</a></li>
+      <li><a href="#cult">修炼机制</a></li>
+      <li><a href="#breakthrough">突破机制</a></li>
+      <li><a href="#alchemy">炼丹系统</a></li>
+      <li><a href="#sect">宗门系统</a></li>
+      <li><a href="#market">坊市交易</a></li>
+      <li><a href="#dungeon">秘境副本</a></li>
+      <li><a href="#adventure">奇遇事件</a></li>
+      <li><a href="#battle">战斗系统</a></li>
+      <li><a href="#monster">妖兽图鉴</a></li>
+      <li><a href="#item">物品图鉴</a></li>
+      <li><a href="#quest">夙愿系统（v5）</a></li>
+      <li><a href="#economy-v6">经济再平衡（v6）</a></li>
+      <li><a href="#pet-system">灵宠契约（v6.2）</a></li>
+      <li><a href="#portrait-system">玩家形象（v6.4）</a></li>
+      <li><a href="#auto">自动托管</a></li>
+      <li><a href="#save">存档机制</a></li>
+      <li><a href="#tech-stack">技术栈</a></li>
+      <li><a href="#roadmap">未来规划</a></li>
+    </ol>
+  </nav>
+
+  <!-- 正文 -->
+  <main>
+
+  <!-- 1 -->
+  <section id="overview">
+    <h2>一、项 目 概 览</h2>
+    <p class="lead">
+      《凡人修仙路》是一款纯文字浏览器单机修仙游戏，玩家从天资被随机抽取的凡人开始，
+      经历闭关、历练、突破、战斗、奇遇，沿着 <b>21 阶境界</b> 一路修至仙人。
+    </p>
+    <div class="cards">
+      <div class="card">
+        <div class="name">核心定位</div>
+        <div class="desc">挂机 + 文字叙事 + 修仙数值养成；轻操作、重数值、长成长曲线。</div>
+      </div>
+      <div class="card">
+        <div class="name">玩家循环</div>
+        <div class="desc">攒修为 → 试突破 → 寿元延长 → 探险得资源 → 再攒修为，正反馈滚雪球。</div>
+      </div>
+      <div class="card">
+        <div class="name">运行环境</div>
+        <div class="desc">双击 <code>index.html</code> 即可游玩，无需安装、无需服务器、无需联网。</div>
+      </div>
+      <div class="card">
+        <div class="name">数据规模</div>
+        <div class="desc">21 境界 × 9 灵根 × 5 五行 × 5 功法 × 10 神通 × 19 装备 × 5 本命法宝 × 8 丹方 × 5 宗门 × 6 秘境 × 8 妖兽 × 18 奇遇 × 20 物品。</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2 -->
+  <section id="core-loop">
+    <h2>二、核 心 循 环</h2>
+    <div class="flow">
+      <div class="node gold">闭关修炼</div><span class="arrow">→</span>
+      <div class="node">修为累积</div><span class="arrow">→</span>
+      <div class="node jade">尝试突破</div><span class="arrow">→</span>
+      <div class="node">境界提升</div><span class="arrow">→</span>
+      <div class="node">寿元延长</div><span class="arrow">↩</span>
+    </div>
+    <div class="flow">
+      <div class="node gold">外出历练</div><span class="arrow">→</span>
+      <div class="node">奇遇 / 战斗</div><span class="arrow">→</span>
+      <div class="node">资源 / 功法</div><span class="arrow">→</span>
+      <div class="node">反哺修为/突破</div>
+    </div>
+    <div class="info">
+      <div class="h">设 计 哲 学</div>
+      闭关是稳定线性收益、历练是高方差波动收益。两者交替使用，玩家需在「稳收益」与「博奇遇」之间做策略选择。
+    </div>
+  </section>
+
+  <!-- 3 -->
+  <section id="character">
+    <h2>三、角 色 系 统</h2>
+    <p class="lead">v3 引入「三层属性架构」：六大根骨主属性 → 八大派生战斗属性 → 修仙特色（道心 / 寿元 / 业力）。主面板默认仅显示核心数值，点击「玄机」按钮可查看全部根骨与派生公式。</p>
+    <table>
+      <thead><tr><th>属性</th><th>含义</th><th>初始</th><th>成长来源</th></tr></thead>
+      <tbody>
+        <tr><td class="g">道号 / 灵根 / 境界</td><td>身份与天资</td><td>开局生成</td><td>—</td></tr>
+        <tr><td class="g">修为</td><td>累积灵气值，决定突破</td><td class="num">0</td><td>闭关 / 奇遇 / 丹药</td></tr>
+        <tr><td class="g">气血 maxHp</td><td>生命值，归零即陨</td><td class="num">100 / 100</td><td>体魄派生 + 道行</td></tr>
+        <tr><td class="b">真元 maxMp</td><td><b>v3 新增</b>·神通施放消耗，无 mp 强制普攻</td><td class="num">50 / 50</td><td>灵力派生</td></tr>
+        <tr><td class="g">攻击 / 防御</td><td>战斗派生输出 / 减伤</td><td class="num">10 / 0</td><td>灵力 / 体魄</td></tr>
+        <tr><td class="b">身法 spd</td><td><b>v3 新增</b>·决定先手与闪避</td><td class="num">10</td><td>神识 + 境界</td></tr>
+        <tr><td class="b">暴击 crit</td><td><b>v3 新增</b>·暴击率 / 暴伤倍率</td><td class="num">5% / 150%</td><td>神识 + 气运</td></tr>
+        <tr><td class="b">破防 pen</td><td><b>v3 新增</b>·无视目标防御百分比</td><td class="num">0</td><td>神识 + 道行</td></tr>
+        <tr><td class="g">道心 / 寿元</td><td>修仙稳定度 / 阳寿</td><td class="num">100 / 80</td><td>突破 / 渡劫</td></tr>
+        <tr><td class="b">业力 karma</td><td><b>v3 新增</b>·善恶因果，影响渡劫与奇遇（-100~+100）</td><td class="num">0</td><td>斩邪 +善 / 滥杀 -业</td></tr>
+        <tr><td class="g">功法</td><td>修炼倍率 + 攻击加成 + 五行属性</td><td>引气诀</td><td>奇遇得功法残篇</td></tr>
+      </tbody>
+    </table>
+    <div class="formula">
+      非线性减伤公式：dmg = atk × elBonus × (1 − effDef / (effDef + 600))<br>
+      其中 effDef = def × (1 − pen%)，elBonus 为五行系数（克 1.20 / 被克 0.80 / 否则 1.00）<br>
+      暴击伤害 ×critDmg（默认 1.5）；闪避 = 神识/气运累积 + 装备
+    </div>
+  </section>
+
+  <!-- 3.5 v3 三层属性详表 -->
+  <section id="stat-arch">
+    <h2>三· · 三 层 属 性 架 构（v3）</h2>
+    <p class="lead">所有"加属性"操作（突破 / 装备 / 丹药 / 奇遇）都直接加根骨，再由 <code>recalcStats(P)</code> 重算派生。装备 / 法宝 / 灵根都用根骨加成参数描述，无需重写战斗公式。</p>
+
+    <h3>Layer 1 · 六大根骨主属性</h3>
+    <table>
+      <thead><tr><th>属性</th><th>修仙对应</th><th>主要派生</th><th>主要来源</th></tr></thead>
+      <tbody>
+        <tr><td class="r">体魄 ti</td><td>肉身 / 根骨</td><td>maxHp、防御</td><td>突破、armor 装备、奇遇「周天通畅」</td></tr>
+        <tr><td class="b">灵力 ling</td><td>法力 / 真元</td><td>攻击、maxMp</td><td>突破、weapon 装备、奇遇「参透一篇」</td></tr>
+        <tr><td style="color:#c0a8d4">神识 shen</td><td>神魂 / 识海</td><td>身法、暴击、破防</td><td>悟道、accessory 装备</td></tr>
+        <tr><td class="j">悟性 wu</td><td>慧根天资</td><td>修为转化、突破成功率</td><td>灵根天赋、奇遇</td></tr>
+        <tr><td class="g">气运 yun</td><td>福缘气运</td><td>暴击伤害、奇遇</td><td>累积善业、奇遇加成</td></tr>
+        <tr><td>道行 dao</td><td>大道感悟</td><td>渡劫抗性、防御、破防</td><td>突破、渡劫、岁月累积</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Layer 2 · 八大派生公式</h3>
+    <div class="formula">
+      maxHp   = 100 + ti×8 + 境界×60 + dao×2<br>
+      maxMp   =  50 + ling×3 + 境界×15<br>
+      atk     = ling×2 + 功法基础 + 境界×5<br>
+      def     = ti×1.5 + dao×0.5<br>
+      spd     = 10 + shen×0.3 + 境界×2<br>
+      crit    = 5% + shen×0.15% + yun×0.30%（上限 85%）<br>
+      critDmg = 150% + yun×1%<br>
+      pen     = shen×0.2 + dao×0.5
+    </div>
+
+    <h3>Layer 3 · 修仙特色三件套</h3>
+    <table>
+      <thead><tr><th>属性</th><th>取值范围</th><th>核心作用</th></tr></thead>
+      <tbody>
+        <tr><td class="b">道心 dx</td><td>0 ~ maxDx</td><td>≥90% 突破成功率 ×1.1；归 0 走火入魔暴毙</td></tr>
+        <tr><td class="g">寿元</td><td>初始 80；累积制</td><td>突破累加；丹药延寿；高阶神通/渡劫消耗；归 0 坐化</td></tr>
+        <tr><td class="g">业力 karma</td><td>-100 ~ +100</td><td>±0.5 减伤 / 增伤渡劫；正业触发善缘奇遇，负业招天劫加难</td></tr>
+      </tbody>
+    </table>
+
+    <h3>战斗策略机制（v3 新增）</h3>
+    <ul>
+      <li><b>真元消耗</b>：神通施放扣 mp（v4 梯度：剑气斩 5、烈焰咒 20、金丹真解 80、元婴神雷 180、化神一念 300、大乘法相 600），真元不足时<b>强制转普攻</b>。战斗中每回合自回 <b style="color:var(--red)">1.5% maxMp</b>（v4 由 5% 降低），突破仅回 <b style="color:var(--red)">30% maxMp</b>（不再满蓝）。后期高阶神通耗蓝巨大，须备『聚灵丹 +60 / 玄元丹 +200 / 紫府丹 +500』，战斗中点「服丹」按缺值优先级自动选取。</li>
+      <li><b>先手系统</b>：玩家身法 ≥ 怪物 spd × 1.3 时多打一击（0.6 倍伤害），俗称「连斩」。</li>
+      <li><b>暴击 / 闪避</b>：每次攻击独立 roll 命中、闪避、暴击；战斗 log 染色显示「暴击」「相克」「破防」。</li>
+      <li><b>五行相克</b>（v3 调柔）：克 +20% / 被克 -20%（旧版奇遇 +50%/-30% 只用于事件文案）。</li>
+      <li><b>业力联动</b>：杀邪修类怪（血煞修士 / 散修剑仙）+5 善业；杀普通妖兽 +1~+2；累积 +50 后渡劫减伤 25%。</li>
+    </ul>
+  </section>
+
+  <!-- 4 -->
+  <section id="root">
+    <h2>四、灵 根 体 系</h2>
+    <p class="lead">灵根是修仙者的根基，由「等级」与「五行属性」两个维度组成，且<b>可在游戏中后天改变</b>。</p>
+
+    <h3>九阶灵根</h3>
+    <table>
+      <thead><tr><th>灵根</th><th>修炼倍率</th><th>抽取权重</th><th>属性数</th><th>稀有度</th><th>评语</th></tr></thead>
+      <tbody>
+        <tr><td class="r">废灵根</td><td class="num">×0.5</td><td class="num">5</td><td class="num">0</td><td>常见</td><td>天资愚钝，却暗藏玄机</td></tr>
+        <tr><td>五灵根</td><td class="num">×0.8</td><td class="num">8</td><td class="num">5</td><td>常见</td><td>五行皆通，资质平庸</td></tr>
+        <tr><td>四灵根</td><td class="num">×1.0</td><td class="num">12</td><td class="num">4</td><td>普通</td><td>中规中矩</td></tr>
+        <tr><td class="j">三灵根</td><td class="num">×1.2</td><td class="num">8</td><td class="num">3</td><td>普通</td><td>资质不错</td></tr>
+        <tr><td class="j">双灵根</td><td class="num">×1.5</td><td class="num">4</td><td class="num">2</td><td>稀有</td><td>上佳之资</td></tr>
+        <tr><td class="g">单灵根</td><td class="num">×2.0</td><td class="num">1</td><td class="num">1</td><td>极稀</td><td>万中无一的奇才</td></tr>
+        <tr><td class="g">天灵根</td><td class="num">×3.0</td><td class="num">0.3</td><td class="num">1</td><td>传说</td><td>传说中的修炼至宝</td></tr>
+        <tr><td class="b">异变灵根</td><td class="num">×2.5</td><td class="num">—</td><td class="num">2</td><td>奇遇</td><td>经天地异象淬炼，灵根质变</td></tr>
+        <tr><td style="color:#ffd966">混沌灵根</td><td class="num g">×5.0</td><td class="num">—</td><td>无</td><td>神话</td><td>包罗万象，免疫五行克制</td></tr>
+      </tbody>
+    </table>
+    <div class="info">
+      <div class="h">动 态 灵 根</div>
+      普通灵根的等级会<b>随属性数量自动调整</b>：当你通过奇遇/丹药增减五行属性时，
+      废灵根→单→双→三→四→五灵根之间会自动转换；天灵根、异变、混沌不参与自动调整。
+    </div>
+    <div class="info">
+      <div class="h">改 变 灵 根 的 途 径</div>
+      <ul style="margin:0">
+        <li>奇遇「五行灵泉」：吸纳一种缺失属性</li>
+        <li>奇遇「灵气紊乱」：随机增/减属性，或触发异变</li>
+        <li>奇遇「纯阳天雷」：受伤但有 15% 概率灵根质变 → 异变灵根</li>
+        <li>道具「五行淬体丹」：玩家选择吸纳一种属性</li>
+        <li>道具「洗髓丹」：玩家选择洗去一种属性</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- 4.5 五行 -->
+  <section id="element">
+    <h2>五、五 行 相 克</h2>
+    <p class="lead">每个角色与妖兽都拥有 0~5 种五行属性，战斗时根据属性进行伤害修正。</p>
+
+    <h3>相生相克图</h3>
+    <div class="flow">
+      <div class="node" style="border-color:#d4b46a;color:#d4b46a">金</div><span class="arrow">克→</span>
+      <div class="node" style="border-color:#7fc7a3;color:#7fc7a3">木</div><span class="arrow">克→</span>
+      <div class="node" style="border-color:#c9a872;color:#c9a872">土</div><span class="arrow">克→</span>
+      <div class="node" style="border-color:#7ab0d4;color:#7ab0d4">水</div><span class="arrow">克→</span>
+      <div class="node" style="border-color:#d96a6a;color:#d96a6a">火</div><span class="arrow">克→</span>
+      <div class="node" style="border-color:#d4b46a;color:#d4b46a">金</div>
+    </div>
+
+    <h3>战斗伤害修正</h3>
+    <table>
+      <thead><tr><th>关系</th><th>伤害倍率</th><th>说明</th></tr></thead>
+      <tbody>
+        <tr><td class="g">攻方克防方</td><td class="num g">×1.5</td><td>克制对方任一属性，攻击伤害提升 50%</td></tr>
+        <tr><td>互不相干</td><td class="num">×1.0</td><td>属性中性</td></tr>
+        <tr><td class="r">防方克攻方</td><td class="num r">×0.7</td><td>被对方任一属性克制，攻击伤害下降 30%</td></tr>
+        <tr><td style="color:#ffd966">含「无」属性</td><td class="num g">×1.0</td><td>混沌灵根免疫一切五行克制</td></tr>
+      </tbody>
+    </table>
+
+    <h3>多属性策略</h3>
+    <p>属性越多 → 越容易克制对手 / 越难被反克。</p>
+    <p>属性越少（如单灵根） → 修炼倍率高，但战斗时容易被克。<b>用倍率换可控性</b>是核心权衡。</p>
+
+    <div class="info">
+      <div class="h">攻 击 属 性 选 择 算 法</div>
+      战斗中系统会自动从你的属性中挑选最优攻击属性：<br>
+      ① 优先选择能克制对手属性的；② 否则取第一个属性；③ 无属性则按中性结算。
+    </div>
+  </section>
+
+  <!-- 4.6 隐藏支线 -->
+  <section id="hidden">
+    <h2>六、隐 藏 支 线 · 废 灵 根 逆 袭</h2>
+    <p class="lead">看似最垃圾的「废灵根」，藏着全游戏最强的成长路线 —— <b>混沌灵根 ×5.0</b>。</p>
+
+    <h3>四步飞升流程</h3>
+    <div class="flow">
+      <div class="node">① 开局抽到<br>废灵根</div><span class="arrow">→</span>
+      <div class="node jade">② 历练时<br>觉醒「无属之体」</div><span class="arrow">→</span>
+      <div class="node jade">③ 集齐「逆天改命丹」<br>+「鸿蒙古玉」</div><span class="arrow">→</span>
+      <div class="node gold">④ 服丹合体<br>混沌灵根 ×5.0</div>
+    </div>
+
+    <h3>关键事件 / 道具</h3>
+    <table>
+      <thead><tr><th>名称</th><th>触发条件</th><th>作用</th></tr></thead>
+      <tbody>
+        <tr><td class="b">疯癫老道</td><td>废灵根角色历练</td><td>赠予「逆天改命丹」</td></tr>
+        <tr><td class="b">绝境道经</td><td>废灵根角色历练 × 未觉醒</td><td>觉醒「无属之体」标记</td></tr>
+        <tr><td class="b">上古遗迹</td><td>已觉醒无属之体 × 未持玉</td><td>获得「鸿蒙古玉」</td></tr>
+        <tr><td class="g">逆天改命丹</td><td>必须三件齐备</td><td>触发蜕变 → 混沌灵根 ×5.0</td></tr>
+        <tr><td class="g">鸿蒙古玉</td><td>蜕变引子</td><td>共鸣消耗品</td></tr>
+      </tbody>
+    </table>
+
+    <div class="warn">
+      <div class="h">误 用 后 果</div>
+      非废灵根服用「逆天改命丹」会受到 50~150 点反噬伤害，丹药也会消失。
+      废灵根但未觉醒/无玉时服用，丹药白白浪费。
+    </div>
+
+    <h3>混沌灵根特性</h3>
+    <ul>
+      <li>修炼倍率 <b style="color:#ffd966">×5.0</b>（全游戏最高）</li>
+      <li>属性 = 「无」，<b>免疫所有五行克制</b>，受击与输出永远 ×1.0</li>
+      <li>自动变身奖励：气血上限 +200，攻击力 +30</li>
+      <li>不再受奇遇影响，灵根永久固定</li>
+    </ul>
+    <div class="info">
+      <div class="h">设 计 立 意</div>
+      废灵根 = 「无」= 道之始；从「天资最差」走向「无入有间」的极致逆袭，
+      是修仙叙事中常见的「无字真经」「废柴爽文」母题，也是本作最大彩蛋。
+    </div>
+  </section>
+
+  <!-- 5 -->
+  <section id="realm">
+    <h2>七、境 界 体 系</h2>
+    <p class="lead">从凡人到仙人共 21 阶。每次突破：气血上限提升、寿元延长、攻击增长。</p>
+
+    <div class="realm-list" id="realm-list"></div>
+
+    <div class="info">
+      <div class="h">突 破 收 益</div>
+      <div>气血上限 +50 + 境界×20 ｜ 攻击 +5 + 境界×2 ｜ 寿元 +30 + 境界×10 年（小幅累积，不再跳到境界上限） ｜ 本命法宝温养 +1 级</div>
+    </div>
+  </section>
+
+  <!-- 7.5 寿元 -->
+  <section id="lifespan">
+    <h2>八、寿 元 体 系（ 中 度 硬 核 ）</h2>
+    <p class="lead">本作采用<b style="color:var(--red)">中度硬核</b>寿元：突破仅小幅延寿，高阶神通施放折寿，渡劫失败大损寿元，须靠<b style="color:#ffe6b4">蟠桃 / 万年灵芝精 / 九转还魂丹</b>主动续命，寿元真正成为后期稀缺资源。</p>
+
+    <h3>寿元增减来源</h3>
+    <table>
+      <thead><tr><th>来源</th><th>类型</th><th>数值</th><th>说明</th></tr></thead>
+      <tbody>
+        <tr><td>初始</td><td class="g">+</td><td class="num">80 年</td><td>16 岁入道，凡人寿元 80</td></tr>
+        <tr><td>突破成功</td><td class="g">+</td><td class="num">+30 + 境界×10</td><td>例：练气一 +30；金丹九 +120；化神 +180</td></tr>
+        <tr><td>蟠桃</td><td class="g">+</td><td class="num">+30 年</td><td>坊市 8,000 灵石；秘境 1% 掉</td></tr>
+        <tr><td class="j">万年灵芝精</td><td class="g">+</td><td class="num">+120 年</td><td>坊市 50,000；秘境 0.5%；可炼制</td></tr>
+        <tr><td class="r">九转还魂丹</td><td class="g">+</td><td class="num">+500 年</td><td>仅秘境 0.1% / 炼制（需蟠桃 + 九叶玄参）</td></tr>
+        <tr><td>元婴神雷</td><td class="r">−</td><td class="num">−5 年/次</td><td>每次施放折寿</td></tr>
+        <tr><td>化神一念</td><td class="r">−</td><td class="num">−20 年/次</td><td>每次施放折寿</td></tr>
+        <tr><td>大乘法相</td><td class="r">−</td><td class="num">−50 年/次</td><td>每次施放折寿</td></tr>
+        <tr><td class="r">渡劫失败</td><td class="r">−</td><td class="num">−(200+雷数×15)</td><td>折后 ≤0 真坐化；&gt;0 重伤退出（hp=1，劫消可再渡）</td></tr>
+      </tbody>
+    </table>
+
+    <h3>核心规则</h3>
+    <div class="warn">
+      <div class="h">机 制 要 点</div>
+      · 寿元剩余 < 折寿值时，高阶神通禁止施放（防止意外暴毙）。<br>
+      · 寿元剩余 ≤ 10 年时，红字一次性警告（不送资源），回升 ≥ 30 年后可再次警告。<br>
+      · 渡劫失败先扣寿元；扣完仍有阳寿则重伤退出，下次能再渡；扣完无阳寿则真坐化。<br>
+      · 每 360 天年龄 +1 岁；闭关 3~21 日，历练 3 日 / 次；时间紧迫感不变。<br>
+      · 后期高阶神通是双刃剑：威力越大代价越大，玩家须权衡战斗收益与寿元消耗。
+    </div>
+  </section>
+
+  <!-- 8 天劫 -->
+  <section id="tribulation">
+    <h2>九、天 劫 系 统</h2>
+    <p class="lead">突破至<b style="color:#ffe6b4">大境界</b>时触发天劫，玩家需选择应对策略扛过多道天雷，失败即陨。</p>
+    <table>
+      <thead><tr><th>劫名</th><th>触发境界</th><th>雷数</th><th>单道伤害</th><th>备注</th></tr></thead>
+      <tbody>
+        <tr><td class="b">筑基雷劫</td>      <td>筑基初期</td> <td class="num">3</td> <td class="num">40~80</td> <td>入门考验</td></tr>
+        <tr><td class="b">金丹心魔劫</td>    <td>金丹初期</td> <td class="num">5</td> <td class="num">80~150</td> <td>五雷轰顶 · 心魔偕来</td></tr>
+        <tr><td class="j">元婴阴阳劫</td>    <td>元婴初期</td> <td class="num">7</td> <td class="num">150~280</td> <td>阴阳颠倒</td></tr>
+        <tr><td class="j">化神九天劫</td>    <td>化神期</td>   <td class="num">9</td> <td class="num">280~500</td> <td>九道神雷</td></tr>
+        <tr><td class="g">大乘仙劫</td>      <td>大乘期</td>   <td class="num">11</td><td class="num">500~900</td> <td>粉身碎骨</td></tr>
+        <tr><td class="g">渡劫期雷劫</td>    <td>渡劫期</td>   <td class="num">13</td><td class="num">900~1600</td><td>洗髓伐毛</td></tr>
+        <tr><td style="color:#ffe6b4">飞升仙劫</td><td>仙人</td>      <td class="num">15</td><td class="num">1600~3000</td><td>登仙与否在此一劫</td></tr>
+      </tbody>
+    </table>
+    <h3>三种应对策略</h3>
+    <table>
+      <thead><tr><th>操作</th><th>减伤</th><th>消耗</th></tr></thead>
+      <tbody>
+        <tr><td class="r">硬抗此雷</td><td class="num">0%</td><td>仅拼血量</td></tr>
+        <tr><td class="j">服丹护体</td><td class="num">30%</td><td>消耗一枚回血丹药并回血</td></tr>
+        <tr><td class="g">祭出法宝</td><td class="num">50% + 法宝等级</td><td>需持有本命法宝</td></tr>
+      </tbody>
+    </table>
+    <div class="formula">
+      实际伤害 = 随机[下限,上限] × 应对减伤倍率 × (1 - 灵根倍率×5% - 破障丹加成) - 防御×0.3
+    </div>
+    <div class="warn">
+      <div class="h">死 亡 即 结 束</div>
+      任一天劫期间血量归零 → 角色陨落，存档清除。建议天劫前备齐破障丹、回元丹、本命法宝。
+    </div>
+  </section>
+
+
+  <!-- 6 -->
+  <section id="tech">
+    <h2>八、功 法 体 系</h2>
+    <p class="lead">功法影响修炼速度（修为获取倍率）与战斗攻击。可通过历练拾得「功法残篇」更换。</p>
+    <table>
+      <thead><tr><th>功法</th><th>修炼倍率</th><th>攻击加成</th><th>评语</th></tr></thead>
+      <tbody>
+        <tr><td>引气诀</td><td class="num">×1.0</td><td class="num">+0</td><td>最基础的入门功法</td></tr>
+        <tr><td class="b">玄阴真经</td><td class="num">×1.3</td><td class="num">+5</td><td>阴寒入骨，修为大进</td></tr>
+        <tr><td class="r">烈阳剑诀</td><td class="num">×1.2</td><td class="num">+12</td><td>至阳剑意，攻伐犀利</td></tr>
+        <tr><td class="j">九转玄功</td><td class="num">×1.6</td><td class="num">+8</td><td>古老传承，威力无穷</td></tr>
+        <tr><td class="g">太上忘情</td><td class="num">×2.0</td><td class="num">+15</td><td>传说仙诀，斩断七情</td></tr>
+      </tbody>
+    </table>
+    <div class="info">
+      <div class="h">替 换 规 则</div>
+      只有当新功法的「修炼倍率」高于当前功法时，系统才会询问是否更换；劣质残篇直接弃用。
+    </div>
+  </section>
+
+  <!-- 神通 -->
+  <section id="skill">
+    <h2>十 一、神 通 术 法</h2>
+    <p class="lead">境界达到对应门槛时自动解锁神通，战斗中点「施展神通」消耗修为施展。</p>
+    <table>
+      <thead><tr><th>神通</th><th>解锁境界</th><th>耗修为</th><th>效果</th></tr></thead>
+      <tbody>
+        <tr><td class="g">剑气斩</td>   <td>练气一层</td><td class="num">30</td>   <td>伤害 ×1.8</td></tr>
+        <tr><td class="b">五行遁术</td> <td>练气六层</td><td class="num">50</td>   <td>90% 逃跑</td></tr>
+        <tr><td class="r">烈焰咒</td>   <td>筑基初期</td><td class="num">100</td>  <td>火系伤害 ×2.5</td></tr>
+        <tr><td class="b">玄冰诀</td>   <td>筑基初期</td><td class="num">100</td>  <td>水系伤害 ×2.5</td></tr>
+        <tr><td class="j">护体罡气</td> <td>筑基后期</td><td class="num">80</td>   <td>下次受伤 -50%</td></tr>
+        <tr><td class="j">归元术</td>   <td>筑基后期</td><td class="num">0</td>    <td>回 40% 气血</td></tr>
+        <tr><td class="g">金丹真解</td> <td>金丹初期</td><td class="num">300</td>  <td>伤害 ×3.5</td></tr>
+        <tr><td class="g">元婴神雷</td> <td>元婴初期</td><td class="num">800</td>  <td>伤害 ×5</td></tr>
+        <tr><td style="color:#ffe6b4">化神一念</td><td>化神期</td><td class="num">2000</td>  <td>伤害 ×8</td></tr>
+        <tr><td style="color:#ffe6b4">大乘法相</td><td>大乘期</td><td class="num">5000</td>  <td>伤害 ×15</td></tr>
+      </tbody>
+    </table>
+    <div class="info">
+      <div class="h">使 用 要 领</div>
+      神通以修为为弹药，对高血量怪物 / 天劫 / 秘境 BOSS 尤其有效。<br>
+      修为过低时无法施展；施展后怪物仍会反击一次。
+    </div>
+  </section>
+
+  <!-- 装备 -->
+  <section id="equip">
+    <h2>十 二、装 备 体 系</h2>
+    <p class="lead">右侧面板「装备」页有四个槽位 + 独立本命法宝槽。装备可通过坊市购买、秘境掉落、宗门兑换获取。</p>
+    <table>
+      <thead><tr><th>槽位</th><th>作用</th><th>代表装备</th></tr></thead>
+      <tbody>
+        <tr><td class="g">兵 器</td>  <td>+攻击 / +五行</td>          <td>青铜剑 → 诛仙古剑</td></tr>
+        <tr><td class="j">护 甲</td>  <td>+防御 / +气血上限</td>       <td>牛皮甲 → 紫金战铠</td></tr>
+        <tr><td class="b">饰 品</td>  <td>+修炼速度 / +道心</td>       <td>聚灵玉佩 → 太上玉符</td></tr>
+        <tr><td class="b">遁 具</td>  <td>+遁逃率 / 兼 +攻</td>        <td>黄风舟 → 九霄凤羽</td></tr>
+      </tbody>
+    </table>
+    <div class="formula">
+      总攻击 = 基础攻击 + 功法加成 + 境界×5 + 所有装备攻击 + 法宝攻击（基础 + 成长×等级）<br>
+      总防御 = 基础防御 + 所有装备防御<br>
+      修炼速度 = 灵根 × 功法 × (1 + ΣΣ装备修炼加成)
+    </div>
+  </section>
+
+  <!-- 本命法宝 -->
+  <section id="relic">
+    <h2>十 三、本 命 法 宝</h2>
+    <p class="lead">独立于装备栏的「本命槽」，祭炼后长期温养：<b style="color:#ffe6b4">每次突破自动升 1 级</b>，攻击随等级成长。</p>
+    <table>
+      <thead><tr><th>法宝</th><th>基础攻击</th><th>成长/级</th><th>特殊</th></tr></thead>
+      <tbody>
+        <tr><td class="j">青竹小剑</td> <td class="num">30</td>  <td class="num">+10</td>  <td>朴素启蒙</td></tr>
+        <tr><td class="b">阴阳镜</td>   <td class="num">80</td>  <td class="num">+25</td>  <td>被动 -10% 受伤</td></tr>
+        <tr><td class="g">九曜神幡</td> <td class="num">200</td> <td class="num">+60</td>  <td>附带五行轮转</td></tr>
+        <tr><td class="g">万剑诀图</td> <td class="num">500</td> <td class="num">+150</td> <td>所有攻击 +30%</td></tr>
+        <tr><td style="color:#ffe6b4">混沌葫芦</td><td class="num">1500</td><td class="num">+500</td><td>混沌流专属传说</td></tr>
+      </tbody>
+    </table>
+    <div class="formula">
+      祭炼代价 = 1000 灵石 + 法宝本身（背包消耗）<br>
+      法宝总攻击 = 基础 + 成长 × 已突破次数<br>
+      天劫时「祭出法宝」 减伤 = 50% + 法宝被动 + min(30%, 等级 × 2%)
+    </div>
+    <div class="warn">
+      <div class="h">替 换 重 置</div>
+      替换本命法宝将损失当前温养等级，请谨慎选择。
+    </div>
+  </section>
+
+  <!-- 炼丹 -->
+  <section id="alchemy">
+    <h2>十 四、炼 丹 系 统</h2>
+    <p class="lead">采集灵草，按配方炼制丹药。本作采用<b style="color:var(--red)">凡人流硬核</b>设定：基础成功率偏低、有爆炉反伤、有极品产出。</p>
+    <h3>灵草表</h3>
+    <table>
+      <thead><tr><th>灵草</th><th>品阶</th><th>坊市基础价</th><th>用途</th></tr></thead>
+      <tbody>
+        <tr><td class="g">聚灵草</td><td class="num">1</td><td class="num">5</td><td>基础丹方主料</td></tr>
+        <tr><td class="r">凝血花</td><td class="num">1</td><td class="num">8</td><td>疗伤丹方</td></tr>
+        <tr><td class="b">破障花</td><td class="num">2</td><td class="num">60</td><td>破障丹/筑基丹</td></tr>
+        <tr><td class="j">千年灵芝</td><td class="num">3</td><td class="num">250</td><td>筑基/金丹料</td></tr>
+        <tr><td class="g">万年玄参</td><td class="num">4</td><td class="num">1000</td><td>金丹/元婴料</td></tr>
+        <tr><td style="color:#ffe6b4">九叶玄参</td><td class="num">5</td><td class="num">4000</td><td>化神丹主料</td></tr>
+        <tr><td class="g">蟠桃（天材地宝）</td><td class="num">★</td><td class="num">8000</td><td>延寿 +30 年；坊市/秘境产出，不可炼制</td></tr>
+      </tbody>
+    </table>
+    <h3>配方表（节选）</h3>
+    <table>
+      <thead><tr><th>丹药</th><th>配方</th><th>基础成功率</th></tr></thead>
+      <tbody>
+        <tr><td>聚气丹</td>   <td>聚灵草×2</td>                <td class="num">85%</td></tr>
+        <tr><td>金创药</td>   <td>凝血花×2</td>                <td class="num">90%</td></tr>
+        <tr><td class="b">凝神丹</td>   <td>聚灵草×3 + 凝血花×1</td><td class="num">75%</td></tr>
+        <tr><td class="j">破障丹</td>   <td>破障花×2 + 千年灵芝×1</td><td class="num">50%</td></tr>
+        <tr><td class="j">筑基丹</td>   <td>千年灵芝×1 + 破障花×1</td><td class="num">45%</td></tr>
+        <tr><td class="g">金丹玉露</td> <td>万年玄参×1 + 千年灵芝×2</td><td class="num">35%</td></tr>
+        <tr><td style="color:#ffe6b4">化神丹</td>   <td>九叶玄参×1 + 万年玄参×2</td><td class="num">25%</td></tr>
+        <tr><td class="j">万年灵芝精</td> <td>万年玄参×3 + 千年灵芝×5</td><td class="num">25%</td></tr>
+        <tr><td class="r">九转还魂丹</td> <td>九叶玄参×2 + 万年玄参×5 + 蟠桃×1</td><td class="num">15%</td></tr>
+      </tbody>
+    </table>
+    <div class="formula">
+      实际成功率 = 配方基础率 + 境界×1% + 炼丹等级×2%（上限 95%）<br>
+      滚动：成功 → 获丹（8% 概率极品 ×2）｜ 失败 → 废丹 ｜ 爆炉 → 受伤 20 + 境界×10
+    </div>
+    <div class="info">
+      <div class="h">炼 丹 等 级</div>
+      每成功炼制 10 次自动升 1 级（上限 Lv.5），永久提高成功率。可在「宗门·天机阁」换取高阶丹方。
+    </div>
+  </section>
+
+  <!-- 宗门 -->
+  <section id="sect">
+    <h2>十 五、宗 门 系 统</h2>
+    <p class="lead">加入宗门可领任务赚贡献点，以贡献兑换丹药、装备、法宝、功法。</p>
+    <table>
+      <thead><tr><th>宗门</th><th>风格</th><th>加入修为</th><th>备注</th></tr></thead>
+      <tbody>
+        <tr><td class="g">青云门</td>   <td>正道剑修</td>   <td class="num">200</td>   <td>剑修圣地</td></tr>
+        <tr><td class="j">万兽谷</td>   <td>兽修</td>       <td class="num">100</td>   <td>门槛最低</td></tr>
+        <tr><td class="b">玄阴宗</td>   <td>阴柔杀伐</td>   <td class="num">300</td>   <td>擅毒擅计</td></tr>
+        <tr><td class="g">天机阁</td>   <td>炼丹炼器</td>   <td class="num">800</td>   <td>可换丹方</td></tr>
+        <tr><td style="color:#ffe6b4">大衍宗</td>   <td>仙道正宗</td> <td class="num">2000</td>  <td>传说门派</td></tr>
+      </tbody>
+    </table>
+    <h3>任务类型</h3>
+    <table>
+      <thead><tr><th>任务</th><th>要求</th><th>奖励</th></tr></thead>
+      <tbody>
+        <tr><td>伐妖任务</td>   <td>斩杀妖兽 ×3</td>         <td>贡献+30 / 修为+100</td></tr>
+        <tr><td>采药任务</td>   <td>献上聚灵草 ×5</td>       <td>贡献+50 / 修为+150</td></tr>
+        <tr><td>护山任务</td>   <td>闭关 30 天护山</td>       <td>贡献+60 / 修为+300</td></tr>
+        <tr><td>秘境探索</td>   <td>通关一次秘境</td>         <td>贡献+120 / 修为+800</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- 坊市 -->
+  <section id="market">
+    <h2>十 六、坊 市 交 易</h2>
+    <p class="lead">以灵石买卖物品。物价随玩家境界上浮（每境界 +5%），出售价为基础价的 50%。</p>
+    <div class="info">
+      <div class="h">可 交 易 物 品</div>
+      <ul style="margin:0">
+        <li>丹药：聚气/凝神/筑基/金创/回元/破障/五行淬体/洗髓</li>
+        <li>灵草：聚灵草/凝血花/破障花/千年灵芝/万年玄参/九叶玄参</li>
+        <li>装备：青铜剑、玄铁剑、赤炎刀、牛皮甲、乌金甲、聚灵玉佩、黄风舟等</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- 秘境 -->
+  <section id="dungeon">
+    <h2>十 七、秘 境 副 本</h2>
+    <p class="lead">按境界开放的多层秘境。逐层与妖兽战斗，通关后给修为/灵石/丹药；<b style="color:#ffe6b4">首通额外赠一件本命法宝</b>。</p>
+    <table>
+      <thead><tr><th>秘境</th><th>开放境界</th><th>层数</th><th>修为</th><th>灵石</th><th>首通法宝</th></tr></thead>
+      <tbody>
+        <tr><td class="g">青木秘境</td>   <td>≥3</td><td class="num">3</td><td class="num">300</td>     <td class="num">100</td>    <td>青竹小剑</td></tr>
+        <tr><td class="b">玄冰谷</td>     <td>≥6</td><td class="num">4</td><td class="num">1200</td>    <td class="num">500</td>    <td>阴阳镜</td></tr>
+        <tr><td class="r">炎魔窟</td>     <td>≥10</td><td class="num">5</td><td class="num">5000</td>   <td class="num">2000</td>   <td>阴阳镜</td></tr>
+        <tr><td class="j">上古遗迹</td>   <td>≥13</td><td class="num">6</td><td class="num">15000</td>  <td class="num">8000</td>   <td>九曜神幡</td></tr>
+        <tr><td class="g">太古战场</td>   <td>≥16</td><td class="num">7</td><td class="num">50000</td>  <td class="num">30000</td>  <td>万剑诀图</td></tr>
+        <tr><td style="color:#ffe6b4">仙古墓</td>     <td>≥19</td><td class="num">9</td><td class="num">200000</td><td class="num">100000</td><td>混沌葫芦</td></tr>
+      </tbody>
+    </table>
+    <div class="warn">
+      <div class="h">秘 境 失 败</div>
+      秘境中战斗败北即退出，已走过的层数不保留。重入需从第一层开始。
+    </div>
+  </section>
+
+
+  <!-- 7 -->
+  <section id="cult">
+    <h2>九、修 炼 机 制</h2>
+    <h3>闭关时长（v2.1 随机化）</h3>
+    <table>
+      <thead><tr><th>闭关类型</th><th>天数</th><th>触发概率</th></tr></thead>
+      <tbody>
+        <tr><td>普 通 闭 关</td>     <td class="num">5 ~ 9 天</td>   <td class="num">50%</td></tr>
+        <tr><td class="b">短 闭 关</td>   <td class="num">3 ~ 4 天</td>   <td class="num">25%</td></tr>
+        <tr><td class="j">长 闭 关</td>   <td class="num">10 ~ 14 天</td> <td class="num">17%</td></tr>
+        <tr><td class="g">大 闭 关</td>   <td class="num">15 ~ 21 天</td> <td class="num">8%</td></tr>
+      </tbody>
+    </table>
+
+    <h3>心 境 倍 率（每次闭关随机）</h3>
+    <table>
+      <thead><tr><th>心境</th><th>倍率</th><th>概率</th></tr></thead>
+      <tbody>
+        <tr><td class="r">心 浮 气 躁</td><td class="num r">×0.4</td><td class="num">5%</td></tr>
+        <tr><td class="r">心 神 不 宁</td><td class="num r">×0.7</td><td class="num">10%</td></tr>
+        <tr><td>心 平 气 和</td>          <td class="num">×1.0</td>  <td class="num">55%</td></tr>
+        <tr><td class="j">心 如 止 水</td><td class="num j">×1.3</td><td class="num">20%</td></tr>
+        <tr><td class="g">灵 台 清 明</td><td class="num g">×1.8</td><td class="num">8%</td></tr>
+        <tr><td style="color:#ffe6b4">天 人 合 一</td><td class="num" style="color:#ffe6b4">×3.0</td><td class="num">2%</td></tr>
+      </tbody>
+    </table>
+    <div class="info">
+      <div class="h">道 心 影 响 心 境</div>
+      道心 ≥ 90% 满值 → 心境倍率额外 ×1.1；道心 &lt; 50% → 倍率 ×0.8。<br>
+      闭关期间道心会自然恢复（每天 +1.5）。
+    </div>
+
+    <h3>闭关公式</h3>
+    <div class="formula">
+      修为收益 = Σ ( (10 + 境界×5) + 随机[-2, +4] ) × 心境倍率 × 道心修正<br>
+      最终入账 = 上式 × 灵根倍率 × 功法倍率 × 装备修炼加成
+    </div>
+
+    <h3>闭 关 异 事（约 25% ~ 60% 概率触发）</h3>
+    <p style="color:var(--muted);font-size:13px">天数越长、境界越高，触发概率越高。事件分五档：</p>
+    <table>
+      <thead><tr><th>类别</th><th>代表事件</th><th>效果</th></tr></thead>
+      <tbody>
+        <tr><td style="color:#ffe6b4">大 吉</td><td>梦中遇仙 / 灵气倒灌 / 五行融汇 / 参透真意</td>
+          <td>修为暴涨 15% / 道心圆满 / 多吸属性 / 永久 +5 攻</td></tr>
+        <tr><td class="j">中 吉</td><td>突生顿悟 / 日月精华 / 周天通畅 / 灵识出窍 / 道心通明</td>
+          <td>修为 +200~600 / 永久气血上限 +20 / 拾灵草灵石 / 道心恢复</td></tr>
+        <tr><td>中 性</td><td>风云不起 / 雷雨涤尘 / 野兽路过 / 故友入梦</td>
+          <td>无事 / 微量气血恢复 / 道心 ±15</td></tr>
+        <tr><td class="r">中 凶</td><td>心魔丛生 / 灵气紊乱 / 丹田淤塞</td>
+          <td>道心 -20+ / 修为 -5% / 受伤</td></tr>
+        <tr><td class="r" style="font-weight:bold">大 凶</td><td>走火入魔 / 外魔扰道 / 心魔化身</td>
+          <td>气血 -50% + 修为 -15% + 道心 -40 / 中断闭关进战斗 / 与心魔实体战</td></tr>
+      </tbody>
+    </table>
+    <div class="warn">
+      <div class="h">心 魔 化 身</div>
+      当道心低于 30% 时闭关，可能召出与你同境界的"心魔化身"——它的攻击 = 你的 60%，气血 = 你的全部。
+      若道心常年低迷，建议多做正向奇遇 / 在宗门换聚灵玉佩压制。
+    </div>
+
+    <h3>举例（练气一层 / 单灵根 / 引气诀 / 心如止水）</h3>
+    <div class="formula">
+      日均 ≈ (10+1×5) = 15  →  7 日 ≈ 105  →  ×1.3 心境 ×2.0 灵根 ≈ <span style="color:var(--gold)">273 修为 / 7 天</span>
+    </div>
+    <div class="info">
+      <div class="h">时 间 流 逝</div>
+      闭关 3~21 日不等；历练 1 次消耗 3 日。每 360 天年龄增长 1 岁，逼近寿元上限即坐化。突破不再大幅延寿、神通施放与渡劫失败均扣寿，<b style="color:var(--red)">必须主动寻得蟠桃 / 万年灵芝精续命，否则后期寿元紧张</b>。
+    </div>
+  </section>
+
+  <!-- 8 -->
+  <section id="breakthrough">
+    <h2>十、突 破 机 制</h2>
+    <h3>成功率公式</h3>
+    <div class="formula">
+      基础成功率 = 45% + 灵根倍率 × 5%<br>
+      若服用「破障丹」 + 25%<br>
+      最终封顶 95%
+    </div>
+    <h3>结果</h3>
+    <table>
+      <thead><tr><th>结果</th><th>变化</th></tr></thead>
+      <tbody>
+        <tr><td class="j">成功</td><td>境界 +1，气血回满 + 上限提升，攻击 +，寿元 +</td></tr>
+        <tr><td class="r">失败</td><td>受到 (30 + 境界×15) 点伤害，修为 ×0.7</td></tr>
+      </tbody>
+    </table>
+    <div class="warn">
+      <div class="h">风 险 提 示</div>
+      高境界突破失败的修为损失非常痛，临突破前务必备好「破障丹」与「回元丹」。
+    </div>
+  </section>
+
+  <!-- 9 -->
+  <section id="adventure">
+    <h2>十 一、奇 遇 事 件</h2>
+    <p class="lead">外出历练时 55% 概率触发奇遇，45% 概率遭遇妖兽战斗。</p>
+    <div class="cards" id="adv-list"></div>
+  </section>
+
+  <!-- 10 -->
+  <section id="battle">
+    <h2>十 二、战 斗 系 统</h2>
+    <h3>回合制流程</h3>
+    <div class="flow">
+      <div class="node">玩家行动</div><span class="arrow">→</span>
+      <div class="node">怪物存活?</div><span class="arrow">→</span>
+      <div class="node">怪物反击</div><span class="arrow">→</span>
+      <div class="node">玩家存活?</div><span class="arrow">↩</span>
+    </div>
+    <h3>三种行动</h3>
+    <table>
+      <thead><tr><th>行动</th><th>效果</th><th>公式</th></tr></thead>
+      <tbody>
+        <tr><td class="g">出剑攻击</td><td>对怪物造成伤害</td><td>攻击力 + 随机[-3, +6]</td></tr>
+        <tr><td class="j">嗑药回血</td><td>使用回血丹药 + 怪物反击一次</td><td>恢复量见物品表</td></tr>
+        <tr><td class="b">脚踏遁光</td><td>有概率成功逃离战斗</td><td>50% + (境界 - 怪物等级) × 5%</td></tr>
+      </tbody>
+    </table>
+    <h3>怪物伤害公式</h3>
+    <div class="formula">
+      实际伤害 = max(1, 怪物攻击 + 随机[-2, +4] - 玩家境界 × 2)
+    </div>
+    <h3>胜利掉落</h3>
+    <p>修为奖励 + 灵石奖励（见妖兽表）+ 25% 概率掉落随机丹药。</p>
+  </section>
+
+  <!-- 11 -->
+  <section id="monster">
+    <h2>十 三、妖 兽 图 鉴</h2>
+    <p class="lead">系统会根据玩家境界匹配可遭遇的妖兽（境界 +2 以内）。</p>
+    <table>
+      <thead><tr>
+        <th>名称</th><th>属性</th><th>等级要求</th><th>气血</th><th>攻击</th><th>修为奖励</th><th>灵石奖励</th>
+      </tr></thead>
+      <tbody id="monster-list"></tbody>
+    </table>
+  </section>
+
+  <!-- 12 -->
+  <section id="item">
+    <h2>十 四、物 品 图 鉴</h2>
+    <div class="cards" id="item-list"></div>
+  </section>
+
+  <!-- v4 道历 / 节气 / 节庆 -->
+  <section id="calendar">
+    <h2>十 五、道 历 · 节 气 · 节 庆（ v4 ）</h2>
+    <p class="lead">修真界采用 <b style="color:var(--gold)">紫微道历</b>：1 年 = 360 天 = 12 月 × 30 天 = 24 节气 × 15 天。立春当日为入道首日（紫微元年正月初一），无闰月。</p>
+
+    <h3>历法换算</h3>
+    <table>
+      <thead><tr><th>单位</th><th>天数</th><th>说明</th></tr></thead>
+      <tbody>
+        <tr><td>1 年</td><td class="num">360 天</td><td>春/夏/秋/冬 各 90 天</td></tr>
+        <tr><td>1 季</td><td class="num">90 天</td><td>含 6 个节气、3 个月</td></tr>
+        <tr><td>1 月</td><td class="num">30 天</td><td>每月 2 节气（如正月＝立春＋雨水）</td></tr>
+        <tr><td>1 节气</td><td class="num">15 天</td><td>360 ÷ 24 = 15 天</td></tr>
+        <tr><td>年龄推进</td><td class="num">每 360 天 +1 岁</td><td>16 岁入道为 0 天</td></tr>
+      </tbody>
+    </table>
+
+    <h3>节气被动 buff（节选）</h3>
+    <p style="color:#a89c7c;font-size:12px">同一节气期间持续 15 天，跨入下一节气自动切换。完整 24 节气表见游戏内『道历』面板。</p>
+    <table>
+      <thead><tr><th>节气</th><th>季</th><th>主要加成</th></tr></thead>
+      <tbody>
+        <tr><td class="g">立春</td><td>春</td><td>修炼 +20%、真元回复 +20%（万物始发）</td></tr>
+        <tr><td>惊蛰</td><td>春</td><td>攻击 +15%、暴击 +5%（春雷惊百虫）</td></tr>
+        <tr><td>春分</td><td>春</td><td>修炼 +15%、道心 +10%（阴阳和谐）</td></tr>
+        <tr><td>夏至</td><td>夏</td><td>攻击 +20%，但防御 -5%（火气至盛）</td></tr>
+        <tr><td class="r">大暑</td><td>夏</td><td>修炼 -15%、气血上限 -5%（酷暑蚀身）</td></tr>
+        <tr><td class="g">白露</td><td>秋</td><td>修炼 +20%、炼丹 +10%（最佳修炼时令）</td></tr>
+        <tr><td class="g">秋分</td><td>秋</td><td>修炼 +20%、真元 +10%（金气大盛）</td></tr>
+        <tr><td>霜降</td><td>秋</td><td>防御 +20%，攻击略减（万物收敛）</td></tr>
+        <tr><td class="j">冬至</td><td>冬</td><td><b>修炼 +30%</b>、真元 +20%（一阳复始，最佳闭关）</td></tr>
+        <tr><td>大寒</td><td>冬</td><td>气血上限 -5%、修炼 +5%（严寒蚀身）</td></tr>
+      </tbody>
+    </table>
+
+    <h3>节庆事件（手动触发）</h3>
+    <p>在节庆当日跨过该天，会弹出选项让玩家自由决断（参与/婉拒/独自闭关），不同选项导向不同收益与代价。</p>
+    <table>
+      <thead><tr><th>节庆</th><th>日期</th><th>典型选项 / 效果</th></tr></thead>
+      <tbody>
+        <tr><td>元旦</td>     <td>正月初一</td>  <td>庙会得灵石+修为 / 闭关大量修为</td></tr>
+        <tr><td>元宵</td>     <td>正月十五</td>  <td>祈福 +道心+修为 / 夜行得破障丹</td></tr>
+        <tr><td>上巳</td>     <td>三月初三</td>  <td>祓禊 +业力 / 踏青采灵草</td></tr>
+        <tr><td>端午</td>     <td>五月初五</td>  <td>雄黄护体 30 日 / 龙舟回血回修为</td></tr>
+        <tr><td>七夕</td>     <td>七月初七</td>  <td>乞巧 +道心+丹药 / 观星得大量修为</td></tr>
+        <tr><td>中元</td>     <td>七月十五</td>  <td>超度 +业力 / 夜行有得有失（高风险）</td></tr>
+        <tr><td class="g">中秋</td><td>八月十五</td><td>月华吐纳：大量修为+真元回半 / 团圆 道心圆满</td></tr>
+        <tr><td>重阳</td>     <td>九月初九</td>  <td>登高悟道 / 菊酒 30 日攻击 +10%</td></tr>
+        <tr><td>寒衣</td>     <td>十月初一</td>  <td>祭祖追思 +业力+修为</td></tr>
+        <tr><td>腊八</td>     <td>腊月初八</td>  <td>舍粥 +业力 / 领粥回血回真元</td></tr>
+        <tr><td>小年</td>     <td>腊月廿三</td>  <td>祭灶得破障丹/回元丹</td></tr>
+        <tr><td class="j">除夕</td><td>腊月三十</td><td><b>守岁打坐：海量修为 + 气血真元尽复</b> / 放爆竹得灵石</td></tr>
+      </tbody>
+    </table>
+
+    <h3>查阅</h3>
+    <p>顶部按钮 <code>📅 道历</code> 打开月历悬浮窗，可查看：</p>
+    <ul>
+      <li>当月日历（30 格，节气/节庆/今日不同高亮）</li>
+      <li>当前节气 buff 详情（修炼/攻防/真元/道心 等数值标签）</li>
+      <li>24 节气总览条（当前高亮）</li>
+      <li>未来 30 日节庆预告</li>
+    </ul>
+  </section>
+
+
+  <!-- 夙愿系统 v5 -->
+  <section id="quest">
+    <h2>十 六、夙 愿 系 统（ v5 ）</h2>
+    <p class="lead">修真路漫漫，无心结而行，似浮萍无根。<b style="color:var(--gold)">夙愿系统</b>为每一段修仙人生植入一桩贯穿全程的心结——从灭门之夜到道之尽头，5 个节点、3 种结局，让"为何而修"成为推进玩家前行的真正动力。</p>
+
+    <h3>设计目标</h3>
+    <table>
+      <thead><tr><th>痛点</th><th>夙愿系统的应对</th></tr></thead>
+      <tbody>
+        <tr><td>目标缺失（不知道为啥玩）</td><td>开局立愿，每个夙愿是一部微型修仙小说</td></tr>
+        <tr><td>决策稀薄（总在点继续）</td><td>每节点真二选一/三选一，选错有代价</td></tr>
+        <tr><td>叙事扁平（NPC 是工具人）</td><td>夙愿专属 NPC 与图鉴（仇人/恩人/挚爱），跨节点回响</td></tr>
+        <tr><td>风险缺位（赢输都没感觉）</td><td>硬核失败结局：道心崩塌直接道消</td></tr>
+        <tr><td>反馈贫瘠（升级没惊喜）</td><td>夙愿圆满给史诗级专属奖励（独一份的灵宝/功法）</td></tr>
+      </tbody>
+    </table>
+
+    <h3>开局立愿</h3>
+    <p>测灵根之后，弹「立下夙愿」抽 3 选 1（也可选「散修之道」暂不立愿）。可选的 6 大夙愿：</p>
+    <table>
+      <thead><tr><th>夙愿</th><th>调性</th><th>简介</th><th>状态</th></tr></thead>
+      <tbody>
+        <tr><td><b style="color:#d96a6a">🗡 血海深仇</b></td><td>复仇爽文</td><td>玄阴宗灭门，誓杀仇雠</td><td class="g">v5 完整实现</td></tr>
+        <tr><td>💔 寻仙故人</td><td>言情虐恋</td><td>青梅竹马失踪，誓寻归来</td><td class="b">占位</td></tr>
+        <tr><td>👑 问鼎天梯</td><td>热血争锋</td><td>登顶九州天梯榜第一</td><td class="b">占位</td></tr>
+        <tr><td>📜 求知证道</td><td>哲学探索</td><td>破解上古天道残篇</td><td class="b">占位</td></tr>
+        <tr><td>🏯 重振师门</td><td>经营养成</td><td>独力重建千年宗派</td><td class="b">占位</td></tr>
+        <tr><td>🐉 弑神逆天</td><td>黑暗逆天</td><td>天道弃子，誓改天命</td><td class="b">占位</td></tr>
+      </tbody>
+    </table>
+
+    <h3>血海深仇 · 5 节点结构</h3>
+    <table>
+      <thead><tr><th>节点</th><th>触发条件</th><th>抉择</th><th>典型奖惩</th></tr></thead>
+      <tbody>
+        <tr><td><b>一、灭门之夜</b></td><td>练气三层（idx ≥ 2）</td><td>拼死一搏 / 隐忍记名 / 假意投靠</td><td>觉醒血煞之体（10% 概率） / 仇人图鉴 / 潜伏者标记</td></tr>
+        <tr><td><b>二、坊市寻仇</b></td><td>筑基初期（idx ≥ 5）</td><td>当街索命 / 高价拍下 / 暗中跟踪</td><td>血煞令 + 修为 ×3000 / 真相之线</td></tr>
+        <tr><td><b>三、玄阴山门</b></td><td>金丹初期（idx ≥ 9）</td><td>屠山而上 / 一击必杀 / 暗渡陈仓</td><td>玄阴宗令 + 修为 ×8000~12000 / 蟠桃 / 折寿 20 年</td></tr>
+        <tr><td><b>四、真相之重</b></td><td>元婴初期（idx ≥ 12）</td><td>仇上加仇 / 放下屠刀 / 自立山门</td><td>锁定终局路径（slaughter / mercy / throne）</td></tr>
+        <tr><td><b>五、道之尽头</b></td><td>化神期（idx ≥ 15）</td><td>屠尽仇雠 / 归隐山林 / 执掌天监 / 道心崩塌</td><td>血煞噬天剑 / 太上忘情诀 + 寿元 +200 / 天监司印 + 分身符 / <b style="color:#d96a6a">道消</b></td></tr>
+      </tbody>
+    </table>
+
+    <h3>核心机制</h3>
+    <ul>
+      <li><b style="color:var(--gold)">夙愿值（questProgress）</b>：每完成一节点 +1，影响 UI 进度条</li>
+      <li><b style="color:var(--gold)">夙愿专属 flag（questFlags）</b>：bloodBody / spy / foeList / endingPath 等持久化标记，跨节点回响</li>
+      <li><b style="color:var(--gold)">仇人图鉴</b>：节点 1 选「隐忍记名」解锁，记录已知仇敌与已斩仇敌</li>
+      <li><b style="color:var(--gold)">硬核失败</b>：终局选错路径或选「道心崩塌」直接 P.hp = 0 → afterAction 接管 gameOver</li>
+      <li><b style="color:var(--gold)">境界门控</b>：节点严格按 realmIdx 触发，afterAction 中 checkQuestTrigger 扫描</li>
+      <li><b style="color:var(--gold)">优先级</b>：夙愿弹窗优先于节庆事件（剧情主线 > 周期性事件）</li>
+    </ul>
+
+    <h3>UI 入口</h3>
+    <ul>
+      <li>状态栏「🌙 夙愿」行：显示当前夙愿名 + 进度（点击打开面板）</li>
+      <li>主操作区「🌙 夙愿」按钮：随时查看夙愿录</li>
+      <li>夙愿录面板：剧情简介 + 进度条 + 节点列表（已完成 ✅ / 当前 🌙 / 未解锁 🔒）+ 仇人图鉴</li>
+    </ul>
+
+    <h3>自动模式兼容</h3>
+    <p>内置三个 autoHandler 自动接管夙愿弹窗：</p>
+    <ul>
+      <li><b>夙愿立愿</b>：开局/补抽时自动选第一个 available 夙愿</li>
+      <li><b>夙愿节点</b>：智能打分避免送死项（送死项 -100 / 终局按 endingPath 匹配 +100 / 信息收集 +30）</li>
+      <li><b>夙愿弹窗收尾</b>：关闭夙愿录与圆满弹窗</li>
+    </ul>
+
+    <h3>扩展接口（开发中）</h3>
+    <p>新增夙愿仅需在 <code>QUESTS</code> 中追加 <code>{ id, nm, intro, color, available:true, nodes:[...] }</code> 一项即可。每个 node 是 <code>{ idx, realm, title, desc, opts:[{nm, hint?, fn(p)}] }</code>。后续 5 个占位夙愿将在 v5.1 逐步铺满。</p>
+
+    <h3>存档兼容</h3>
+    <p>SAVE_VERSION 升至 4。新增字段 <code>quest / questProgress / questFlags / _questQueue</code> 全部在 loadGame 中做兜底，老存档可继续。老存档玩家进入游戏后将自动弹出「立下夙愿」窗，可立即立愿或选「散修之道」跳过。</p>
+  </section>
+
+
+  <!-- 经济系统再平衡 v6 -->
+  <section id="economy-v6">
+    <h2>十 七、经 济 再 平 衡（ v6 ）</h2>
+    <p class="lead">v6 是一次"经济系统大手术"。核心理念：<b style="color:var(--gold)">闭关修炼不再是万能钥匙</b>。每一项旁系系统（炼丹/秘境/宗门/坊市）都成为某个境界突破的<b style="color:var(--gold)">唯一来源</b>，逼迫玩家全栈使用游戏的所有玩法。</p>
+
+    <h3>1. 弹窗 BUG 修复</h3>
+    <p>问题：节庆/夙愿事件弹窗在玩家正在看其他界面（坊市/秘境/夙愿录）时被强行覆盖。</p>
+    <p>方案：新增 <code>schedulePump(fn)</code> 闸门 — 若当前已有弹窗显示，事件泵被压入 <code>_pendingPump</code>；用户关闭当前弹窗时 <code>closeModal</code> 自动重试。 <code>afterAction</code> 中所有"动作后异步触发"已切到 schedulePump。链式 onclick 不受影响。</p>
+
+    <h3>2. 装备数值再平衡</h3>
+    <p>EQUIP_META 全表数值 ×2.5，让装备真正改变战力。RELICS 法宝 base/grow ×2.5，强化"本命法宝"的存在感。</p>
+    <table>
+      <thead><tr><th>装备</th><th>v5 数值</th><th>v6 数值</th></tr></thead>
+      <tbody>
+        <tr><td>诛仙古剑</td><td>ling 280 / shen 150 / dao 100</td><td class="g">ling 700 / shen 380 / dao 250</td></tr>
+        <tr><td>紫金战铠</td><td>ti 280 / dao 80</td><td class="g">ti 700 / dao 200</td></tr>
+        <tr><td>九霄凤羽</td><td>shen 120 / ling 50 / yun 30</td><td class="g">shen 300 / ling 130 / yun 75</td></tr>
+        <tr><td>万剑诀图（法宝）</td><td>base 500 / grow 150 / dmg+30%</td><td class="g">base 1200 / grow 400 / dmg+50%</td></tr>
+      </tbody>
+    </table>
+
+    <h3>3. 雷劫硬核化</h3>
+    <ul>
+      <li><b style="color:#d96a6a">硬扛 tribBoltRaw</b>：每道雷永久折损 <b>1 点道行</b>（永久根骨损失，影响后续防御与真元）；通关后若硬扛比例 ≥70%，额外 -30 道心</li>
+      <li><b style="color:#7fc7a3">服丹 tribBoltPill</b>：消耗丹药回血 + 减伤 30%</li>
+      <li><b style="color:#d4b46a">法宝 tribBoltRelic</b>：减伤 50%~100%；通关后若法宝抗雷 ≥50% → <b>采得【天劫真血】×N</b>（合体期及以上突破必需），额外法宝温养 +1 级</li>
+    </ul>
+    <p>结果：硬扛不再是无脑最优解，玩家有动力购置法宝并主动用法宝渡劫。</p>
+
+    <h3>4. 突破五维化（核心改造）</h3>
+    <p>checkBreakthroughGate 在 <code>actBreakthrough</code> 入口检查必需品；不满足直接弹窗拒绝。</p>
+    <table>
+      <thead><tr><th>突破至</th><th>realmIdx</th><th>必需品 / 软门槛</th><th>独家来源</th></tr></thead>
+      <tbody>
+        <tr><td>筑基</td><td class="num">5</td><td>装备 ≥2 件（否则 -10%~-30% 成功率）</td><td>坊市 / 奇遇</td></tr>
+        <tr><td>金丹</td><td class="num">9</td><td><b style="color:#d96a6a">金丹 ×1（消耗）</b></td><td>炼丹（破障花×2 + 千年灵芝×3 + 万年玄参×1）/ 宗门贡献 2000 / 坊市 12000 灵石</td></tr>
+        <tr><td>元婴</td><td class="num">12</td><td><b style="color:#d96a6a">本命法宝（温养 ≥ Lv2）</b></td><td>秘境首通独家 / 宗门贡献商店 / 法宝祭炼丹 +1 级</td></tr>
+        <tr><td>化神</td><td class="num">15</td><td><b style="color:#d96a6a">道行 ≥ 30</b></td><td>宗门任务（每完成 +1~5）/ 夙愿节点（+5~20）/ 秘境通关（+1~3）/ 悟道茶 / 罕见悟道事件</td></tr>
+        <tr><td>合体期</td><td class="num">17</td><td><b style="color:#d96a6a">天劫真血 ×1</b></td><td>用本命法宝抗雷渡过天劫（≥50% 雷以法宝抵挡）</td></tr>
+        <tr><td>大乘期</td><td class="num">18</td><td><b style="color:#d96a6a">天劫真血 ×2</b></td><td>同上</td></tr>
+        <tr><td>渡劫期</td><td class="num">19</td><td><b style="color:#d96a6a">天劫真血 ×3</b></td><td>同上</td></tr>
+        <tr><td>仙人</td><td class="num">20</td><td><b style="color:#d96a6a">天劫真血 ×5</b></td><td>同上</td></tr>
+      </tbody>
+    </table>
+    <p style="color:#d96a6a">⚠ 天劫真血<b>无法</b>从坊市购买，是 v6 经济系统中"最稀缺资源"。它强迫玩家在化神之后，每次渡劫都不得不使用法宝抗雷——彻底解决"硬扛无所谓"的问题。</p>
+
+    <h3>5. 配套产出链调整</h3>
+    <ul>
+      <li><b>炼丹</b> 新增配方：金丹 / 悟道茶 / 法宝祭炼丹（lv 3~4 阶）</li>
+      <li><b>宗门任务</b> 全部加 <code>dao</code> 字段（1~5 道行/任务）；新增「参悟道经」任务（60 天 +5 道行）</li>
+      <li><b>宗门贡献商店</b> 加：悟道茶 300 贡 / 法宝祭炼丹 600 贡 / 金丹 2000 贡</li>
+      <li><b>秘境通关</b> 给永久道行（1 + need/4）</li>
+      <li><b>坊市</b> 加金丹 12000 灵石 / 悟道茶 1500 / 法宝祭炼丹 3000（高价兜底，不卖天劫真血）</li>
+      <li><b>奇遇事件</b> 新增 3 条罕见悟道事件（古松/溪水/悟道茶谱）</li>
+    </ul>
+
+    <h3>6. Roguelike 飞升（endgame）</h3>
+    <p>到达"仙人"（idx=20）触发飞升流程，独立于 gameOver。本周目数据写入 <code>localStorage["xiuxian_lineage"]</code>（独立 key，不被存档清除影响）。</p>
+    <h4>转世传承机制</h4>
+    <ul>
+      <li><b style="color:#7fc7a3">本命法宝传承</b>：飞升时记录当前法宝 + 温养 ×0.3，新周目 newPlayer 自动装备</li>
+      <li><b style="color:#7fc7a3">起手道行</b>：累计 daoSum / 10（上限 +20）— 加速化神门槛</li>
+      <li><b style="color:#7fc7a3">起手灵石</b>：每次飞升 +50 灵石</li>
+      <li><b style="color:#7fc7a3">转世福袋</b>：飞升 1 次 → 悟道茶；2 次 → 金丹；3 次 → 天劫真血</li>
+      <li><b style="color:#7fc7a3">灵根重抽</b>：每次飞升 +2 次免费重抽（在测灵根弹窗）</li>
+      <li><b style="color:#7fc7a3">仙缘事迹</b>：保留最近 9 次飞升的修仙日志（暂未 UI 化，未来扩展）</li>
+    </ul>
+    <h4>飞升弹窗内容</h4>
+    <p>展示本周目所有成就（道号、灵根、修行天数、终境、夙愿圆满状态、道行/业力/击杀、本命法宝），转世传承预览（累计飞升次数、新增传承条目）。点击「入轮回」即清档 + bootstrap 重新开始。</p>
+
+    <h3>7. 老存档兼容</h3>
+    <p>SAVE_VERSION 升至 5。新增字段 <code>lineage</code> 在 loadGame 兜底；EQUIP_META 数值变化对老档自动生效（recalcStats 重算）；旧档突破到 idx≥9 时若无金丹会被门控拦截，需先到丹房/坊市补一颗金丹（这是预期行为，不算 bug）。</p>
+  </section>
+
+
+  <!-- 灵宠契约系统 v6.2 -->
+  <section id="pet-system">
+    <h2>十 八、灵 宠 契 约 系 统（ v6.2 ）</h2>
+    <p class="lead">每个修真者都有"第二个成长对象"——灵宠。妖兽不再只是修为来源，更是与你并肩作战的伙伴。<b style="color:var(--gold)">收服 → 喂养 → 升级 → 协战 → 进化</b>，在闭关之外开辟一条全新的养成线。</p>
+
+    <h3>核心字段</h3>
+    <table>
+      <thead><tr><th>字段</th><th>含义</th></tr></thead>
+      <tbody>
+        <tr><td><code>P.pets</code></td><td>已签约灵宠列表，每只独立 lv/exp/hp/loyalty</td></tr>
+        <tr><td><code>P.activePet</code></td><td>当前出战灵宠 key（同时只能 1 只出战）</td></tr>
+        <tr><td><code>P.petDex</code></td><td>妖兽图鉴：所有击败过的妖兽计数</td></tr>
+        <tr><td><code>PETS_META</code></td><td>12 种灵宠定义（8 种妖兽 + 4 种专属蛋）</td></tr>
+        <tr><td><code>PET_SKILLS</code></td><td>11 种灵宠神通效果（伤害倍率 / 回血 / 护盾 / 无视五行等）</td></tr>
+      </tbody>
+    </table>
+
+    <h3>1. 灵宠收服</h3>
+    <p>战斗胜利触发：<code>tryCapturePrompt(monsterName)</code> 在 <code>endBattle(true)</code> 中检查 <code>PETS_META[m.name]</code> 存在且玩家未达签约上限时弹出「契约之缘」窗。</p>
+    <table>
+      <thead><tr><th>影响因素</th><th>修正</th></tr></thead>
+      <tbody>
+        <tr><td>基础概率</td><td>普通 30% / 稀有 8~18% / 史诗 3~5% / 传说 2% / 神话 0（专属蛋）</td></tr>
+        <tr><td>怪物末血</td><td>HP &lt; 30% 时每点低 1% 加 1.66% 概率</td></tr>
+        <tr><td>道行加成</td><td>每 50 道行 +5%（上限 +30%）</td></tr>
+        <tr><td>业力修正</td><td>≥+50 善业 +5%；≤-50 恶业 -10%</td></tr>
+      </tbody>
+    </table>
+    <p>签约上限：<code>1 + Math.floor(realmIdx/5)</code> 只 — 凡人 1 / 筑基 2 / 金丹 2 / 元婴 3 / 化神 4 …</p>
+
+    <h3>2. 灵宠图鉴（12 种）</h3>
+    <table>
+      <thead><tr><th>名</th><th>稀有度</th><th>来源</th><th>五行</th><th>神通</th></tr></thead>
+      <tbody>
+        <tr><td>黑风狼</td><td>普通</td><td>击败妖兽 30%</td><td>木</td><td>—</td></tr>
+        <tr><td>赤焰狐</td><td>普通</td><td>击败妖兽 25%</td><td>火</td><td>火尾扫</td></tr>
+        <tr><td>玄铁蟒</td><td>稀有</td><td>击败妖兽 18%</td><td>金</td><td>金鳞缠</td></tr>
+        <tr><td>血煞傀儡</td><td>稀有</td><td>击败妖兽 10%</td><td>火</td><td>血煞掌</td></tr>
+        <tr><td>筑基妖修</td><td>稀有</td><td>击败妖兽 8%</td><td>水</td><td>妖息冲</td></tr>
+        <tr><td>化形蛟龙</td><td>史诗</td><td>击败妖兽 5%</td><td>水</td><td>水龙吟</td></tr>
+        <tr><td>元婴傀儡</td><td>史诗</td><td>击败妖兽 3%</td><td>土</td><td>地脉吼</td></tr>
+        <tr><td>剑灵</td><td>传说</td><td>击败散修剑仙 2%</td><td>金</td><td>剑气回旋（200%）</td></tr>
+        <tr><td>青鸾雏</td><td>史诗</td><td>青木秘境/玄冰谷 蛋</td><td>木</td><td>凤鸣（回 10% 血+5% 蓝）</td></tr>
+        <tr><td>玄武灵</td><td>史诗</td><td>炎魔窟 蛋</td><td>水</td><td>玄龟息（套护盾）</td></tr>
+        <tr><td>九尾天狐</td><td>传说</td><td>上古遗迹 蛋</td><td>火</td><td>九尾焚天（220%）</td></tr>
+        <tr><td>混沌兽</td><td>神话</td><td>太古战场/仙古墓 蛋</td><td>无</td><td>混沌一击（300% 无视五行）</td></tr>
+      </tbody>
+    </table>
+
+    <h3>3. 战斗参与（全自动）</h3>
+    <ul>
+      <li><b style="color:#7fc7a3">协攻</b>：玩家普攻 / 神通后，<code>petAssistAttack()</code> 自动出手一次。伤害 = <code>(petAtk - mDef*0.2) × skillMul × 五行修正</code></li>
+      <li><b style="color:#7fc7a3">分担伤害</b>：怪物攻击玩家时，<code>petSoakDamage()</code> 自动拦截 30% 伤害（在所有玩家减伤之前）</li>
+      <li><b style="color:#d96a6a">力竭</b>：灵宠 hp ≤ 0 时归位（不死亡），扣 10 忠诚</li>
+      <li><b style="color:#d96a6a">低忠诚</b>：忠诚 &lt; 30 时切换出战有 50% 概率拒绝；忠诚归 0 → 灵宠彻底离去</li>
+    </ul>
+
+    <h3>4. 喂养升级</h3>
+    <p>灵宠等级上限 = 玩家境界 idx（凡人 1 → 仙人 20）。每级所需经验 = <code>lv*lv*100</code>。</p>
+    <table>
+      <thead><tr><th>食材</th><th>经验</th><th>忠诚</th></tr></thead>
+      <tbody>
+        <tr><td>聚灵草</td><td class="num">5</td><td class="num">+1</td></tr>
+        <tr><td>凝血花</td><td class="num">5</td><td class="num">+3</td></tr>
+        <tr><td>破障花</td><td class="num">30</td><td class="num">+2</td></tr>
+        <tr><td>千年灵芝</td><td class="num">80</td><td class="num">+5</td></tr>
+        <tr><td>万年玄参</td><td class="num">300</td><td class="num">+8</td></tr>
+        <tr><td>九叶玄参</td><td class="num">1500</td><td class="num">+15</td></tr>
+        <tr><td>聚气丹/凝神丹/筑基丹</td><td class="num">30/80/300</td><td class="num">+1~2</td></tr>
+        <tr><td>金丹（暴殄天物）</td><td class="num">1500</td><td class="num">+30</td></tr>
+      </tbody>
+    </table>
+
+    <h3>5. 专属灵宠蛋</h3>
+    <p>秘境首通除法宝外，有 <b style="color:var(--gold)">50%</b> 概率掉落对应稀有蛋（按秘境等级递进）：</p>
+    <table>
+      <thead><tr><th>秘境</th><th>蛋</th><th>孵化境界要求</th></tr></thead>
+      <tbody>
+        <tr><td>青木秘境 / 玄冰谷</td><td>青鸾蛋 → 青鸾雏</td><td>≥ 筑基</td></tr>
+        <tr><td>炎魔窟</td><td>玄武蛋 → 玄武灵</td><td>≥ 金丹</td></tr>
+        <tr><td>上古遗迹</td><td>天狐蛋 → 九尾天狐</td><td>≥ 元婴</td></tr>
+        <tr><td>太古战场 / 仙古墓</td><td>混沌蛋 → 混沌兽</td><td>≥ 化神</td></tr>
+      </tbody>
+    </table>
+    <p>孵化耗费 7 天，背包点击灵宠蛋触发（icon: 🥚）。孵化后进入起名流程。</p>
+
+    <h3>6. UI / 自动模式</h3>
+    <ul>
+      <li>右侧第 4 个 Tab「🐉 灵宠」：出战卡片（HP/EXP 进度条 + 喂养/归位按钮）+ 已签灵宠列表 + 妖兽图鉴</li>
+      <li>切换出战 / 放归 / 喂养弹窗均在面板内完成</li>
+      <li>3 个内置 autoHandler：「灵宠收服」「灵宠起名」「灵宠面板收尾」 → 全自动模式无缝兼容</li>
+    </ul>
+
+    <h3>7. 存档兼容</h3>
+    <p>SAVE_VERSION 升至 6。新增字段 <code>pets / activePet / petDex</code> 在 loadGame 兜底，老档自动迁移不丢角色。</p>
+
+    <h3>8. 下一轮（v6.3）规划</h3>
+    <ul>
+      <li>灵宠进化：lv 满 + 特定材料 → 形态变更（黑风狼 → 风灵狼 → 凌风狼君）</li>
+      <li>道侣协同：道侣系统上线后，灵宠可与道侣的灵宠组合 buff</li>
+      <li>图鉴成就：集齐 N 种灵宠解锁主角特殊 buff</li>
+    </ul>
+  </section>
+
+
+  <!-- 玩家形象系统 v6.4 -->
+  <section id="portrait-system">
+    <h2>十 九、玩 家 形 象 系 统（ v6.4 ）</h2>
+    <p class="lead">每个修真者都是独一无二的。v6.4 引入<b style="color:var(--gold)">数据驱动的 SVG 矢量形象</b>——8 大维度共同决定玩家外观，21 阶境界累计可组合出数十亿种不同画像。单文件零依赖，完全矢量可缩放。</p>
+
+    <h3>核心设计：1 张模板 × 多维参数 = 无数组合</h3>
+    <p>不采用「21 张预制 SVG」的笨办法，而是以 <code>buildPortraitSvg(P, size)</code> 为单一入口，按当前 P 状态动态合成。</p>
+    <table>
+      <thead><tr><th>维度</th><th>来源</th><th>视觉表现</th></tr></thead>
+      <tbody>
+        <tr><td>境界阶次</td><td>realmIdx (0~20)</td><td>压缩为 tier 0~7：姿态/服饰/坐垫/头冠繁简升级；子阶 0~3 决定装饰数量</td></tr>
+        <tr><td>灵根稀有度</td><td>ROOTS[rootName].rare</td><td>光环色（废→灰 / 天→玉绿 / 混沌→彩金）</td></tr>
+        <tr><td>五行首属性</td><td>P.elements[0]</td><td>衣袍主色（金→白黄 / 木→青碧 / 水→碧蓝 / 火→朱红 / 土→褐黄）</td></tr>
+        <tr><td>本命法宝</td><td>P.relic</td><td>身右悬浮小图标（🗡️ 青竹小剑 / 🪞 阴阳镜 / 🎌 九曜神幡 / ⚔️ 万剑诀图 / 🏺 混沌葫芦）</td></tr>
+        <tr><td>出战灵宠</td><td>P.activePet</td><td>脚边小宠物 emoji（🐺/🦊/🐉/🐢/🌀 …）</td></tr>
+        <tr><td>业力</td><td>P.karma</td><td>≥ +50 金光外溢，≤ -50 黑雾缠身（虚线脉动）</td></tr>
+        <tr><td>道心</td><td>P.dx / P.maxDx</td><td>神态三态：安详（≥85%）/ 端肃（≥50%）/ 凝重（&lt;50%）</td></tr>
+        <tr><td>夙愿</td><td>P.quest</td><td>背景纹路：剑影（复仇）/ 花瓣（寻仙）/ 王座（问鼎）/ 卷轴（求知）/ 山门（重振）/ 锁链（弑神）</td></tr>
+      </tbody>
+    </table>
+
+    <h3>境界形象分段（按 tier 渲染差异）</h3>
+    <table>
+      <thead><tr><th>tier</th><th>境界</th><th>头饰</th><th>坐垫</th><th>飘带</th><th>特效</th></tr></thead>
+      <tbody>
+        <tr><td>0</td><td>凡人</td><td>散发</td><td>无</td><td>无</td><td>仅 1 层光环</td></tr>
+        <tr><td>1</td><td>练气一~九层</td><td>简单发髻 + 木簪</td><td>蒲团</td><td>无</td><td>2 层光环</td></tr>
+        <tr><td>2</td><td>筑基初~大圆满</td><td>同上</td><td>蒲团</td><td>有（双侧飘带）</td><td>3 层光环</td></tr>
+        <tr><td>3</td><td>金丹初~后期</td><td>玉冠</td><td>莲台</td><td>有</td><td>4 层光环</td></tr>
+        <tr><td>4</td><td>元婴初~后期</td><td>玉冠</td><td>莲台</td><td>有</td><td>4 层光环</td></tr>
+        <tr><td>5</td><td>化神~合体</td><td>通天冠</td><td>莲台</td><td>有</td><td>5 层光环 + 头顶天光柱</td></tr>
+        <tr><td>6</td><td>大乘~渡劫</td><td>通天冠</td><td>莲台</td><td>有</td><td>同上</td></tr>
+        <tr><td>7</td><td>仙人</td><td>仙冠</td><td>莲台</td><td>有</td><td>头顶真灵环 + 天光柱</td></tr>
+      </tbody>
+    </table>
+
+    <h3>动画</h3>
+    <ul>
+      <li>光环脉动：每层独立周期，3~5 秒一次呼吸，由 <code>SMIL &lt;animate&gt;</code> 驱动，零 JS 开销</li>
+      <li>飘带飞舞：tier ≥ 2 双侧飘带 4 秒一摆</li>
+      <li>法宝悬浮：法宝图标 2.5 秒透明度呼吸</li>
+      <li>善业金光 / 恶业黑雾：4 秒脉动</li>
+      <li>仙人真灵环：3 秒椭圆横向缩放</li>
+    </ul>
+
+    <h3>UI 入口</h3>
+    <ul>
+      <li><b>小头像</b>：左侧状态面板顶部 120×120 圆形，点击展开形象录</li>
+      <li><b>形象录弹窗</b>：左大图 200×200 + 右侧 8 维度解读（境界/灵根/五行/法宝/灵宠/业力/道心/夙愿）</li>
+      <li><b>实时刷新</b>：每次 refresh() 自动重绘；突破/突破/换法宝/换灵宠/业力变化/立夙愿都会立即反映</li>
+    </ul>
+
+    <h3>技术细节</h3>
+    <ul>
+      <li>入口函数：<code>buildPortraitSvg(p, size)</code> 纯函数，返回 SVG 字符串</li>
+      <li>参数提取：<code>portraitParams(p)</code> 从 P 上抽取 8 维参数</li>
+      <li>辅助：<code>shadeColor(hex, percent)</code> 颜色变暗，用于衣袍描边</li>
+      <li>衣袍描边色：robeColor × -25% HSL 处理</li>
+      <li>不改存档格式，不升 SAVE_VERSION，纯展示系统</li>
+    </ul>
+
+    <h3>扩展预留</h3>
+    <p>SVG 模板是数据驱动的，后续可无侵入扩展：</p>
+    <ul>
+      <li>道侣系统上线 → 形象录里并排绘制道侣画像</li>
+      <li>多灵宠战场 → 脚边显示多只 emoji</li>
+      <li>混沌灵根 → 光环加特殊"混沌"渐变</li>
+      <li>飞升演出 → 全屏大图 + 额外光效</li>
+    </ul>
+  </section>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  <!-- 13 -->
+  <section id="auto">
+    <h2>十 五、自 动 托 管</h2>
+    <p class="lead">挂机系统支持「自动闭关」「自动历练 + 自动战斗」两种模式。</p>
+    <h3>速度档位</h3>
+    <table>
+      <thead><tr><th>档位</th><th>间隔</th><th>适用</th></tr></thead>
+      <tbody>
+        <tr><td>缓</td><td class="num">1500 ms</td><td>边看叙事边修炼</td></tr>
+        <tr><td>中</td><td class="num">700 ms</td><td>默认平衡</td></tr>
+        <tr><td>疾</td><td class="num">250 ms</td><td>速通刷数值</td></tr>
+        <tr><td>3x</td><td class="num">233 ms</td><td>以中档为基准的三倍速</td></tr>
+        <tr><td>5x</td><td class="num">140 ms</td><td>以中档为基准的五倍速，极限挂机</td></tr>
+      </tbody>
+    </table>
+    <h3>自动战斗 AI 决策树</h3>
+    <div class="flow">
+      <div class="node">每回合</div><span class="arrow">→</span>
+      <div class="node jade">血量 ≤ 30% 或 一击致死?</div><span class="arrow">→ 是</span>
+      <div class="node">有回血药 → 嗑药</div>
+    </div>
+    <div class="flow">
+      <span style="color:var(--muted);font-size:12px">否则 →</span>
+      <div class="node jade">25 回合打不死?</div><span class="arrow">→ 是</span>
+      <div class="node">脚踏遁光逃跑</div>
+    </div>
+    <div class="flow">
+      <span style="color:var(--muted);font-size:12px">否则 →</span>
+      <div class="node gold">出剑攻击</div>
+    </div>
+    <h3>自动停止条件</h3>
+    <ul>
+      <li>修为达到下一境界门槛 → 提示玩家手动突破</li>
+      <li>气血不足且无回血丹药 → 保命停下</li>
+      <li>玩家死亡 → 立即停止并结算</li>
+    </ul>
+
+    <h3>v6.3 · 弹窗暂停（全暂停模式）</h3>
+    <p>自动循环（autoTick / autoBattleStep / loopTick）每 tick 头部检测 <code>isModalShowing()</code>，若有弹窗显示中：</p>
+    <ul>
+      <li><b style="color:#d4b46a">暂停所有自动动作</b>（不闭关、不历练、不战斗、不嗑药）</li>
+      <li>状态栏显示：<code>⏸ 自动闭关（待您决断）</code></li>
+      <li>玩家点选项 / 关闭弹窗 → <code>closeModal</code> 自动刷新状态栏</li>
+      <li>下一次 tick（700ms 内）自然恢复自动行为</li>
+    </ul>
+    <p>覆盖的弹窗类型（全部暂停）：节庆事件、夙愿节点、灵宠收服契约、灵宠起名、突破/渡劫破障丹询问、拜入宗门、宗门任务、坊市/秘境/道历查看、道基未稳门控、存档迁移提示、闭关异事、奇遇事件等。</p>
+    <p>原 v4 引入的智能 <code>modalResolver</code> + <code>customHandlers</code>（夙愿打分 / 节庆打分 / 灵宠收服等）<b style="color:#a89c7c">不再被自动循环主动调用</b>，仅保留代码以便开发期手动调试（<code>DEV._internal.modalResolver(P)</code>）。</p>
+  </section>
+
+  <!-- 14 -->
+  <section id="save">
+    <h2>十 六、存 档 机 制</h2>
+    <table>
+      <thead><tr><th>项</th><th>说明</th></tr></thead>
+      <tbody>
+        <tr><td>存储介质</td><td>浏览器 <code>localStorage</code></td></tr>
+        <tr><td>存储键名</td><td><code>xiuxian_save</code></td></tr>
+        <tr><td>触发时机</td><td>每次行动结束后自动写入；亦可手动「存档玉简」</td></tr>
+        <tr><td>战斗状态</td><td>不持久化，避免读档异常</td></tr>
+        <tr><td>角色死亡</td><td>自动清除存档</td></tr>
+      </tbody>
+    </table>
+    <div class="warn">
+      <div class="h">注 意 事 项</div>
+      清理浏览器数据 / 切换浏览器 / 切换无痕模式都会丢失存档；当前未提供导入导出功能。
+    </div>
+  </section>
+
+  <!-- 15 -->
+  <section id="tech-stack">
+    <h2>十 七、技 术 栈</h2>
+    <table>
+      <thead><tr><th>层级</th><th>实现</th></tr></thead>
+      <tbody>
+        <tr><td>结构</td><td>原生 HTML（单文件，无构建）</td></tr>
+        <tr><td>样式</td><td>原生 CSS（CSS 变量、Grid、Flex、深色古风主题）</td></tr>
+        <tr><td>逻辑</td><td>原生 JavaScript（无依赖、无打包）</td></tr>
+        <tr><td>存档</td><td>localStorage + JSON 序列化</td></tr>
+        <tr><td>动画</td><td>CSS @keyframes（飘雾、按钮闪烁、进度条过渡）</td></tr>
+      </tbody>
+    </table>
+    <div class="info">
+      <div class="h">设 计 取 舍</div>
+      刻意选择零依赖单文件方案：用户只需双击 HTML 即可游玩，便于分享、备份、修改。
+      代价是无热更新、无模块化，文件体积较大。
+    </div>
+  </section>
+
+  <!-- 16 -->
+  <section id="roadmap">
+    <h2>十 八、未 来 规 划</h2>
+    <div class="cards">
+      <div class="card"><div class="name">道侣 NPC <span class="tag b">P1</span></div>
+        <div class="desc">羁绊系统，双修加速、共渡天劫。</div></div>
+      <div class="card"><div class="name">灵宠契约 <span class="tag g">✓</span></div>
+        <div class="desc">v6.2 已实装。战斗收服/喂养升级/忠诚系统/灵宠神通/图鉴/专属蛋/出战协攻+分担伤害。详见「灵宠契约系统」一章。</div></div>
+      <div class="card"><div class="name">灵田洞府 <span class="tag b">P1</span></div>
+        <div class="desc">种植灵草产出离线收益，洞府可自建阵法。</div></div>
+      <div class="card"><div class="name">心魔劫 QTE <span class="tag b">P1</span></div>
+        <div class="desc">金丹/化神前需过心魔关，选择题式推进。</div></div>
+      <div class="card"><div class="name">名望因果 <span class="tag">P2</span></div>
+        <div class="desc">行善恶影响奇遇走向，排行榜系统。</div></div>
+      <div class="card"><div class="name">存档导入导出 <span class="tag">P2</span></div>
+        <div class="desc">JSON 文件导出，便于备份与跨设备。</div></div>
+      <div class="card"><div class="name">音效与 BGM <span class="tag">P2</span></div>
+        <div class="desc">古风背景乐 + 突破雷鸣音效。</div></div>
+      <div class="card"><div class="name">v2 已完成 <span class="tag g">✓</span></div>
+        <div class="desc">天劫系统、凡人流寿元、炼丹、宗门、坊市、秘境、装备栏、本命法宝、10 种神通。</div></div>
+    </div>
+  </section>
+
+  </main>
+</div>
+
+<footer>
+  © 凡 人 修 仙 路 · 项 目 白 皮 书 · 持 续 演 化 中
+</footer>
+
+<script>
+/* —— 与游戏数据保持一致 —— */
+const REALMS = [
+  ["凡人",0],["练气一层",100],["练气三层",300],["练气六层",700],["练气九层",1200],
+  ["筑基初期",2000],["筑基中期",3500],["筑基后期",5500],["筑基大圆满",8000],
+  ["金丹初期",12000],["金丹中期",18000],["金丹后期",26000],
+  ["元婴初期",40000],["元婴中期",60000],["元婴后期",90000],
+  ["化神期",140000],["炼虚期",220000],["合体期",340000],
+  ["大乘期",520000],["渡劫期",800000],["仙人",1200000],
+];
+const REALM_GROUPS = [
+  ["凡 人 期",   [0,0]],
+  ["练 气 期",   [1,4]],
+  ["筑 基 期",   [5,8]],
+  ["金 丹 期",   [9,11]],
+  ["元 婴 期",   [12,14]],
+  ["化 神 ~ 大 乘", [15,18]],
+  ["渡 劫 · 仙",  [19,20]],
+];
+const ITEMS = {
+  "聚气丹":{type:"丹药",cult:50, desc:"+50 修为"},
+  "凝神丹":{type:"丹药",cult:150,desc:"+150 修为"},
+  "筑基丹":{type:"丹药",cult:500,desc:"+500 修为"},
+  "金创药":{type:"丹药",hp:50,  desc:"恢复 50 气血"},
+  "回元丹":{type:"丹药",hp:200, desc:"恢复 200 气血"},
+  "破障丹":{type:"丹药",luck:25,desc:"突破时 +25% 成功率"},
+  // —— 真元丹（v4） ——
+  "聚灵丹":{type:"丹药",mp:60, desc:"恢复 60 真元"},
+  "玄元丹":{type:"丹药",mp:200,desc:"恢复 200 真元"},
+  "紫府丹":{type:"丹药",mp:500,desc:"恢复 500 真元"},
+  "灵石":  {type:"货币",desc:"修真界通用货币"},
+  "五行淬体丹":{type:"奇物",desc:"服用后吸收一种五行属性"},
+  "洗髓丹":    {type:"奇物",desc:"洗去一种灵根属性"},
+  "逆天改命丹":{type:"奇物",desc:"传说神物——废灵根专属"},
+  "鸿蒙古玉":  {type:"奇物",desc:"上古鸿蒙之气，与无属之体共鸣"},
+};
+const ELE_COLOR = {"金":"#d4b46a","木":"#7fc7a3","水":"#7ab0d4","火":"#d96a6a","土":"#c9a872"};
+const MONSTERS = [
+  ["黑风狼",   "木", 0,  30,   5,  20,  5],
+  ["赤焰狐",   "火", 3,  80,   10, 60,  15],
+  ["玄铁蟒",   "金", 6,  200,  20, 150, 40],
+  ["血煞修士", "火", 9,  400,  35, 300, 80],
+  ["筑基妖修", "水", 12, 800,  55, 600, 200],
+  ["化形蛟龙", "水", 15, 2000, 90, 1500,500],
+  ["元婴老怪", "土", 18, 5000, 150,4000,1200],
+  ["散修剑仙", "金", 20, 10000,250,9000,3000],
+];
+const ADVS = [
+  {n:"老者授法",   t:"山间偶遇白发老者，他看你骨骼清奇，传你一道口诀。", e:"修为 +50~200"},
+  {n:"洞府得丹",   t:"你发现一处隐秘洞府，洞中有一小瓶丹药。",       e:"聚气丹 ×1~3"},
+  {n:"溪边拾石",   t:"溪边洗剑，捡到几块灵石。",                    e:"灵石 ×5~30"},
+  {n:"雷劫淬体",   t:"天降惊雷，你被劈得外焦里嫩……不过似乎打通了一处经脉。", e:"-30HP / 修为 +80"},
+  {n:"赠丹之礼",   t:"救下落难修士，他赠你一枚回元丹后离去。",        e:"回元丹 ×1"},
+  {n:"古墓功法",   t:"古墓深处，看到一卷功法残篇。",                e:"可能更换功法"},
+  {n:"误踏险地",   t:"不慎踩中阵法，被传送到险地，险些殒命！",         e:"-20~80HP"},
+  {n:"顿悟天机",   t:"紫气东来三万里，你心有所感，闭目顿悟。",         e:"修为 +200~600"},
+  {n:"仙姑相赠",   t:"山神庙中，仙姑微微一笑，赠你一枚破障丹。",       e:"破障丹 ×1"},
+  {n:"千年灵芝",   t:"药园中采到千年灵芝，炼制成筑基丹！",            e:"筑基丹 ×1"},
+  {n:"五行灵泉",   t:"误入五行灵泉，灵气倒灌而入……",                e:"灵根吸收一种属性"},
+  {n:"五行淬体丹", t:"得『五行淬体丹』一枚！",                       e:"奇物 ×1"},
+  {n:"洗髓灵丹",   t:"古井深处一枚洗髓丹，似可重塑灵根。",            e:"奇物 ×1"},
+  {n:"灵气紊乱",   t:"天地异象骤起，你周身灵气紊乱……",              e:"灵根属性变化"},
+  {n:"纯阳天雷",   t:"被一道纯阳天雷劈中，灵根隐有质变之兆！",         e:"-50~150HP / 15% 异变"},
+  {n:"疯癫老道（隐藏）", t:"老道塞给你一枚漆黑丹药……『大道无形，废即是无』。", e:"逆天改命丹 ×1（限废灵根）"},
+  {n:"绝境道经（隐藏）", t:"你于绝境中默念道经，竟生出『无属之体』的玄妙感悟！", e:"觉醒『无属之体』（限废灵根）"},
+  {n:"鸿蒙古玉（隐藏）", t:"上古遗迹深处，温润古玉飞入怀中。",          e:"鸿蒙古玉 ×1（限觉醒后）"},
+];
+
+/* —— 渲染境界 —— */
+const realmList = document.getElementById("realm-list");
+const max = REALMS[REALMS.length-1][1];
+REALM_GROUPS.forEach(([gname,[a,b]])=>{
+  const g = document.createElement("div");
+  g.className="group";g.textContent=gname;
+  realmList.appendChild(g);
+  for(let i=a;i<=b;i++){
+    const [name,th] = REALMS[i];
+    const row=document.createElement("div");
+    row.className="row";
+    row.innerHTML=`
+      <div class="idx">${i}</div>
+      <div class="name">${name}</div>
+      <div class="bar"><i style="width:${Math.max(2,th/max*100)}%"></i></div>
+      <div class="num">${th.toLocaleString()}</div>`;
+    realmList.appendChild(row);
+  }
+});
+
+/* —— 渲染奇遇 —— */
+const advList = document.getElementById("adv-list");
+ADVS.forEach(a=>{
+  const c=document.createElement("div");
+  c.className="card";
+  c.innerHTML=`
+    <div class="name">${a.n}</div>
+    <div class="desc">${a.t}</div>
+    <dl><dt>效果</dt><dd>${a.e}</dd></dl>`;
+  advList.appendChild(c);
+});
+
+/* —— 渲染妖兽 —— */
+const monsterTbody = document.getElementById("monster-list");
+MONSTERS.forEach(([n,ele,lvl,hp,atk,cr,sr])=>{
+  const tr=document.createElement("tr");
+  tr.innerHTML=`
+    <td class="g">${n}</td>
+    <td><span style="color:${ELE_COLOR[ele]||'#fff'};border:1px solid currentColor;padding:1px 6px;border-radius:3px">${ele}</span></td>
+    <td class="num">境界 ≥ ${lvl}</td>
+    <td class="num">${hp.toLocaleString()}</td>
+    <td class="num">${atk}</td>
+    <td class="num j">+${cr.toLocaleString()}</td>
+    <td class="num">+${sr.toLocaleString()}</td>`;
+  monsterTbody.appendChild(tr);
+});
+
+/* —— 渲染物品 —— */
+const itemList = document.getElementById("item-list");
+Object.entries(ITEMS).forEach(([name,info])=>{
+  const c=document.createElement("div");
+  c.className="card";
+  let tagCls = "";
+  if(info.type==="货币") tagCls="b";
+  else if(info.type==="奇物") tagCls="r";
+  else if(info.cult) tagCls="g";
+  else if(info.hp)   tagCls="j";
+  else if(info.luck) tagCls="r";
+  c.innerHTML=`
+    <div class="name">${name} <span class="tag ${tagCls}">${info.type}</span></div>
+    <div class="desc">${info.desc}</div>`;
+  itemList.appendChild(c);
+});
+</script>
+</body>
+</html>
