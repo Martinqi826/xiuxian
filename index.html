@@ -319,6 +319,7 @@
       <button data-tab="equip">⚔ 装备</button>
       <button data-tab="skill">✨ 神通</button>
       <button data-tab="pet">🐉 灵宠</button>
+      <button data-tab="partner">💞 道侣</button>
     </div>
 
     <div class="tab-pane active" id="pane-bag">
@@ -359,6 +360,14 @@
         击败妖兽有概率触发契约。出战灵宠每回合自动协攻并分担伤害；不出战每日恢复气血与忠诚。
       </div>
     </div>
+
+    <!-- v7 · 道侣面板 -->
+    <div class="tab-pane" id="pane-partner">
+      <div id="partner-list" style="font-size:12px"></div>
+      <div style="font-size:11px;color:#a89c7c;line-height:1.7;margin-top:8px">
+        道侣 NPC 系统：外出历练、闭关异事有概率相逢。好感 ≥30「相知」可双修加修为；≥60「道侣」；≥80 可共度天劫减伤 30%，三劫共度即结为「白首」。道侣有寿元，若不带她度劫，终将先你而去。
+      </div>
+    </div>
   </aside>
 </div>
 
@@ -372,7 +381,7 @@
 <script>
 /* ============ 数据 ============ */
 /* —— 存档版本号：变更后旧存档自动失效（清档重开） —— */
-const SAVE_VERSION = 6;
+const SAVE_VERSION = 7;
 
 /* ==========================================================
  *  v4 · 道历系统（修真界历法：360 天/年 = 12 月 × 30 天 = 24 节气 × 15 天）
@@ -819,6 +828,432 @@ const QUESTS = {
   restoration:{ id:"restoration",nm:"🏯 重 振 师 门", intro:"师门凋零，仅你一人。誓要重建千年宗派荣光。",                   flavor:"「门下千秋，皆系一身。」",            color:"#7ab0d4", available:false, nodes:[] },
   defiance:   { id:"defiance",   nm:"🐉 弑 神 逆 天", intro:"你发现自己竟是天道弃子，誓要改命斩天。",                       flavor:"「我命由我，不由天。」",              color:"#a85cd1", available:false, nodes:[] },
 };
+
+/* ============================================================
+ *   v7 · 道侣 NPC 系统（Partner）
+ *   "情之一字，磨人无数。"
+ *   - 8 位固定 NPC（性格/灵根/来历各异）
+ *   - 3 阶段关系：萍水（0~30）→ 相知（30~60）→ 道侣（60~100）→ 白首（共度天劫）
+ *   - 相遇：历练奇遇 5% / 闭关异事 3% / 夙愿节点联动
+ *   - 双修：消耗 7 天，按灵根+好感给修为 buff
+ *   - 共度天劫：好感 ≥ 80 可启用，减伤 30%，代价道侣寿元 -10 年
+ *   - 寿元：道侣本身有寿元线，会先你坐化（若不带她度劫）
+ *   - 同时仅 1 位"道侣"（60+ 好感），可有多位"相知"
+ * ============================================================ */
+const PARTNERS = {
+  "素青鸾": {
+    nm:"素青鸾", ele:"木", root:"双灵根",
+    tier:"sect",            // 出身：宗门弟子
+    color:"#7fc7a3",
+    intro:"青云宗剑修，性情冷淡，心中却藏有一缕执念。",
+    desc:"一袭青衫，剑眉星目，腰悬青霜剑。",
+    bgStory:"三百年前她的师兄为救百姓身陨，她誓要寻得当年真凶。",
+    meetLine:"「道友亦是修仙者？敢问师承何处。」",
+    initFondness: 15,
+    gifts:["聚灵草","千年灵芝","破障花"],    // 她喜欢的物品
+    hates:["人血","邪器"],
+    speciality:"cult+",      // 双修加成：修为
+    minRealm: 3,             // 最低可相遇境界（练气六层）
+  },
+  "温如玉": {
+    nm:"温如玉", ele:"水", root:"三灵根",
+    tier:"alchemy",          // 出身：丹师
+    color:"#7ab0d4",
+    intro:"天机阁丹师，温柔似水，笑时如春风化雨。",
+    desc:"淡蓝云纹长裙，发间一支碧玉簪，药香不散。",
+    bgStory:"孤儿出身，被天机阁长老收养，以丹道谋生。",
+    meetLine:"「你面色不佳，我赠你一枚凝神丹可好？」",
+    initFondness: 20,
+    gifts:["万年玄参","九叶玄参","蟠桃"],
+    hates:[],
+    speciality:"heal",       // 双修加成：回血+回蓝
+    minRealm: 5,
+  },
+  "玄阴姬": {
+    nm:"玄阴姬", ele:"火", root:"单灵根",
+    tier:"evil",             // 出身：邪修
+    color:"#d96a6a",
+    intro:"玄阴宗圣女，媚骨天成，手段狠辣。",
+    desc:"红衣胜火，妆容极艳，唇角一颗朱砂痣。",
+    bgStory:"玄阴宗主之女。若你夙愿为血海深仇，她会是你最复杂的一笔。",
+    meetLine:"「道友身上煞气不轻，妾身颇有几分心动。」",
+    initFondness: 30,
+    gifts:["血煞令","凝血花"],
+    hates:["舍粥济众"],       // 业力行为扣好感
+    speciality:"atk+",       // 双修加成：攻击力
+    minRealm: 8,
+    questHook:"revenge",     // 若玩家选了血海深仇夙愿 → 相遇事件不同
+  },
+  "墨白狐": {
+    nm:"墨白狐", ele:"火", root:"异变灵根",
+    tier:"demon",            // 出身：妖族化形
+    color:"#e8c97a",
+    intro:"九尾天狐化形的少女，爱贪玩、爱灵石。",
+    desc:"银发金眸，耳尖若有若无，眉心一点朱砂。",
+    bgStory:"自称九尾天狐之后，事实真假难辨。",
+    meetLine:"「呀——好浓的灵气！你身上的灵石给我一点好不好？」",
+    initFondness: 25,
+    gifts:["灵石","蟠桃","万年灵芝精"],
+    hates:[],
+    speciality:"yun+",       // 双修加成：气运（crit/dodge）
+    minRealm: 10,
+  },
+  "青霞仙子": {
+    nm:"青霞仙子", ele:"金", root:"天灵根",
+    tier:"immortal",         // 出身：飞升前的仙人
+    color:"#ffd966",
+    intro:"传说中的青霞派上一代掌门，早已飞升，有时下凡点化后辈。",
+    desc:"霓裳羽衣，不染尘埃，神情淡漠。",
+    bgStory:"仙人怜凡。若你悟性极高（dao ≥ 50），方有缘得见。",
+    meetLine:"「有缘。此间一别，或许千年后再会。」",
+    initFondness: 10,       // 初始冷淡
+    gifts:["天劫真血","九转还魂丹"],
+    hates:[],
+    speciality:"dao+",       // 双修加成：道行
+    minRealm: 15,
+    condDao: 50,            // 额外条件：道行 ≥ 50
+  },
+  "苏长青": {
+    nm:"苏长青", ele:"木", root:"双灵根",
+    tier:"wanderer",         // 出身：散修
+    color:"#c0a8d4",
+    intro:"一身粗布青衣的散修，豁达乐观，走到哪儿都是朋友。",
+    desc:"腰挂一只酒葫芦，剑背在身后，笑起来眼角有鱼尾纹。",
+    bgStory:"曾是大宗弟子，因看不惯宗门倾轧愤然离开。",
+    meetLine:"「同道？来，喝一杯。世道虽乱，心境自在便好。」",
+    initFondness: 35,
+    gifts:["聚气丹","回元丹","破障丹"],
+    hates:[],
+    speciality:"dx+",        // 双修加成：道心
+    minRealm: 4,
+  },
+  "陆青筠": {
+    nm:"陆青筠", ele:"土", root:"三灵根",
+    tier:"mortal",           // 出身：凡人
+    color:"#c9a872",
+    intro:"江南小镇的寻常女子，因你救下她全家而结下牵绊。",
+    desc:"粗布麻衣，眉清目秀，手上有常年劳作的痕迹。",
+    bgStory:"凡人寿命短暂。若不渡她登仙，你们终将生死相隔。",
+    meetLine:"「恩公……阿筠这辈子都记得您。」",
+    initFondness: 50,        // 救命之恩，起始高好感
+    gifts:["聚灵草","凝血花"],
+    hates:[],
+    speciality:"lifespan",   // 专属：可用你的修为渡她登仙
+    minRealm: 0,             // 凡人期就可能遇到
+    mortal:true,             // 凡人标记：寿元只有 60~80
+  },
+  "玉无缺": {
+    nm:"玉无缺", ele:"水", root:"单灵根",
+    tier:"rival",            // 出身：宿敌
+    color:"#7ab0d4",
+    intro:"名门正派剑修，与你亦敌亦友，切磋中互生情愫。",
+    desc:"白衣玉冠，持剑而立，剑眉入鬓。",
+    bgStory:"你们第一次见面是在天梯榜排位赛，他险胜半招。",
+    meetLine:"「又见面了。上次那一剑，你我都还记得。」",
+    initFondness: 20,
+    gifts:["诛仙古剑","青竹蜂云剑"],
+    hates:[],
+    speciality:"atk+",
+    minRealm: 9,
+  },
+};
+
+/* 关系阶段判定 */
+function partnerStage(fondness){
+  if(fondness >= 100) return {name:"白首", color:"#ffd966"};
+  if(fondness >= 60)  return {name:"道侣", color:"#d4b46a"};
+  if(fondness >= 30)  return {name:"相知", color:"#7fc7a3"};
+  return                    {name:"萍水", color:"#a89c7c"};
+}
+
+/* 创建一位新 partner（从 PARTNERS 模板实例化到 P.partners） */
+function createPartner(key){
+  const meta = PARTNERS[key]; if(!meta) return null;
+  // 寿元：凡人 60~80；普通道侣按灵根给
+  const baseLife = meta.mortal ? (60+Math.floor(Math.random()*20))
+    : ({"天灵根":800,"单灵根":500,"双灵根":400,"三灵根":300,"异变灵根":400,"混沌灵根":2000}[meta.root] || 250);
+  return {
+    key,
+    fondness: meta.initFondness || 10,   // 好感度 0~100
+    age: 16 + Math.floor(Math.random()*80),
+    lifespan: baseLife,
+    life0: baseLife,                      // 初始寿元（显示用）
+    memoryCnt: 0,                         // 共经历的事件数
+    lastMet: P ? (P.days||0) : 0,
+    flags: {},                            // 如 wedded / ascended / fallen
+    deceased: false,                      // 是否已陨落
+  };
+}
+
+/* 获取当前道侣（第一位 stage>="道侣" 的） */
+function primaryPartner(){
+  if(!P || !P.partners) return null;
+  for(const p of P.partners){
+    if(!p.deceased && p.fondness >= 60) return p;
+  }
+  return null;
+}
+
+/* 变更好感度（带上下限 + log） */
+function changeFondness(pt, delta, reason){
+  if(!pt || pt.deceased) return;
+  const before = pt.fondness|0;
+  pt.fondness = Math.max(0, Math.min(100, before + delta));
+  if(pt.fondness === before) return;
+  const meta = PARTNERS[pt.key];
+  const sign = delta>=0 ? "+" : "";
+  const cls  = delta>=0 ? "good" : "bad";
+  log(`【${meta.nm}】好感 ${before} → ${pt.fondness}（${sign}${delta}·${reason||""}）`, cls);
+  // 阶段跃迁提示
+  const bStage = partnerStage(before).name;
+  const aStage = partnerStage(pt.fondness).name;
+  if(bStage !== aStage){
+    log(`※ 你与【${meta.nm}】的关系已由「${bStage}」晋为「${aStage}」！`, "epic");
+  }
+}
+
+/* 触发：相遇一位新道侣 NPC（从 ADVS 或 CULT_EVENTS 调用） */
+function tryMeetPartner(forceKey){
+  if(!P) return;
+  P.partners = P.partners || [];
+  // 已有则跳过
+  const pool = Object.keys(PARTNERS).filter(k=>{
+    if((P.partners||[]).some(x=>x.key===k)) return false;        // 不重复相遇
+    const meta = PARTNERS[k];
+    if(P.realmIdx < (meta.minRealm||0)) return false;            // 境界未到
+    if(meta.condDao && (P.dao||0) < meta.condDao) return false; // 道行未到
+    // 业力相性：玄阴姬只在业力 ≤ 0 时出现，青霞仙子只在业力 ≥ 30 时出现
+    if(meta.tier==="evil"     && (P.karma||0) > 20) return false;
+    if(meta.tier==="immortal" && (P.karma||0) < 30) return false;
+    return true;
+  });
+  if(!pool.length){ log("天地广阔，却无缘人相逢。","hint"); return; }
+  const key = forceKey && pool.indexOf(forceKey)>=0 ? forceKey : pool[Math.floor(Math.random()*pool.length)];
+  const meta = PARTNERS[key];
+  const pt = createPartner(key);
+  P.partners.push(pt);
+  showModal(`
+    <h3 style="color:${meta.color}">💞 萍 水 相 逢</h3>
+    <p style="text-align:center;font-size:12px;color:#a89c7c;letter-spacing:2px">— 修 仙 路 漫 ， 有 人 同 行 —</p>
+    <div style="text-align:left;line-height:1.8">
+      <p><b style="color:${meta.color};font-size:15px">${meta.nm}</b>　<span style="color:#a89c7c;font-size:11px">（${meta.root}·${meta.ele}属·${meta.tier==="mortal"?"凡人":"修士"}）</span></p>
+      <p style="font-size:12px;color:#d6cfb8;margin-left:8px">${meta.desc}</p>
+      <p style="font-size:12px;color:#a89c7c;font-style:italic;margin-left:8px">${meta.intro}</p>
+      <p style="color:${meta.color};font-size:13px;margin-top:10px;letter-spacing:1px">「${meta.meetLine}」</p>
+      <div style="margin-top:8px;padding:6px 8px;background:rgba(212,180,106,.08);border-radius:3px;font-size:11px;color:#a89c7c">
+        初始好感：<b style="color:${meta.color}">${pt.fondness}</b> / 100　阶段：<b style="color:#a89c7c">萍水相逢</b>
+      </div>
+    </div>
+    <div class="btns"><button id="pt-meet-ok" class="primary">记 下 此 缘</button></div>
+  `);
+  $("pt-meet-ok").onclick = ()=>{
+    closeModal();
+    log(`◆ 你与【${meta.nm}】于修仙途中相逢。`, "epic");
+    refresh();
+    saveGame(true);
+  };
+}
+
+/* 双修事件：消耗 7 天，按灵根+好感+五行相生给收益 */
+function partnerDualCult(ptKey){
+  const pt = (P.partners||[]).find(x=>x.key===ptKey);
+  if(!pt){ log("✕ 无此道侣。","hint"); return; }
+  if(pt.deceased){ log(`✕ 【${PARTNERS[pt.key].nm}】已仙逝。`,"bad"); return; }
+  if(pt.fondness < 30){ log(`※ 与【${PARTNERS[pt.key].nm}】尚未相知，不宜双修。`,"hint"); return; }
+  if(P.inBattle){ log("战斗中不可双修。","hint"); return; }
+  const meta = PARTNERS[pt.key];
+  // 五行相生判定
+  const myEl = (P.elements||[])[0];
+  const elBonus = (myEl && GENERATE[myEl]===meta.ele) ? 1.3 : (myEl===meta.ele ? 1.1 : 1.0);
+  // 基础 = 境界基础修为 × 好感系数 × 灵根系数 × 五行相生
+  const rootMulP = ({"天灵根":3.0,"单灵根":2.0,"双灵根":1.5,"三灵根":1.2,"四灵根":1.0})[meta.root] || 1.0;
+  const baseCult = (100 + P.realmIdx*50) * (pt.fondness/60) * rootMulP * elBonus;
+  const gain = Math.floor(baseCult);
+
+  passDays(P, 7);
+  gainCult(P, gain, `双修·${meta.nm}`);
+  changeFondness(pt, 3, "双修同修");
+  pt.memoryCnt++;
+  // 按 speciality 额外给
+  if(meta.speciality === "heal"){
+    heal(P, Math.floor(P.maxHp*0.5));
+    P.mp = Math.min(P.maxMp, (P.mp||0) + Math.floor(P.maxMp*0.5));
+    log(`◆ 【${meta.nm}】以丹药为你疗伤。气血/真元各回 50%。`,"good");
+  } else if(meta.speciality === "atk+"){
+    P.ling = (P.ling||0) + 1;
+    log(`◆ 【${meta.nm}】与你切磋剑意，灵力 +1（永久）。`,"good");
+  } else if(meta.speciality === "yun+"){
+    P.yun = (P.yun||0) + 1;
+    log(`◆ 【${meta.nm}】戏谑你运道，气运 +1（永久）。`,"good");
+  } else if(meta.speciality === "dao+"){
+    P.dao = (P.dao||0) + 2;
+    log(`◆ 【${meta.nm}】为你点化天机，道行 +2（永久）。`,"epic");
+  } else if(meta.speciality === "dx+"){
+    P.dx = Math.min(P.maxDx, (P.dx||100) + 20);
+    log(`◆ 与【${meta.nm}】对饮一盏，道心 +20。`,"good");
+  } else if(meta.speciality === "lifespan"){
+    // 陆青筠专属：消耗你修为 2000 可渡她登仙
+    log(`◆ 【${meta.nm}】是凡人，只有在「护她登仙」分支中方能增益。`,"hint");
+  }
+  recalcStats(P);
+  refresh();
+  afterAction();
+}
+
+/* 赠送礼物：从背包中挑道侣喜欢的物品 +好感 */
+function partnerGift(ptKey){
+  const pt = (P.partners||[]).find(x=>x.key===ptKey); if(!pt || pt.deceased) return;
+  const meta = PARTNERS[pt.key];
+  const gifts = meta.gifts.filter(g=>(P.bag[g]||0) > 0);
+  if(!gifts.length){
+    showModal(`<h3 style="color:${meta.color}">🎁 赠 礼</h3>
+      <p style="text-align:left">你身上没有【${meta.nm}】中意之物。</p>
+      <p style="font-size:11px;color:#a89c7c;text-align:left">她喜欢：${meta.gifts.join("、")}</p>
+      <div class="btns"><button id="pg-ok" class="primary">了 然</button></div>`);
+    $("pg-ok").onclick = closeModal;
+    return;
+  }
+  const rows = gifts.map(g=>`<div class="shop-row">
+    <div><div class="nm">${g}</div><div class="ds">她喜欢之物</div></div>
+    <div class="pr">×${P.bag[g]}</div>
+    <button class="sm" data-gift="${g}">赠 送</button>
+  </div>`).join("");
+  showModal(`<h3 style="color:${meta.color}">🎁 赠 【${meta.nm}】</h3>
+    <p style="font-size:11px;color:#a89c7c;text-align:left">好感：${pt.fondness}/100 · 阶段：${partnerStage(pt.fondness).name}</p>
+    <div class="box left" style="padding:0;border:none;background:none">${rows}</div>
+    <div class="btns"><button id="pg-close">离 开</button></div>`);
+  document.querySelectorAll(".modal [data-gift]").forEach(b=>{
+    b.onclick = ()=>{
+      const g = b.dataset.gift;
+      consume(g);
+      changeFondness(pt, 5, `赠礼 · ${g}`);
+      pt.memoryCnt++;
+      closeModal();
+      refresh();
+      saveGame(true);
+    };
+  });
+  $("pg-close").onclick = closeModal;
+}
+
+/* 道侣每日自然推进（寿元 / 关系冷却） */
+function partnerTickAfterAction(days){
+  if(!P || !P.partners) return;
+  days = days|0; if(days<=0) return;
+  for(const pt of P.partners){
+    if(pt.deceased) continue;
+    const meta = PARTNERS[pt.key];
+    // 年龄/寿元
+    pt.age += days/360;
+    if(pt.age >= pt.lifespan){
+      pt.deceased = true;
+      const isPrimary = primaryPartner()===pt;
+      log(`※ 【${meta.nm}】寿元将尽，于修仙途中溘然长逝。`, "bad");
+      if(isPrimary){
+        // 道侣陨落：主角道心 -40
+        P.dx = Math.max(0, (P.dx||100) - 40);
+        P.karma = Math.min(100, (P.karma||0) + 5);
+        log(`※ 你心如刀绞，道心 -40。`, "bad");
+      }
+      continue;
+    }
+    // 好感自然冷却：长期不互动 → 每 90 天 -1 好感
+    const daysSinceMet = P.days - (pt.lastMet||0);
+    if(daysSinceMet > 90 && Math.random() < 0.1*days){
+      pt.fondness = Math.max(0, pt.fondness - 1);
+    }
+  }
+}
+
+/* 道侣渡劫协助：startTribulation 调用这里获取减伤系数 */
+function partnerTribAssist(){
+  const pt = primaryPartner();
+  if(!pt) return null;
+  if(pt.fondness < 80) return null;
+  const meta = PARTNERS[pt.key];
+  // 道侣寿元 -10 年
+  pt.lifespan = Math.max(pt.age+1, pt.lifespan - 10);
+  log(`◆ 【${meta.nm}】与你执手并肩，共度天劫（她寿元 -10 年）`, "epic");
+  changeFondness(pt, 2, "共度天劫");
+  pt.memoryCnt++;
+  // 若这是第 3 次共度天劫 → 白首（fondness 直接 +到 100，flags.wedded）
+  if((pt.flags.tribTogether||0) >= 2 && !pt.flags.wedded){
+    pt.flags.wedded = true;
+    pt.fondness = 100;
+    log(`※※※ 三劫共度，生死同心！你与【${meta.nm}】结为道侣，白首不离！`, "epic");
+  }
+  pt.flags.tribTogether = (pt.flags.tribTogether||0) + 1;
+  return 0.30;  // 30% 减伤
+}
+
+/* 渲染道侣 Tab 面板 */
+function renderPartnerPanel(){
+  if(!P) return;
+  const listEl = document.getElementById("partner-list");
+  if(!listEl) return;
+  const partners = P.partners || [];
+  if(!partners.length){
+    listEl.innerHTML = `<p class="hint" style="font-size:12px;color:#888">尚无道侣。于外出历练、闭关异事中有缘相逢。</p>`;
+    return;
+  }
+  listEl.innerHTML = partners.map(pt=>{
+    const meta = PARTNERS[pt.key];
+    if(!meta) return "";
+    const stage = partnerStage(pt.fondness);
+    const isPrimary = primaryPartner()===pt;
+    const lifeLeft = Math.max(0, pt.lifespan - pt.age);
+    const deceasedTag = pt.deceased ? ` <span style="color:#d96a6a">· 已仙逝</span>` : "";
+    const weddedTag = pt.flags?.wedded ? ` <span style="color:#ffd966">· 道侣</span>` : "";
+    const fondnessBar = `<div style="height:5px;background:#1a1f2a;border-radius:2px;overflow:hidden;margin-top:3px">
+      <i style="display:block;height:100%;width:${pt.fondness}%;background:${meta.color}"></i></div>`;
+    return `<div style="margin:5px 0;padding:6px 8px;border:1px solid ${isPrimary?meta.color:'#2a2f3c'};border-radius:3px;background:${isPrimary?`${meta.color}15`:'transparent'};${pt.deceased?'opacity:.5':''}">
+      <div style="display:flex;justify-content:space-between">
+        <span><b style="color:${meta.color}">${meta.nm}</b><span style="color:#888;font-size:10px"> (${meta.root}·${meta.ele})</span>${weddedTag}${deceasedTag}</span>
+        <span style="color:${stage.color};font-size:11px">${stage.name}</span>
+      </div>
+      <div style="font-size:10px;color:#a89c7c;margin-top:2px">好感 ${pt.fondness}/100 · 年 ${Math.floor(pt.age)}/${pt.lifespan}（余 ${Math.floor(lifeLeft)}）· 缘 ${pt.memoryCnt}</div>
+      ${fondnessBar}
+      ${pt.deceased?"":`<div class="btns" style="margin-top:4px">
+        <button class="sm" data-pt-cult="${pt.key}" ${pt.fondness<30?"disabled":""}>双修</button>
+        <button class="sm" data-pt-gift="${pt.key}">赠礼</button>
+        <button class="sm" data-pt-info="${pt.key}">详情</button>
+      </div>`}
+    </div>`;
+  }).join("");
+  // 绑定
+  listEl.querySelectorAll("[data-pt-cult]").forEach(b=>{
+    b.onclick = ()=>partnerDualCult(b.dataset.ptCult);
+  });
+  listEl.querySelectorAll("[data-pt-gift]").forEach(b=>{
+    b.onclick = ()=>partnerGift(b.dataset.ptGift);
+  });
+  listEl.querySelectorAll("[data-pt-info]").forEach(b=>{
+    b.onclick = ()=>openPartnerInfo(b.dataset.ptInfo);
+  });
+}
+
+/* 道侣详情弹窗 */
+function openPartnerInfo(key){
+  const pt = (P.partners||[]).find(x=>x.key===key); if(!pt) return;
+  const meta = PARTNERS[pt.key];
+  const stage = partnerStage(pt.fondness);
+  showModal(`
+    <h3 style="color:${meta.color}">💞 ${meta.nm}</h3>
+    <p style="text-align:center;font-size:12px;color:#a89c7c;letter-spacing:2px">— ${stage.name} · 缘 ${pt.memoryCnt} —</p>
+    <div style="text-align:left;font-size:12px;line-height:1.8;color:#d6cfb8">
+      <p><b>身份：</b>${({sect:"宗门弟子",alchemy:"丹师",evil:"邪修",demon:"妖修",immortal:"仙人",wanderer:"散修",mortal:"凡人",rival:"剑道宿敌"}[meta.tier])||"修士"}</p>
+      <p><b>灵根：</b>${meta.root}（${meta.ele}属）</p>
+      <p><b>描述：</b>${meta.desc}</p>
+      <p><b>出身：</b>${meta.bgStory}</p>
+      <p><b>喜好：</b>${meta.gifts.join("、")}</p>
+      <p><b>特长：</b>${({"cult+":"双修时修为加成高","heal":"双修可回血回真元","atk+":"双修时灵力+1","yun+":"双修时气运+1","dao+":"双修时道行+2","dx+":"双修时道心+20","lifespan":"凡人·可渡她登仙"}[meta.speciality])||"通用"}</p>
+      ${pt.flags?.wedded?`<p style="color:#ffd966"><b>※ 已共度三劫，结为道侣白首不离。</b></p>`:""}
+      <p style="font-size:11px;color:#a89c7c;margin-top:8px">好感 ${pt.fondness}/100 · 年 ${Math.floor(pt.age)}/${pt.lifespan}</p>
+    </div>
+    <div class="btns"><button id="pt-info-ok" class="primary">了 然</button></div>
+  `);
+  $("pt-info-ok").onclick = closeModal;
+}
 
 const ROOTS = {
   // key: [修炼倍率, 抽取权重, 描述, 颜色]
@@ -1464,6 +1899,19 @@ function openPetFeedModal(petKey){
 const ADVS = [
   // —— 通用奇遇 ——
   {t:"山间偶遇白发老者，他看你骨骼清奇，传你一道口诀。",fn:p=>gainCult(p,rand(50,200),"老者授法")},
+  // v7 · 道侣 NPC 相遇（低概率、多条独立触发，各自有境界门槛）
+  {t:"云雾深处一道青影掠过，对方似在观察你。",
+   cond:p=>p.realmIdx>=3 && (!p.partners || p.partners.length<8) && Math.random()<0.25,
+   fn:"partner_meet"},
+  {t:"坊市人流中，有人向你投来温和的目光。",
+   cond:p=>p.realmIdx>=5 && (!p.partners || p.partners.length<8) && Math.random()<0.2,
+   fn:"partner_meet"},
+  {t:"江边一女子独酌，见你便举杯邀饮。",
+   cond:p=>p.realmIdx>=4 && (!p.partners || p.partners.length<8) && Math.random()<0.15,
+   fn:"partner_meet"},
+  {t:"你出手救下一凡人小镇，镇上一女子红着眼眶跪谢。",
+   cond:p=>p.realmIdx>=2 && !(p.partners||[]).some(x=>x.key==="陆青筠") && Math.random()<0.15,
+   fn:p=>tryMeetPartner("陆青筠")},
   {t:"你发现一处隐秘洞府，洞中有一小瓶丹药！",fn:p=>addItem(p,"聚气丹",rand(1,3))},
   {t:"溪边洗剑，捡到几块灵石。",fn:p=>addItem(p,"灵石",rand(5,30))},
   {t:"天降惊雷，你被劈得外焦里嫩……不过似乎打通了一处经脉？",fn:p=>{takeDmg(p,30);gainCult(p,80,"雷劫淬体")}},
@@ -1870,6 +2318,9 @@ function newPlayer(name,rootName,elements){
     pets: [],                                  // 已签约灵宠列表
     activePet: null,                           // 出战灵宠 key（PETS_META 索引）
     petDex: {},                                // 妖兽图鉴：见到/击败次数
+    // —— v7 · 道侣 NPC 系统 ——
+    partners: [],                              // 已相识的道侣 NPC
+    partnerFlags: {},                          // 道侣共同 flag（已婚/生离等全局标记）
   };
   recalcStats(p);
   // 初始化后按当前 maxHp/maxMp 满血满蓝
@@ -2217,6 +2668,10 @@ function passDays(p,n){
   // v6.2 · 灵宠每日回血/回忠诚
   if(typeof petTickAfterAction === "function"){
     petTickAfterAction(n);
+  }
+  // v7 · 道侣每日寿元推进 / 好感冷却
+  if(typeof partnerTickAfterAction === "function"){
+    partnerTickAfterAction(n);
   }
 }
 /* v4：节庆事件触发（从队列取首项弹窗，玩家选项后再处理下一项） */
@@ -2637,6 +3092,26 @@ const CULT_EVENTS = [
       p.dx = p.maxDx;
       log("道心圆满！","good");
     }},
+  // v7 · 故人来访（道侣好感度 +5 或触发相遇）
+  {tag:"good", w:2, cond:p=>p.realmIdx>=3 && (!p.partners||p.partners.length<8), t:"故 人 来 访",
+    fn:p=>{
+      const partners = p.partners || [];
+      // 若已有道侣 → 随机一位来访 +5 好感
+      if(partners.length > 0 && Math.random() < 0.7){
+        const pt = choice(partners.filter(x=>!x.deceased));
+        if(pt){
+          const meta = PARTNERS[pt.key];
+          log(`✦ 闭关期间，【${meta.nm}】踏云而来，与你谈天论道。`,"good");
+          changeFondness(pt, 5, "故人来访");
+          pt.memoryCnt++;
+          pt.lastMet = p.days;
+          return;
+        }
+      }
+      // 否则触发新相遇
+      log("✦ 一阵清风吹开你的洞府门，有人立于门外……","epic");
+      setTimeout(()=>tryMeetPartner(), 200);
+    }},
   {tag:"epic", w:1, cond:p=>p.realmIdx>=3, t:"灵 气 倒 灌",
     fn:p=>{
       log("✦ 周遭百里灵气尽数倒灌入你丹田，经脉如河奔涌！","epic");
@@ -2841,6 +3316,9 @@ function actAdventure(){
       }else{
         tryRootEvolve(P, "mutate");
       }
+    }else if(ev.fn==="partner_meet"){
+      // v7 · 道侣相遇
+      tryMeetPartner();
     }else{
       ev.fn(P);
     }
@@ -3118,8 +3596,14 @@ function startTribulation(trib, nextIdx, useDan){
   // 进入天劫状态（复用战斗按钮布局）
   // v3：业力影响渡劫强度 — 善业 +bonus（减伤），恶业 -bonus（增伤）
   const karmaBonus = (P.karma||0) / 200;  // ±100 业力 → ±0.5 减伤
+  // v7 · 道侣共度天劫
+  let partnerBonus = 0;
+  if(typeof partnerTribAssist === "function"){
+    const pb = partnerTribAssist();
+    if(pb){ partnerBonus = pb; }
+  }
   // v6：tally 记录三种应对次数，用于结束时给差异化奖励
-  P.tribulation = {trib, nextIdx, idx:0, bonus:(useDan?0.1:0)+karmaBonus, hpStart:P.hp,
+  P.tribulation = {trib, nextIdx, idx:0, bonus:(useDan?0.1:0)+karmaBonus+partnerBonus, hpStart:P.hp,
     tally:{raw:0, pill:0, relic:0}};
   if(Math.abs(karmaBonus) >= 0.05){
     log(`【业力·${karmaBonus>0?"善":"孽"}】${karmaBonus>0?"上苍垂怜，雷劫减伤 ":"业障牵引，雷劫增伤 "}${Math.round(Math.abs(karmaBonus)*100)}%`, "karma");
@@ -4417,6 +4901,10 @@ function refresh(){
   if(typeof renderPetPanel === "function"){
     renderPetPanel();
   }
+  // v7：道侣面板
+  if(typeof renderPartnerPanel === "function"){
+    renderPartnerPanel();
+  }
 }
 
 /* v3：渲染玄机详情面板 HTML */
@@ -4723,6 +5211,9 @@ function loadGame(){
     if(!Array.isArray(d.pets)) d.pets = [];
     if(d.activePet===undefined) d.activePet = null;
     if(!d.petDex) d.petDex = {};
+    // v7 字段（道侣 NPC 系统）
+    if(!Array.isArray(d.partners)) d.partners = [];
+    if(!d.partnerFlags) d.partnerFlags = {};
     // v4 寿元迁移：移除强制拉满逻辑（避免覆盖新机制），仅做异常兜底
     if(d.lifespan===undefined || d.lifespan<=0){
       d.lifespan = 80 + (d.realmIdx||0)*30;

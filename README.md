@@ -46,6 +46,7 @@
 | 🏔 秘境 | 6 大秘境首通独家法宝 + 灵宠蛋 |
 | 🌙 夙愿系统 | 6 大开局夙愿 × 5 节点主线剧情（首发：血海深仇）|
 | 🐉 灵宠契约 | 12 种灵宠 × 4 种专属蛋 × 11 种灵宠神通 |
+| 💞 道侣 NPC | 8 位道侣 × 3 阶段关系 × 双修/共度天劫/白首 |
 | 🌅 飞升 | 仙人飞升触发 Roguelike 转世，传承法宝/道行/灵根重抽 |
 | 📅 道历 | 紫微道历 360 天/年，24 节气 + 12 节庆 BUFF |
 
@@ -87,6 +88,7 @@ xiuxian/
 | **v6.2** | 灵宠契约 | 12 种灵宠 + 协攻分担 + 图鉴 + 专属蛋 |
 | **v6.3** | 自动暂停 | 弹窗时自动模式暂停等玩家决断 |
 | **v6.5** | 回退形象 | SVG 形象因不符古风水墨调性，回退至无形象方案 |
+| **v7** | 道侣 NPC | 8 位道侣 × 3 阶段关系 × 双修/共度天劫 |
 
 ### 🛠 开发控制台（DEV 面板）
 
@@ -127,6 +129,7 @@ A **single-file HTML** cultivation idle game. From mortal to immortal, 21 realms
 - **Alchemy / Sect / Market / Dungeon**: All contribute unique resources to your breakthrough requirements
 - **Quest System**: 6 destiny quests × 5 plot nodes (feat. "Blood Feud of Xuanyin Sect")
 - **Spirit Pet Contract**: 12 pets × 4 exclusive eggs × 11 pet skills
+- **Partner NPC**: 8 partner NPCs × 3 relationship stages × dual cultivation/tribulation
 - **Ascension**: Reaching Immortal triggers Roguelike rebirth with inheritance
 
 ### 🚀 Quick Start
@@ -154,6 +157,7 @@ python -m http.server 8000
 | v6.2 | Pet contract | 12 pets + co-combat + dex + exclusive eggs |
 | v6.3 | Auto-pause | Auto mode pauses for decision modals |
 | v6.5 | Portrait rollback | SVG portrait rolled back due to Q-style mismatch |
+| v7   | Partner NPCs | 8 partners × 3-stage relationship × dual cultivation |
 
 ### 📝 License
 

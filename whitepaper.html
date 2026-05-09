@@ -197,6 +197,7 @@
       <li><a href="#quest">夙愿系统（v5）</a></li>
       <li><a href="#economy-v6">经济再平衡（v6）</a></li>
       <li><a href="#pet-system">灵宠契约（v6.2）</a></li>
+      <li><a href="#partner-system">道侣 NPC（v7）</a></li>
       <li><a href="#auto">自动托管</a></li>
       <li><a href="#save">存档机制</a></li>
       <li><a href="#tech-stack">技术栈</a></li>
@@ -1197,6 +1198,82 @@
 
 
   <!-- 玩家形象系统 v6.4 已移除（回退于 v6.5，Q 萌风格不符合古风水墨调性，待未来寻得合适美术再加回） -->
+
+
+  <!-- 道侣 NPC 系统 v7 -->
+  <section id="partner-system">
+    <h2>十 九、道 侣 N P C 系 统（ v7 ）</h2>
+    <p class="lead">「情之一字，磨人无数。」v7 引入道侣 NPC 系统——在修真路上，不再孤身。8 位固定 NPC，各具性格与来历；3 阶段关系（萍水→相知→道侣→白首）；双修、共度天劫、寿元生离，构成一段段可追忆的修仙情缘。</p>
+
+    <h3>8 位道侣 NPC 图鉴</h3>
+    <table>
+      <thead><tr><th>NPC</th><th>出身</th><th>灵根·五行</th><th>特长</th><th>触发条件</th></tr></thead>
+      <tbody>
+        <tr><td><b style="color:#7fc7a3">素青鸾</b></td><td>青云宗剑修</td><td>双灵根·木</td><td>双修修为加成</td><td>realmIdx≥3</td></tr>
+        <tr><td><b style="color:#7ab0d4">温如玉</b></td><td>天机阁丹师</td><td>三灵根·水</td><td>双修回血+回真元</td><td>realmIdx≥5</td></tr>
+        <tr><td><b style="color:#d96a6a">玄阴姬</b></td><td>玄阴宗圣女（邪）</td><td>单灵根·火</td><td>双修灵力+1</td><td>realmIdx≥8，业力≤20</td></tr>
+        <tr><td><b style="color:#e8c97a">墨白狐</b></td><td>九尾天狐化形（妖）</td><td>异变灵根·火</td><td>双修气运+1</td><td>realmIdx≥10</td></tr>
+        <tr><td><b style="color:#ffd966">青霞仙子</b></td><td>下凡仙人</td><td>天灵根·金</td><td>双修道行+2</td><td>realmIdx≥15，dao≥50，业力≥30</td></tr>
+        <tr><td><b style="color:#c0a8d4">苏长青</b></td><td>洒脱散修</td><td>双灵根·木</td><td>双修道心+20</td><td>realmIdx≥4</td></tr>
+        <tr><td><b style="color:#c9a872">陆青筠</b></td><td>凡人少女</td><td>三灵根·土</td><td>可渡她登仙</td><td>realmIdx≥0，救助触发</td></tr>
+        <tr><td><b style="color:#7ab0d4">玉无缺</b></td><td>剑道宿敌</td><td>单灵根·水</td><td>双修灵力+1</td><td>realmIdx≥9</td></tr>
+      </tbody>
+    </table>
+
+    <h3>关系 3 阶段 + 1 终局</h3>
+    <table>
+      <thead><tr><th>阶段</th><th>好感度</th><th>可用操作</th><th>色系</th></tr></thead>
+      <tbody>
+        <tr><td>萍水</td><td class="num">0~29</td><td>赠礼</td><td style="color:#a89c7c">灰</td></tr>
+        <tr><td>相知</td><td class="num">30~59</td><td>赠礼 / 双修</td><td style="color:#7fc7a3">玉绿</td></tr>
+        <tr><td>道侣</td><td class="num">60~99</td><td>+ 共度天劫（≥80）</td><td style="color:#d4b46a">金</td></tr>
+        <tr><td>白首</td><td class="num">100</td><td>三度共渡天劫自动晋升</td><td style="color:#ffd966">霞金</td></tr>
+      </tbody>
+    </table>
+
+    <h3>核心机制</h3>
+    <ul>
+      <li><b style="color:var(--gold)">相遇</b>：外出历练奇遇（4 条触发器） / 闭关异事「故人来访」（触发）+ 夙愿剧情联动</li>
+      <li><b style="color:var(--gold)">好感变更</b>：赠礼 +5 / 双修 +3 / 共度天劫 +2 / 长期不互动 -1/90 天</li>
+      <li><b style="color:var(--gold)">双修</b>：消耗 7 天，按【境界×好感×灵根乘数×五行相生】给修为，并按特长给额外奖励</li>
+      <li><b style="color:var(--gold)">共度天劫</b>：好感 ≥ 80 时自动启用；减伤 30%，代价道侣寿元 -10 年</li>
+      <li><b style="color:#d96a6a">寿元生离</b>：道侣自身年龄/寿元独立推进（passDays 每日推进）；凡人陆青筠只有 60~80 年阳寿，若不采取措施终将先你而去</li>
+      <li><b style="color:#d96a6a">道侣陨落</b>：道侣若逝，主角道心 -40（对主要道侣）</li>
+      <li><b style="color:#ffd966">白首</b>：三度共度天劫自动结为道侣，好感锁定 100，获得永久 buff（未来扩展）</li>
+    </ul>
+
+    <h3>UI</h3>
+    <p>右侧第 5 个 Tab「💞 道侣」：</p>
+    <ul>
+      <li>所有已相识道侣列表（含 已逝 / 白首 标签）</li>
+      <li>每位：好感度条 + 年龄/寿元 + 缘分数</li>
+      <li>操作按钮：双修 / 赠礼 / 详情</li>
+      <li>赠礼弹窗：筛选背包中她喜欢的物品</li>
+      <li>详情弹窗：身份/灵根/出身/特长/已婚状态</li>
+    </ul>
+
+    <h3>技术细节</h3>
+    <ul>
+      <li>核心函数：<code>tryMeetPartner(key?)</code> / <code>partnerDualCult(key)</code> / <code>partnerTribAssist()</code> / <code>partnerTickAfterAction(days)</code></li>
+      <li>数据结构：<code>PARTNERS</code>（8 个模板）+ <code>P.partners</code>（玩家已相识实例）</li>
+      <li>渡劫接入：<code>startTribulation</code> 入口调 <code>partnerTribAssist()</code>，返回减伤系数加入 tribulation.bonus</li>
+      <li>业力相性：邪修道侣（玄阴姬）业力 ≤20 才出现；仙人道侣（青霞仙子）业力 ≥30 才出现</li>
+      <li>存档兼容：SAVE_VERSION 升至 7，新增字段 <code>partners / partnerFlags</code> 在 loadGame 兜底</li>
+      <li>自动模式：道侣事件通过 <code>showModal</code> 触发，天然受 v6.3 全暂停机制保护</li>
+    </ul>
+
+    <h3>未来扩展（v7.x）</h3>
+    <ul>
+      <li>寻仙故人夙愿（QUESTS.reunion）激活，专属首位道侣 NPC（温如玉？）为 5 节点主线</li>
+      <li>道侣战斗协攻：出战时每回合 10% 额外伤害</li>
+      <li>道侣结婚仪式：白首时触发专属弹窗与永久 buff</li>
+      <li>道侣-灵宠协同：道侣专属灵宠陪伴</li>
+      <li>渡凡人道侣登仙：消耗大量修为 + 蟠桃 ×3 等，可让陆青筠踏入修真</li>
+    </ul>
+  </section>
+
+
+
 
 
 
