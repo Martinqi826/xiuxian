@@ -197,7 +197,6 @@
       <li><a href="#quest">夙愿系统（v5）</a></li>
       <li><a href="#economy-v6">经济再平衡（v6）</a></li>
       <li><a href="#pet-system">灵宠契约（v6.2）</a></li>
-      <li><a href="#portrait-system">玩家形象（v6.4）</a></li>
       <li><a href="#auto">自动托管</a></li>
       <li><a href="#save">存档机制</a></li>
       <li><a href="#tech-stack">技术栈</a></li>
@@ -1196,76 +1195,11 @@
   </section>
 
 
-  <!-- 玩家形象系统 v6.4 -->
-  <section id="portrait-system">
-    <h2>十 九、玩 家 形 象 系 统（ v6.4 ）</h2>
-    <p class="lead">每个修真者都是独一无二的。v6.4 引入<b style="color:var(--gold)">数据驱动的 SVG 矢量形象</b>——8 大维度共同决定玩家外观，21 阶境界累计可组合出数十亿种不同画像。单文件零依赖，完全矢量可缩放。</p>
 
-    <h3>核心设计：1 张模板 × 多维参数 = 无数组合</h3>
-    <p>不采用「21 张预制 SVG」的笨办法，而是以 <code>buildPortraitSvg(P, size)</code> 为单一入口，按当前 P 状态动态合成。</p>
-    <table>
-      <thead><tr><th>维度</th><th>来源</th><th>视觉表现</th></tr></thead>
-      <tbody>
-        <tr><td>境界阶次</td><td>realmIdx (0~20)</td><td>压缩为 tier 0~7：姿态/服饰/坐垫/头冠繁简升级；子阶 0~3 决定装饰数量</td></tr>
-        <tr><td>灵根稀有度</td><td>ROOTS[rootName].rare</td><td>光环色（废→灰 / 天→玉绿 / 混沌→彩金）</td></tr>
-        <tr><td>五行首属性</td><td>P.elements[0]</td><td>衣袍主色（金→白黄 / 木→青碧 / 水→碧蓝 / 火→朱红 / 土→褐黄）</td></tr>
-        <tr><td>本命法宝</td><td>P.relic</td><td>身右悬浮小图标（🗡️ 青竹小剑 / 🪞 阴阳镜 / 🎌 九曜神幡 / ⚔️ 万剑诀图 / 🏺 混沌葫芦）</td></tr>
-        <tr><td>出战灵宠</td><td>P.activePet</td><td>脚边小宠物 emoji（🐺/🦊/🐉/🐢/🌀 …）</td></tr>
-        <tr><td>业力</td><td>P.karma</td><td>≥ +50 金光外溢，≤ -50 黑雾缠身（虚线脉动）</td></tr>
-        <tr><td>道心</td><td>P.dx / P.maxDx</td><td>神态三态：安详（≥85%）/ 端肃（≥50%）/ 凝重（&lt;50%）</td></tr>
-        <tr><td>夙愿</td><td>P.quest</td><td>背景纹路：剑影（复仇）/ 花瓣（寻仙）/ 王座（问鼎）/ 卷轴（求知）/ 山门（重振）/ 锁链（弑神）</td></tr>
-      </tbody>
-    </table>
+  <!-- 玩家形象系统 v6.4 已移除（回退于 v6.5，Q 萌风格不符合古风水墨调性，待未来寻得合适美术再加回） -->
 
-    <h3>境界形象分段（按 tier 渲染差异）</h3>
-    <table>
-      <thead><tr><th>tier</th><th>境界</th><th>头饰</th><th>坐垫</th><th>飘带</th><th>特效</th></tr></thead>
-      <tbody>
-        <tr><td>0</td><td>凡人</td><td>散发</td><td>无</td><td>无</td><td>仅 1 层光环</td></tr>
-        <tr><td>1</td><td>练气一~九层</td><td>简单发髻 + 木簪</td><td>蒲团</td><td>无</td><td>2 层光环</td></tr>
-        <tr><td>2</td><td>筑基初~大圆满</td><td>同上</td><td>蒲团</td><td>有（双侧飘带）</td><td>3 层光环</td></tr>
-        <tr><td>3</td><td>金丹初~后期</td><td>玉冠</td><td>莲台</td><td>有</td><td>4 层光环</td></tr>
-        <tr><td>4</td><td>元婴初~后期</td><td>玉冠</td><td>莲台</td><td>有</td><td>4 层光环</td></tr>
-        <tr><td>5</td><td>化神~合体</td><td>通天冠</td><td>莲台</td><td>有</td><td>5 层光环 + 头顶天光柱</td></tr>
-        <tr><td>6</td><td>大乘~渡劫</td><td>通天冠</td><td>莲台</td><td>有</td><td>同上</td></tr>
-        <tr><td>7</td><td>仙人</td><td>仙冠</td><td>莲台</td><td>有</td><td>头顶真灵环 + 天光柱</td></tr>
-      </tbody>
-    </table>
 
-    <h3>动画</h3>
-    <ul>
-      <li>光环脉动：每层独立周期，3~5 秒一次呼吸，由 <code>SMIL &lt;animate&gt;</code> 驱动，零 JS 开销</li>
-      <li>飘带飞舞：tier ≥ 2 双侧飘带 4 秒一摆</li>
-      <li>法宝悬浮：法宝图标 2.5 秒透明度呼吸</li>
-      <li>善业金光 / 恶业黑雾：4 秒脉动</li>
-      <li>仙人真灵环：3 秒椭圆横向缩放</li>
-    </ul>
 
-    <h3>UI 入口</h3>
-    <ul>
-      <li><b>小头像</b>：左侧状态面板顶部 120×120 圆形，点击展开形象录</li>
-      <li><b>形象录弹窗</b>：左大图 200×200 + 右侧 8 维度解读（境界/灵根/五行/法宝/灵宠/业力/道心/夙愿）</li>
-      <li><b>实时刷新</b>：每次 refresh() 自动重绘；突破/突破/换法宝/换灵宠/业力变化/立夙愿都会立即反映</li>
-    </ul>
-
-    <h3>技术细节</h3>
-    <ul>
-      <li>入口函数：<code>buildPortraitSvg(p, size)</code> 纯函数，返回 SVG 字符串</li>
-      <li>参数提取：<code>portraitParams(p)</code> 从 P 上抽取 8 维参数</li>
-      <li>辅助：<code>shadeColor(hex, percent)</code> 颜色变暗，用于衣袍描边</li>
-      <li>衣袍描边色：robeColor × -25% HSL 处理</li>
-      <li>不改存档格式，不升 SAVE_VERSION，纯展示系统</li>
-    </ul>
-
-    <h3>扩展预留</h3>
-    <p>SVG 模板是数据驱动的，后续可无侵入扩展：</p>
-    <ul>
-      <li>道侣系统上线 → 形象录里并排绘制道侣画像</li>
-      <li>多灵宠战场 → 脚边显示多只 emoji</li>
-      <li>混沌灵根 → 光环加特殊"混沌"渐变</li>
-      <li>飞升演出 → 全屏大图 + 额外光效</li>
-    </ul>
-  </section>
 
 
 
