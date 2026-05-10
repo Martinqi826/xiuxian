@@ -168,6 +168,21 @@
   }
   .scene.tribulation .title{color:#ffe6b4;animation:shake .3s infinite}
   @keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-2px)}75%{transform:translateX(2px)}}
+  /* v8 · 突破金光脉冲 */
+  @keyframes bk-pulse{0%{box-shadow:inset 0 0 120px rgba(255,230,180,.7)}100%{box-shadow:inset 0 0 0 transparent}}
+  .bk-flash{animation:bk-pulse 2.5s ease-out;border-color:var(--gold)!important}
+  /* v8 · 连修势能提示 */
+  @keyframes streak-glow{0%{text-shadow:0 0 8px rgba(255,170,60,.8)}100%{text-shadow:none}}
+  /* P1-1 · 视觉反馈分层 */
+  @keyframes screen-flash-gold{0%{opacity:.6}100%{opacity:0}}
+  @keyframes screen-flash-red{0%{opacity:.4}100%{opacity:0}}
+  @keyframes screen-flash-blue{0%{opacity:.3}100%{opacity:0}}
+  @keyframes screen-shake{0%,100%{transform:translate(0)}20%{transform:translate(-3px,2px)}40%{transform:translate(2px,-2px)}60%{transform:translate(-1px,3px)}80%{transform:translate(3px,-1px)}}
+  .vfx-overlay{position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:9990}
+  .vfx-gold{background:radial-gradient(ellipse at center,rgba(255,230,140,.6),transparent 70%);animation:screen-flash-gold 1.8s ease-out forwards}
+  .vfx-red{background:radial-gradient(ellipse at center,rgba(255,60,60,.4),transparent 70%);animation:screen-flash-red 1.2s ease-out forwards}
+  .vfx-blue{background:radial-gradient(ellipse at center,rgba(100,180,255,.35),transparent 70%);animation:screen-flash-blue 1.5s ease-out forwards}
+  .vfx-shake{animation:screen-shake .4s ease-in-out}
   button.epic{border-color:#ffe6b4;color:#ffe6b4;background:linear-gradient(180deg,rgba(255,230,180,.2),rgba(255,230,180,.05))}
   /* 右侧 Tab 切换 */
   .tabs{display:flex;gap:2px;margin:8px 0 8px;border-bottom:1px solid var(--line);flex-wrap:wrap}
@@ -381,7 +396,128 @@
 <script>
 /* ============ 数据 ============ */
 /* —— 存档版本号：变更后旧存档自动失效（清档重开） —— */
-const SAVE_VERSION = 7;
+const SAVE_VERSION = 8;
+
+/* ==========================================================
+ *  P1-1 · Web Audio 音效引擎（零依赖，程序化合成）
+ * ========================================================== */
+const SFX = (function(){
+  let ctx = null;
+  function getCtx(){
+    if(!ctx) try{ ctx = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){}
+    return ctx;
+  }
+  function play(fn){
+    const c = getCtx();
+    if(!c) return;
+    if(c.state==="suspended") c.resume();
+    fn(c);
+  }
+  return {
+    /* 突破雷鸣：低频隆隆 + 高频闪击 */
+    thunder(){
+      play(c=>{
+        const now = c.currentTime;
+        // 低频隆响
+        const osc = c.createOscillator();
+        const gain = c.createGain();
+        osc.type = "sawtooth"; osc.frequency.setValueAtTime(60, now);
+        osc.frequency.exponentialRampToValueAtTime(30, now+1.2);
+        gain.gain.setValueAtTime(0.3, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now+1.5);
+        osc.connect(gain); gain.connect(c.destination);
+        osc.start(now); osc.stop(now+1.5);
+        // 高频劈裂
+        const n = c.createBufferSource();
+        const buf = c.createBuffer(1, c.sampleRate*0.3, c.sampleRate);
+        const d = buf.getChannelData(0);
+        for(let i=0;i<d.length;i++) d[i]=(Math.random()*2-1)*Math.exp(-i/(c.sampleRate*0.08));
+        n.buffer = buf;
+        const g2 = c.createGain(); g2.gain.setValueAtTime(0.25, now);
+        n.connect(g2); g2.connect(c.destination);
+        n.start(now+0.05);
+      });
+    },
+    /* 天劫隆鸣：持续震动 */
+    rumble(){
+      play(c=>{
+        const now = c.currentTime;
+        const osc = c.createOscillator();
+        const gain = c.createGain();
+        osc.type = "triangle"; osc.frequency.setValueAtTime(45, now);
+        const lfo = c.createOscillator();
+        const lfoGain = c.createGain();
+        lfo.frequency.value = 8; lfoGain.gain.value = 15;
+        lfo.connect(lfoGain); lfoGain.connect(osc.frequency);
+        lfo.start(now);
+        gain.gain.setValueAtTime(0.2, now);
+        gain.gain.linearRampToValueAtTime(0.25, now+0.5);
+        gain.gain.exponentialRampToValueAtTime(0.001, now+2.5);
+        osc.connect(gain); gain.connect(c.destination);
+        osc.start(now); osc.stop(now+2.5); lfo.stop(now+2.5);
+      });
+    },
+    /* 获得传说物品：清脆钟鸣 */
+    chime(){
+      play(c=>{
+        const now = c.currentTime;
+        [523, 659, 784, 1047].forEach((freq, i)=>{
+          const osc = c.createOscillator();
+          const gain = c.createGain();
+          osc.type = "sine"; osc.frequency.value = freq;
+          const t = now + i*0.12;
+          gain.gain.setValueAtTime(0, t);
+          gain.gain.linearRampToValueAtTime(0.15, t+0.02);
+          gain.gain.exponentialRampToValueAtTime(0.001, t+0.8);
+          osc.connect(gain); gain.connect(c.destination);
+          osc.start(t); osc.stop(t+0.8);
+        });
+      });
+    },
+    /* 里程碑：短促上升音阶 */
+    milestone(){
+      play(c=>{
+        const now = c.currentTime;
+        [440, 554, 659].forEach((freq, i)=>{
+          const osc = c.createOscillator();
+          const gain = c.createGain();
+          osc.type = "sine"; osc.frequency.value = freq;
+          const t = now + i*0.08;
+          gain.gain.setValueAtTime(0.12, t);
+          gain.gain.exponentialRampToValueAtTime(0.001, t+0.4);
+          osc.connect(gain); gain.connect(c.destination);
+          osc.start(t); osc.stop(t+0.4);
+        });
+      });
+    },
+    /* 失败/伤害：低沉闷响 */
+    fail(){
+      play(c=>{
+        const now = c.currentTime;
+        const osc = c.createOscillator();
+        const gain = c.createGain();
+        osc.type = "square"; osc.frequency.setValueAtTime(120, now);
+        osc.frequency.exponentialRampToValueAtTime(50, now+0.5);
+        gain.gain.setValueAtTime(0.15, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now+0.6);
+        osc.connect(gain); gain.connect(c.destination);
+        osc.start(now); osc.stop(now+0.6);
+      });
+    }
+  };
+})();
+
+/* P1-1 · 视觉特效：全屏闪光 + 震屏 */
+function vfx(type){
+  const el = document.createElement("div");
+  el.className = "vfx-overlay vfx-" + type;
+  document.body.appendChild(el);
+  setTimeout(()=>el.remove(), 2000);
+}
+function screenShake(){
+  const scene = $("scene");
+  if(scene){ scene.classList.add("vfx-shake"); setTimeout(()=>scene.classList.remove("vfx-shake"), 500); }
+}
 
 /* ==========================================================
  *  v4 · 道历系统（修真界历法：360 天/年 = 12 月 × 30 天 = 24 节气 × 15 天）
@@ -547,6 +683,16 @@ const REALMS = [
   ["元婴初期",40000],["元婴中期",60000],["元婴后期",90000],
   ["化神期",140000],["炼虚期",220000],["合体期",340000],
   ["大乘期",520000],["渡劫期",800000],["仙人",1200000],
+];
+
+/* v8 · 修为里程碑（一次性奖励） */
+const MILESTONES = [
+  [1000,   "千里修行，始于足下",     {ti:3, ling:3}],
+  [5000,   "五千修为，小有所成",     {wu:5, yun:3, items:{"破障丹":2}}],
+  [20000,  "两万修为，名动一方",     {shen:10, dao:5, lifespan:100}],
+  [50000,  "五万修为，已近大道",     {ling:20, wu:10, items:{"天劫真血":1}}],
+  [200000, "二十万修为，天地动容",   {ti:30, ling:30, dao:20, items:{"万年灵芝精":2}}],
+  [500000, "五十万修为，半步飞升",   {ti:50, ling:50, shen:30, dao:40, lifespan:500}],
 ];
 
 /* ============================================================
@@ -822,11 +968,539 @@ const QUESTS = {
   },
 
   /* —— 占位夙愿（v2 再补） —— */
-  reunion:    { id:"reunion",    nm:"💔 寻 仙 故 人", intro:"青梅竹马在化形大劫中失踪，你誓要踏遍九州寻她归来。",         flavor:"「纵此身万丈红尘，唯念当年一句承诺。」", color:"#c0a8d4", available:false, nodes:[] },
+  /* —— 💔 寻仙故人（P0-2 完整实现） —— */
+  reunion: {
+    id: "reunion",
+    nm: "💔 寻 仙 故 人",
+    intro: "青梅竹马在化形大劫中失踪，你誓要踏遍九州寻她归来。",
+    flavor: "「纵此身万丈红尘，唯念当年一句承诺。」",
+    color: "#c0a8d4",
+    available: true,
+    nodes: [
+      /* 节点 1：练气期 · 离别 */
+      {
+        idx: 0, realm: 2,
+        title: "节点 一 · 桃 花 渡 口",
+        desc: "入道前夕，你与青梅竹马阿蘅在桃花渡口分别。她将一枚碧玉坠系在你腕上：「若你修成大道，来寻我。」翌日，村中传来消息——阿蘅在化形大劫中失踪，生死不明。",
+        opts: [
+          { nm: "💎 碧 玉 感 应", hint: "以灵力灌注碧玉坠，感应阿蘅气息方向",
+            fn: p => {
+              p.questFlags = p.questFlags || {};
+              p.questFlags.jadeLink = 1;
+              p.shen = (p.shen||0) + 3;
+              log("✧ 碧玉坠微微发光——她还活着！灵识顺感应追去，隐约指向东方。", "epic");
+              log("神识 +3（碧玉共鸣）", "good");
+            }
+          },
+          { nm: "📜 遍 访 仙 门", hint: "走遍附近宗门打听消息，悟性 +2",
+            fn: p => {
+              p.questFlags = p.questFlags || {};
+              p.questFlags.askedSects = 1;
+              p.wu = (p.wu||0) + 2;
+              gainCult(p, 500, "访道求人");
+              log("◇ 走遍七八个小门派，皆言不知。但路上所见所闻，令你心境更宽。", "good");
+              log("悟性 +2", "good");
+            }
+          },
+          { nm: "🔥 血 誓 寻 人", hint: "以心头血立誓，获强大决心但折寿10年",
+            fn: p => {
+              p.questFlags = p.questFlags || {};
+              p.questFlags.bloodOath = 1;
+              p.lifespan = Math.max(p.age+5, p.lifespan - 10);
+              p.ti = (p.ti||0) + 5;
+              p.dx = Math.min(p.maxDx, (p.dx||100) + 15);
+              log("✧ 你咬破指尖，一滴心头血滴入碧玉坠——「此生不见阿蘅，誓不飞升！」", "epic");
+              log("体魄 +5，道心 +15，寿元 -10", "good");
+            }
+          },
+        ],
+      },
+
+      /* 节点 2：筑基期 · 线索 */
+      {
+        idx: 1, realm: 5,
+        title: "节点 二 · 枯 井 残 魂",
+        desc: "筑基后你踏入东荒，在一座荒废的仙门遗址中发现一口枯井。井底残留阿蘅的气息——还有一缕游荡的残魂，似乎知晓什么。",
+        opts: [
+          { nm: "🕯 渡 化 残 魂", hint: "消耗真元引渡残魂，获取关键线索",
+            fn: p => {
+              p.mp = Math.max(0, p.mp - Math.floor(p.maxMp*0.6));
+              p.questFlags = p.questFlags || {};
+              p.questFlags.ghostClue = 1;
+              log("✧ 残魂感你诚意，显出生前记忆：阿蘅被一头远古妖兽裹挟，坠入了【幽冥裂谷】。", "epic");
+              log("「幽冥裂谷在极北之地，非元婴不可入……」残魂化光消散。", "hint");
+              gainCult(p, 2000, "残魂指引");
+            }
+          },
+          { nm: "⚔ 强 取 记 忆", hint: "以神识强行窥探残魂记忆，快但有业力代价",
+            fn: p => {
+              p.questFlags = p.questFlags || {};
+              p.questFlags.ghostClue = 1;
+              p.questFlags.forcedGhost = 1;
+              p.karma = Math.max(-100, (p.karma||0) - 15);
+              log("◇ 你以神识强行撕裂残魂——记忆碎片涌入脑海。", "bad");
+              log("「幽冥裂谷……极北……远古妖兽……」残魂惨叫消散。业力 -15。", "hint");
+              gainCult(p, 3000, "窃取记忆");
+            }
+          },
+          { nm: "🌿 留 下 标 记", hint: "在井底留下灵力标记，日后阿蘅若归可循迹",
+            fn: p => {
+              p.questFlags = p.questFlags || {};
+              p.questFlags.wellMark = 1;
+              p.dao = (p.dao||0) + 3;
+              log("◇ 你在井壁刻下灵纹，留下一缕神识为灯。若阿蘅路过此处，定能感应。", "good");
+              log("道行 +3（留灯之念）", "good");
+            }
+          },
+        ],
+      },
+
+      /* 节点 3：金丹期 · 重逢 */
+      {
+        idx: 2, realm: 9,
+        title: "节点 三 · 幽 冥 裂 谷",
+        desc: "金丹已成。你踏入极北幽冥裂谷，在最深处发现了阿蘅——她被封在一块巨大的妖晶中，面容如昔，却被妖气侵蚀了半身经脉。妖晶旁，一头远古冥蛟盘踞守护。",
+        opts: [
+          { nm: "⚔ 斩 蛟 破 晶", hint: "正面击杀冥蛟、击碎妖晶，风险高但直接",
+            fn: p => {
+              const win = p.realmIdx >= 10 && Math.random() < 0.55;
+              if(win){
+                log("✧✧ 金丹之力催动剑芒！冥蛟哀嚎倒地，妖晶应声碎裂！", "epic");
+                log("阿蘅缓缓睁开眼——「你……真的来了。」", "epic"); SFX.chime();
+                gainCult(p, 10000, "斩蛟");
+                p.questFlags = p.questFlags || {};
+                p.questFlags.rescued = "force";
+              }else{
+                log("✕ 冥蛟太过强大！你被击退，重伤逃离……", "bad");
+                takeDmg(p, Math.floor(p.maxHp*0.8));
+                p.dx = Math.max(0, (p.dx||100) - 30);
+              }
+            }
+          },
+          { nm: "🎵 以 情 化 妖", hint: "以碧玉坠共鸣唤醒阿蘅，让她自内部瓦解妖晶",
+            fn: p => {
+              p.questFlags = p.questFlags || {};
+              if(p.questFlags.jadeLink){
+                log("✧ 碧玉坠光芒大盛！妖晶中阿蘅双眼睁开，一声清啸！", "epic");
+                log("妖晶从内部碎裂，冥蛟失去寄主之力，仓皇遁逃。", "epic"); SFX.chime();
+                gainCult(p, 6000, "碧玉共鸣");
+                p.questFlags.rescued = "jade";
+                p.dx = Math.min(p.maxDx, (p.dx||100) + 20);
+              }else{
+                log("◇ 碧玉坠微微发热，但力量不足以穿透妖晶……", "hint");
+                log("你只能暂退，另寻良策。", "bad");
+                p.dx = Math.max(0, (p.dx||100) - 10);
+              }
+            }
+          },
+          { nm: "🤝 与 蛟 交 易", hint: "献出大量修为换阿蘅自由",
+            fn: p => {
+              const cost = Math.floor(p.cult * 0.2);
+              p.cult = Math.max(0, p.cult - cost);
+              p.questFlags = p.questFlags || {};
+              p.questFlags.rescued = "deal";
+              p.karma = Math.min(100, (p.karma||0) + 10);
+              log(`◇ 冥蛟通灵性。你献出 ${cost} 修为，它释放了阿蘅。`, "good");
+              log("阿蘅倒在你怀中，虚弱地笑了：「你怎么变这么傻了。」", "hint");
+            }
+          },
+        ],
+      },
+
+      /* 节点 4：元婴期 · 代价 */
+      {
+        idx: 3, realm: 12,
+        title: "节点 四 · 半 妖 之 身",
+        desc: "阿蘅被救出后，你才发现她的半身经脉已被妖气彻底侵蚀，化为半人半妖之体。她的修为暴涨，但神智时而清醒时而被妖性吞噬。你必须做出选择。",
+        opts: [
+          { nm: "💊 炼 丹 净 化", hint: "耗费大量资源炼制净妖丹，根除妖气",
+            fn: p => {
+              const hasDan = (p.bag["万年灵芝精"]||0) >= 1;
+              p.questFlags = p.questFlags || {};
+              if(hasDan){
+                p.bag["万年灵芝精"] -= 1;
+                p.questFlags.purified = 1;
+                p.wu = (p.wu||0) + 5;
+                log("✧ 万年灵芝精催动，妖气一缕缕被抽离！阿蘅恢复清醒。", "epic");
+                log("她含泪看你：「你为我……又花了多少心血？」", "hint");
+                log("悟性 +5（双修参悟）", "good");
+              }else{
+                log("✕ 净妖需【万年灵芝精】，你尚未拥有……", "bad");
+                log("阿蘅妖化加剧，你只能暂时以真元压制。", "hint");
+                p.mp = Math.max(0, p.mp - p.maxMp);
+              }
+            }
+          },
+          { nm: "🐉 拥 抱 妖 性", hint: "帮阿蘅融合妖气，获强大力量但改变结局走向",
+            fn: p => {
+              p.questFlags = p.questFlags || {};
+              p.questFlags.embraceDemon = 1;
+              gainCult(p, 15000, "妖人合一");
+              p.ling = (p.ling||0) + 8;
+              p.karma = Math.max(-100, (p.karma||0) - 20);
+              log("✧ 你引导阿蘅接纳妖气——她的双瞳变为金色竖瞳，气息暴涨！", "epic");
+              log("「这股力量……好强。」她的声音多了一丝妖异。", "hint");
+              log("灵力 +8，业力 -20", "good");
+            }
+          },
+          { nm: "🔮 封 印 半 身", hint: "封印妖化的半身经脉，保住人性但修为受限",
+            fn: p => {
+              p.questFlags = p.questFlags || {};
+              p.questFlags.sealedHalf = 1;
+              p.dao = (p.dao||0) + 8;
+              p.dx = Math.min(p.maxDx, (p.dx||100) + 20);
+              log("◇ 你以道心为印，封住她半身妖脉。阿蘅修为大减，却恢复了往日温柔。", "good");
+              log("「只要能记得你的样子，修为什么的……不重要。」", "hint");
+              log("道行 +8，道心 +20", "good");
+            }
+          },
+        ],
+      },
+
+      /* 节点 5：化神期 · 终局 */
+      {
+        idx: 4, realm: 15,
+        title: "节点 五 · 此 生 无 悔",
+        desc: "化神之后，你与阿蘅站在九州之巅。极目远眺，当年桃花渡口的方向已被云海淹没。阿蘅转身看你，眼中有泪也有光。",
+        opts: [
+          { nm: "💍 双 修 飞 升",
+            hint: "携手飞升：获终极奖励【鸳鸯仙剑】+ 大量属性",
+            fn: p => {
+              const rescued = p.questFlags?.rescued;
+              if(!rescued){
+                log("✕ 阿蘅从未被救出……你形单影只，无人飞升。", "bad");
+                p.dx = Math.max(0, (p.dx||100) - 50);
+                return;
+              }
+              log("✧✧✧ 碧玉坠碎裂，化作漫天萤火。你与阿蘅执手，踏入仙门。", "epic"); SFX.thunder(); vfx("gold");
+              addItem(p, "鸳鸯仙剑", 1);
+              addItem(p, "九转还魂丹", 2);
+              gainCult(p, 40000, "夙愿圆满·双修飞升");
+              p.dao = (p.dao||0) + 15;
+              p.lifespan += 300;
+              p.questFlags.questDone = "ascend";
+            }
+          },
+          { nm: "🌸 桃 花 渡 口",
+            hint: "放弃飞升，回桃花渡口平凡终老：大量寿元 +道行",
+            fn: p => {
+              log("✧✧ 「不飞升了。回去吧，桃花该开了。」", "epic");
+              log("你解散修为，与阿蘅归隐桃花渡口。此生短暂，却了无遗憾。", "epic");
+              p.lifespan += 500;
+              p.dao = (p.dao||0) + 30;
+              p.karma = Math.min(100, (p.karma||0) + 50);
+              gainCult(p, 20000, "夙愿圆满·归隐");
+              p.questFlags = p.questFlags || {};
+              p.questFlags.questDone = "retire";
+            }
+          },
+          { nm: "🐉 妖 道 双 全",
+            hint: "（须节点四选拥抱妖性）阿蘅以半妖之身开辟新道",
+            fn: p => {
+              if(!p.questFlags?.embraceDemon){
+                log("✕ 阿蘅并未走上妖道，此路不通。", "hint");
+                return;
+              }
+              log("✧✧✧ 阿蘅金瞳大睁！人妖合一之道，前无古人！", "epic"); SFX.thunder(); vfx("gold");
+              addItem(p, "妖仙血玉", 1);
+              gainCult(p, 60000, "夙愿圆满·妖道");
+              p.ling = (p.ling||0) + 20;
+              p.ti = (p.ti||0) + 15;
+              p.questFlags.questDone = "demon";
+            }
+          },
+          { nm: "💀 此 情 已 逝", hint: "道心崩塌结局",
+            fn: p => {
+              log("✕✕ 「我等了太久……已经忘了为什么要来。」", "bad");
+              log("碧玉坠坠入云海，你的道心随之碎裂。", "bad");
+              p.hp = 0;
+              p.questFlags = p.questFlags || {};
+              p.questFlags.questDone = "fallen";
+            }
+          },
+        ],
+      },
+    ],
+  },
   pinnacle:   { id:"pinnacle",   nm:"👑 问 鼎 天 梯", intro:"出身寒微的你，立志登顶九州天梯榜第一，以剑名压群雄。",       flavor:"「天若有顶，我便登之。」",            color:"#d4b46a", available:false, nodes:[] },
   scholar:    { id:"scholar",    nm:"📜 求 知 证 道", intro:"你痴迷大道，要破解上古「天道残篇」之谜。",                     flavor:"「朝闻道，夕死可矣。」",              color:"#7fc7a3", available:false, nodes:[] },
   restoration:{ id:"restoration",nm:"🏯 重 振 师 门", intro:"师门凋零，仅你一人。誓要重建千年宗派荣光。",                   flavor:"「门下千秋，皆系一身。」",            color:"#7ab0d4", available:false, nodes:[] },
-  defiance:   { id:"defiance",   nm:"🐉 弑 神 逆 天", intro:"你发现自己竟是天道弃子，誓要改命斩天。",                       flavor:"「我命由我，不由天。」",              color:"#a85cd1", available:false, nodes:[] },
+  /* —— 🐉 弑神逆天（P0-2 完整实现） —— */
+  defiance: {
+    id: "defiance",
+    nm: "🐉 弑 神 逆 天",
+    intro: "你发现自己竟是天道弃子，誓要改命斩天。",
+    flavor: "「我命由我，不由天。」",
+    color: "#a85cd1",
+    available: true,
+    nodes: [
+      /* 节点 1：练气期 · 天印 */
+      {
+        idx: 0, realm: 2,
+        title: "节点 一 · 命 数 之 印",
+        desc: "闭关时你偶然发现胸口浮现一道暗红印记——这是「天弃印」，代表天道判定你不配飞升。凡被天弃印标记之人，渡劫必死。一个苍老的声音在脑中响起：「命已注定，挣扎何用？」",
+        opts: [
+          { nm: "🔥 焚 印 抗 命", hint: "以灵力硬烧天弃印，剧痛但获强大意志",
+            fn: p => {
+              p.questFlags = p.questFlags || {};
+              p.questFlags.burnedSeal = 1;
+              takeDmg(p, Math.floor(p.maxHp*0.4));
+              p.ti = (p.ti||0) + 5;
+              p.dao = (p.dao||0) + 3;
+              p.dx = Math.min(p.maxDx, (p.dx||100) + 15);
+              log("✧ 灵力灌入天弃印——剧痛如万蚁噬骨！但印记淡了三分！", "epic");
+              log("「天若不许我活，我便自己刻出一条命来！」", "epic");
+              log("体魄 +5，道行 +3，道心 +15", "good");
+            }
+          },
+          { nm: "📖 参 悟 天 印", hint: "研究天弃印的构造，获取天道运行之秘",
+            fn: p => {
+              p.questFlags = p.questFlags || {};
+              p.questFlags.studiedSeal = 1;
+              p.wu = (p.wu||0) + 5;
+              p.shen = (p.shen||0) + 3;
+              gainCult(p, 800, "参悟天印");
+              log("◇ 你压下恐惧，以神识细细描摹天弃印的每一道纹路。", "good");
+              log("「了解你的敌人——哪怕敌人是天。」", "hint");
+              log("悟性 +5，神识 +3", "good");
+            }
+          },
+          { nm: "🎭 装 若 无 事", hint: "隐藏天弃印，韬光养晦 +气运",
+            fn: p => {
+              p.questFlags = p.questFlags || {};
+              p.questFlags.hiddenSeal = 1;
+              p.yun = (p.yun||0) + 5;
+              gainCult(p, 500, "韬光养晦");
+              log("◇ 你面不改色，以灵力遮蔽天弃印。没人知道你的秘密。", "good");
+              log("气运 +5（隐忍之福）", "good");
+            }
+          },
+        ],
+      },
+
+      /* 节点 2：筑基期 · 天使 */
+      {
+        idx: 1, realm: 5,
+        title: "节点 二 · 天 道 使 者",
+        desc: "筑基之夜，一道金光降临你的洞府。自称「天监」的使者立于空中：「天弃之人，理应伏诛。你可愿跪地领死，换来世一个好灵根？」",
+        opts: [
+          { nm: "⚔ 拔 剑 斩 使", hint: "向天使宣战，开启与天道的正面冲突",
+            fn: p => {
+              const win = Math.random() < 0.5 + rootMul(p)*0.1;
+              p.questFlags = p.questFlags || {};
+              if(win){
+                log("✧✧ 你一剑斩出——天监使者愕然后退！金光碎裂！", "epic"); SFX.thunder(); screenShake();
+                log("「小小练气修士，竟敢……！」使者化光遁逃。", "epic");
+                gainCult(p, 5000, "斩天使");
+                p.questFlags.slainEnvoy = 1;
+                p.ti = (p.ti||0) + 3;
+              }else{
+                log("✕ 天使力量远超你的想象！一指弹飞你的飞剑！", "bad");
+                takeDmg(p, Math.floor(p.maxHp*0.6));
+                p.dx = Math.max(0, (p.dx||100) - 20);
+                log("使者冷笑离去：「不自量力。下次不会只是警告。」", "hint");
+              }
+            }
+          },
+          { nm: "🗣 言 辞 相 抗", hint: "以道理质问天道之不公，获「论道」加成",
+            fn: p => {
+              p.questFlags = p.questFlags || {};
+              p.questFlags.debatedHeaven = 1;
+              p.dao = (p.dao||0) + 6;
+              p.wu = (p.wu||0) + 3;
+              log("◇ 「天道若公，何来天弃？天道若正，何须你来执法？」", "good");
+              log("天监使者沉默良久，化光离去。你的话似乎动摇了什么。", "hint");
+              log("道行 +6，悟性 +3（论天之悟）", "good");
+            }
+          },
+          { nm: "🎭 假 意 臣 服", hint: "骗取使者信任，窃取天道信物",
+            fn: p => {
+              p.questFlags = p.questFlags || {};
+              p.questFlags.stolenToken = 1;
+              p.karma = Math.max(-100, (p.karma||0) - 10);
+              addItem(p, "天监令牌", 1);
+              log("◇ 你跪地叩首——使者满意转身刹那，你偷走了他腰间的【天监令牌】！", "epic");
+              log("业力 -10，获得 天监令牌 ×1", "good");
+            }
+          },
+        ],
+      },
+
+      /* 节点 3：金丹期 · 封印 */
+      {
+        idx: 2, realm: 9,
+        title: "节点 三 · 天 道 锁 链",
+        desc: "金丹结成之日，天弃印突然暴走！三道无形锁链从虚空垂下，捆缚住你的金丹——天道在限制你的修为上限。若不打碎锁链，你将永远止步于金丹。",
+        opts: [
+          { nm: "🔥 硬 破 锁 链", hint: "以全部修为催动金丹，强行震碎天道锁链",
+            fn: p => {
+              const cost = Math.floor(p.cult * 0.3);
+              p.cult = Math.max(0, p.cult - cost);
+              p.questFlags = p.questFlags || {};
+              p.questFlags.chainsMethod = "force";
+              p.ti = (p.ti||0) + 8;
+              p.ling = (p.ling||0) + 5;
+              log(`✧ 修为燃烧 -${cost}！金丹光芒暴涨——三道锁链寸寸断裂！`, "epic"); SFX.thunder(); vfx("gold");
+              log("天穹仿佛裂开一道缝隙，有无形之物在震怒。", "epic");
+              log("体魄 +8，灵力 +5", "good");
+            }
+          },
+          { nm: "📖 以 智 解 链", hint: "利用参悟天印的知识拆解锁链构造",
+            fn: p => {
+              p.questFlags = p.questFlags || {};
+              if(p.questFlags.studiedSeal){
+                p.questFlags.chainsMethod = "wisdom";
+                p.wu = (p.wu||0) + 8;
+                p.shen = (p.shen||0) + 5;
+                gainCult(p, 8000, "解锁天机");
+                log("✧ 你以参悟天印时的知识，逐一拆解锁链上的道纹——无声无息！", "epic");
+                log("天道浑然未觉。你不仅挣脱了锁链，还窥见了天道的运行法则。", "epic");
+                log("悟性 +8，神识 +5", "good");
+              }else{
+                log("◇ 你试图分析锁链构造，但对天道所知太少……", "hint");
+                log("最终只能以蛮力震松两道，第三道仍在。修为受限。", "bad");
+                p.questFlags.chainsMethod = "partial";
+                p.wu = (p.wu||0) + 3;
+              }
+            }
+          },
+          { nm: "🗡 借 外 力 斩", hint: "使用天监令牌冒充天使，命令锁链自解",
+            fn: p => {
+              p.questFlags = p.questFlags || {};
+              if(p.questFlags.stolenToken && (p.bag["天监令牌"]||0) >= 1){
+                p.questFlags.chainsMethod = "token";
+                p.bag["天监令牌"] -= 1;
+                gainCult(p, 12000, "盗天之功");
+                p.yun = (p.yun||0) + 5;
+                log("✧ 你举起天监令牌——锁链感应到天道权柄，乖乖解开！", "epic"); SFX.chime();
+                log("「连天道的锁链都能骗。」你丢掉烧焦的令牌，冷笑。", "hint");
+                log("气运 +5", "good");
+              }else{
+                log("✕ 你没有天监令牌，此法无从施展。", "bad");
+                p.questFlags.chainsMethod = "partial";
+              }
+            }
+          },
+        ],
+      },
+
+      /* 节点 4：元婴期 · 天庭 */
+      {
+        idx: 3, realm: 12,
+        title: "节点 四 · 叩 天 之 门",
+        desc: "元婴大成。你终于找到了天道的实体化所在——九霄之上的「天机阁」。那里存放着所有生灵的命数简册。你决定闯入，亲手抹去自己的天弃印。",
+        opts: [
+          { nm: "⚔ 正 面 强 攻", hint: "以元婴之力强闯天机阁，战天道守卫",
+            fn: p => {
+              const win = p.realmIdx >= 13 && Math.random() < 0.5;
+              p.questFlags = p.questFlags || {};
+              if(win){
+                log("✧✧ 你撕裂天机阁大门！守卫们如纸糊一般！", "epic"); SFX.thunder(); vfx("gold"); screenShake();
+                gainCult(p, 20000, "破门之功");
+                p.questFlags.enteredHall = "force";
+                p.ti = (p.ti||0) + 10;
+              }else{
+                log("✕ 天机阁守卫远比你想象的强大！你身受重伤，被击退！", "bad");
+                takeDmg(p, Math.floor(p.maxHp*0.7));
+                p.dx = Math.max(0, (p.dx||100) - 30);
+                p.questFlags.enteredHall = "failed";
+              }
+            }
+          },
+          { nm: "🌑 潜 入 暗 行", hint: "以天道规则的漏洞偷入天机阁",
+            fn: p => {
+              p.questFlags = p.questFlags || {};
+              const bonus = p.questFlags.chainsMethod==="wisdom" || p.questFlags.studiedSeal;
+              if(bonus){
+                p.questFlags.enteredHall = "stealth";
+                p.shen = (p.shen||0) + 8;
+                gainCult(p, 15000, "暗渡天机");
+                log("✧ 你利用对天道构造的理解，找到了天机阁的规则盲区……", "epic");
+                log("无声无息，你已站在命数简册之前。", "epic");
+                log("神识 +8", "good");
+              }else{
+                log("◇ 你试图寻找漏洞，但对天道理解不够深。只能硬闯……", "hint");
+                takeDmg(p, Math.floor(p.maxHp*0.4));
+                p.questFlags.enteredHall = "partial";
+                gainCult(p, 5000, "冒死闯入");
+              }
+            }
+          },
+          { nm: "📜 与 天 辩 道", hint: "在天机阁前开坛论道，以大道之理逼天道让步",
+            fn: p => {
+              p.questFlags = p.questFlags || {};
+              p.questFlags.enteredHall = "debate";
+              p.dao = (p.dao||0) + 15;
+              p.wu = (p.wu||0) + 10;
+              gainCult(p, 18000, "论道动天");
+              log("✧✧ 你盘坐天机阁前，开口诵经——", "epic");
+              log("「天生万物而不语，天定命数而不公。天若有道，弃子何辜？天若无道，何以为天？」", "epic");
+              log("天机阁大门缓缓打开——天道被你的道理说服了。", "epic");
+              log("道行 +15，悟性 +10", "good");
+            }
+          },
+        ],
+      },
+
+      /* 节点 5：化神期 · 斩天 */
+      {
+        idx: 4, realm: 15,
+        title: "节点 五 · 天 道 之 上",
+        desc: "你站在命数简册前。你的名字旁，赫然写着三个血红大字——「天弃子」。一个无形的意志从简册中苏醒，化作你自己的模样——这是天道意志的化身。它说：「你我本是一体。你弃我即弃己。」",
+        opts: [
+          { nm: "🗡 斩 天 道 · 我 即 新 天",
+            hint: "正面斩杀天道化身：获终极奖励【弑天之剑】",
+            fn: p => {
+              log("✧✧✧ 「你不是我。你是困住所有人的枷锁！」", "epic"); SFX.thunder(); vfx("gold"); screenShake();
+              log("一剑出——天道化身碎裂如镜，命数简册化为灰烬！", "epic");
+              log("天穹之上，裂开一道永恒的光。", "epic");
+              addItem(p, "弑天之剑", 1);
+              addItem(p, "天劫真血", 5);
+              gainCult(p, 80000, "夙愿圆满·弑天");
+              p.ti = (p.ti||0) + 20;
+              p.questFlags = p.questFlags || {};
+              p.questFlags.questDone = "slayHeaven";
+            }
+          },
+          { nm: "🤝 合 道 天 地 · 超 越 二 元",
+            hint: "与天道化身融合，成为新的天道 +大量全属性",
+            fn: p => {
+              log("✧✧✧ 「你说得对。你我本是一体——那就让我成为新的天道。」", "epic"); SFX.chime(); vfx("gold");
+              log("天道化身微笑，化入你体内。你的双眼中映出整个天地。", "epic");
+              addItem(p, "天道之心", 1);
+              for(const k of ["ti","ling","shen","wu","yun","dao"]) p[k] = (p[k]||0) + 15;
+              p.lifespan += 500;
+              gainCult(p, 50000, "夙愿圆满·合道");
+              p.questFlags = p.questFlags || {};
+              p.questFlags.questDone = "mergeHeaven";
+            }
+          },
+          { nm: "📜 改 写 天 规 · 天 弃 为 天 选",
+            hint: "不毁天道，但改写规则：获【天命改书】+开放所有修道路",
+            fn: p => {
+              log("✧✧ 你没有挥剑。你拿起笔，在命数简册上划去「天弃」，写下「天选」。", "epic");
+              log("天道化身惊愕：「你不杀我？」「杀你做什么。我只是来改规矩的。」", "epic");
+              addItem(p, "天命改书", 1);
+              p.yun = (p.yun||0) + 30;
+              p.karma = Math.min(100, (p.karma||0) + 50);
+              gainCult(p, 60000, "夙愿圆满·改天");
+              p.questFlags = p.questFlags || {};
+              p.questFlags.questDone = "rewriteHeaven";
+            }
+          },
+          { nm: "💀 道 心 崩 塌", hint: "直面天道后精神崩溃",
+            fn: p => {
+              log("✕✕ 天道化身的面容正是你自己——你无法对自己挥剑。", "bad");
+              log("「原来命数……就是我自己。」道心碎裂，元神消散。", "bad");
+              p.hp = 0;
+              p.questFlags = p.questFlags || {};
+              p.questFlags.questDone = "fallen";
+            }
+          },
+        ],
+      },
+    ],
+  },
 };
 
 /* ============================================================
@@ -955,6 +1629,40 @@ const PARTNERS = {
     hates:[],
     speciality:"atk+",
     minRealm: 9,
+  },
+};
+
+/* v8 · NPC 持续对话（按性格差异化） */
+const PARTNER_LINES = {
+  breakthrough: {
+    "素青鸾": ["「……你又强了。」她抿着唇，眼中有一丝不甘。","「不错。不过离我还差三百年。」她冷冷地说，但剑柄上的手松了些。"],
+    "温如玉": ["「恭喜你呀！」她递过一杯灵茶，笑盈盈地，「我特意炼了一炉丹药庆祝。」","「我就知道你可以的。」她轻声说，眼眶微红。"],
+    "玄阴姬": ["「呵。」她嫣然一笑，「你越强，妾身越欢喜。」","「这般境界……妾身倒是愈发好奇你的极限在哪里了。」"],
+    "墨白狐": ["「哇——你变强了！那以后灵石是不是也变多了？」她两眼放光。","「好厉害！本大人决定今天奖赏你一根尾巴毛！」"],
+    "青霞仙子": ["「万里修途，今日又进一步。」她微微颔首，如赏春花。","「不错。此等心性，仙途可期。」"],
+    "苏长青": ["「哈哈！好小子！来来来，喝一杯庆祝！」他把酒葫芦往你手里塞。","「不赖不赖。照这速度，迟早赶上老哥我。」"],
+    "陆青筠": ["「恩公……阿筠看到了天上那道光。您又变强了吧？」她仰头看你，满眼崇敬。","「阿筠虽然不懂修仙，但能感觉到您和从前不一样了。」"],
+    "玉无缺": ["「你又突破了？」他握剑的手紧了紧，「下次切磋，别再留手。」","「很好。如此一来，再交手才有意思。」"],
+  },
+  nearDeath: {
+    "素青鸾": ["「……别死。」她的声音第一次颤抖了。"],
+    "温如玉": ["「别动！我给你疗伤！」她手忙脚乱地翻出丹药，药粉洒了一地。"],
+    "玄阴姬": ["「你若死了，谁来陪妾身解闷？」她声音冰冷，但指尖在微微发抖。"],
+    "墨白狐": ["「不要死不要死不要死！」她急得耳朵都竖了出来，毛绒绒的尾巴扫来扫去。"],
+    "青霞仙子": ["「凡尘劫数，亦是修行。」她轻抬手，一缕仙气注入你体内。"],
+    "苏长青": ["「撑住！老哥的酒还没请你喝够呢！」他一把扶住你。"],
+    "陆青筠": ["「恩公！」她扑过来，泪水打湿了你的衣襟。"],
+    "玉无缺": ["「你不准死。我还没赢过你。」他咬牙，将灵力渡入你体内。"],
+  },
+  idle: {
+    "素青鸾": ["素青鸾在院中练剑，剑光如霜雪。你看了一会儿，她察觉到你的目光，耳尖微红。","远处传来剑鸣，是素青鸾在晨练。那把青霜剑，被她养得越来越通灵了。"],
+    "温如玉": ["温如玉在丹房中忙碌，身上沾了草药的清香。她哼着一首你听不懂的小调。","温如玉捧着一摞丹方走过来：「你帮我看看这个配比对不对嘛。」"],
+    "玄阴姬": ["玄阴姬倚在窗边，以指尖描绘符箓，红唇微翘。你总觉得她在算计什么。","「你又在偷看妾身？」她忽然抬头，你却什么都没说。"],
+    "墨白狐": ["墨白狐蜷在洞府门口晒太阳，尾巴一翘一翘的。看到你走近，她跳起来：「带灵石了吗？」","远处传来一声炸响——墨白狐又把你的炼丹炉当玩具了。"],
+    "青霞仙子": ["青霞仙子静坐云端，霞光万道。她偶尔会化一朵云给你遮雨。","她望向远方，不知在想什么。你有时觉得，飞升之人的寂寞比凡人更深。"],
+    "苏长青": ["苏长青坐在山石上饮酒赏月，向你招手：「来坐，月色不错。」","苏长青在翻一本旧书，神色复杂。你走近时他笑着合上了：「没什么，旧事罢了。」"],
+    "陆青筠": ["陆青筠在院中晾晒草药，动作娴熟。阳光落在她的侧脸上，很安静。","「恩公，今天的粥我加了灵芝。」她双手捧着碗，站在你的静室外面。"],
+    "玉无缺": ["玉无缺在崖边练剑，剑意凛冽。你能感觉到他在以你为假想敌。","你路过时他正在打坐，睁开一只眼看了你一下，又闭上了。"],
   },
 };
 
@@ -1148,12 +1856,19 @@ function partnerTickAfterAction(days){
     if(pt.age >= pt.lifespan){
       pt.deceased = true;
       const isPrimary = primaryPartner()===pt;
-      log(`※ 【${meta.nm}】寿元将尽，于修仙途中溘然长逝。`, "bad");
+      // v8 · 道侣逝世仪式化（全屏 Modal）
+      const deathNarr = choice(NARRATIVE.partnerDeath);
+      const years = Math.floor((P.days - (pt.firstMet||0))/360);
+      showModal(`<h3 style="color:${meta.color||'#a89c7c'}">🕯 ${meta.nm} · 道 殒</h3>
+        <p style="text-align:left;line-height:1.9;margin:12px 0">${deathNarr}</p>
+        <p style="color:#a89c7c;font-size:12px">与你相识 ${years} 年。好感 ${pt.fondness}/100。</p>
+        <div class="btns"><button id="death-ok" class="primary">……归去</button></div>`);
+      $("death-ok").onclick = ()=>closeModal();
+      log(`【${meta.nm}】溘然长逝。`, "bad");
       if(isPrimary){
-        // 道侣陨落：主角道心 -40
         P.dx = Math.max(0, (P.dx||100) - 40);
         P.karma = Math.min(100, (P.karma||0) + 5);
-        log(`※ 你心如刀绞，道心 -40。`, "bad");
+        log(`你心如刀绞，道心 -40。`, "bad");
       }
       continue;
     }
@@ -1161,6 +1876,11 @@ function partnerTickAfterAction(days){
     const daysSinceMet = P.days - (pt.lastMet||0);
     if(daysSinceMet > 90 && Math.random() < 0.1*days){
       pt.fondness = Math.max(0, pt.fondness - 1);
+    }
+    // v8 · 日常NPC对话（每~90天随机一条）
+    if(!pt.deceased && pt.fondness >= 30 && Math.random() < 0.02 * days){
+      const lines = PARTNER_LINES.idle[pt.key];
+      if(lines) log(choice(lines), "hint");
     }
   }
 }
@@ -1354,6 +2074,27 @@ const MONSTERS = [
  *           hpMul atkMul defMul 战斗倍率（基于 lv 计算）/ skill 灵宠神通
  *   - 灵宠属性 = 基础 × lv 倍率，每升一级强化一次
  * ============================================================ */
+/* v8 · 灵宠性格系统 */
+const PET_PERSONALITIES = ["贪吃","傲娇","忠诚","懒散","好斗","粘人"];
+const PET_LINES = {
+  attack: {
+    "贪吃": "冲上去一口咬住——似乎以为那是食物。",
+    "傲娇": "不情不愿地出了一爪，假装自己并不在意。",
+    "忠诚": "毫不犹豫地扑向敌人，挡在你身前。",
+    "懒散": "打了个哈欠，慢吞吞地挥了一下爪子。",
+    "好斗": "嗷呜一声扑上去，战意昂扬！",
+    "粘人": "回头看了你一眼，确认你安全后才冲上去。",
+  },
+  fed: {
+    "贪吃": "眼睛发亮，吞食之后还意犹未尽地舔着嘴角。",
+    "傲娇": "别过头去吃完了，假装没那么好吃。",
+    "忠诚": "感激地蹭了蹭你的手心。",
+    "懒散": "懒洋洋地啃了两口就趴下了，吃什么都不积极。",
+    "好斗": "吃完后精神大振，对着空气呲牙。",
+    "粘人": "吃的时候一直用头拱你，不让你走。",
+  },
+};
+
 const PETS_META = {
   // —— 8 种妖兽收服灵宠（idx 对应 MONSTERS） ——
   "黑风狼":   {idx:0, nm:"黑风狼",   ele:"木", rarity:"普通", catchRate:0.30,
@@ -1448,6 +2189,7 @@ function createPet(metaKey, customName){
     bornAt: P ? (P.days||0) : 0,
     kills: 0,                                         // 协助击杀数（图鉴用）
     evolveStage: 0,                                   // v6.3 进化预留
+    personality: choice(PET_PERSONALITIES),            // v8 · 随机性格
   };
 }
 
@@ -1639,6 +2381,11 @@ function feedPet(petKey, foodName){
     pet.loyalty = Math.min(100, pet.loyalty + food.loyalty);
   }
   log(`◆ 【${pet.nm}】食【${foodName}】， +${food.exp} 经验`,"good");
+  // v8 · 宠物性格喂养反应
+  if(pet.personality){
+    const line = PET_LINES.fed[pet.personality];
+    if(line) log(`（${pet.nm}${line}）`, "hint");
+  }
   refresh();
   saveGame(true);
 }
@@ -1695,6 +2442,11 @@ function petAssistAttack(){
   m.mhp -= dmg;
   const skTxt = pet.skill ? `【${pet.skill}】` : "";
   log(`✧ 【${pet.nm}】${skTxt} 出击，造成 ${dmg} 伤害！（${Math.max(0,m.mhp)}/${m.maxMhp}）`,"el");
+  // v8 · 宠物性格台词（30%概率）
+  if(pet.personality && Math.random() < 0.3){
+    const line = PET_LINES.attack[pet.personality];
+    if(line) log(`（${pet.nm}${line}）`, "hint");
+  }
   // 灵宠神通的辅助效果：回血/回蓝/护盾
   if(skillMeta){
     if(skillMeta.hpRegen){
@@ -2230,14 +2982,14 @@ const SKILL_META = {
 
 /* —— 怪物扩展元数据：spd / crit / karma 落差（按怪物 idx） —— */
 const MONSTER_META = [
-  {spd:8,  crit:0.05, karma:-1},   // 黑风狼
-  {spd:14, crit:0.08, karma:-1},   // 赤焰狐
-  {spd:18, crit:0.10, karma:-2},   // 玄铁蟒
-  {spd:25, crit:0.15, karma:-5},   // 血煞修士（人形邪修，杀之得善业）
-  {spd:35, crit:0.18, karma:-2},   // 筑基妖修
-  {spd:45, crit:0.22, karma:-2},   // 化形蛟龙
-  {spd:55, crit:0.25, karma:-3},   // 元婴老怪
-  {spd:80, crit:0.30, karma:-5},   // 散修剑仙
+  {spd:8,  crit:0.05, karma:-1, special:{name:"狼嚎",   dmgMul:2.5, interval:[4,6], interruptThreshold:0.15, desc:"仰天长嗥——下一击将是凶猛撕咬！"}},
+  {spd:14, crit:0.08, karma:-1, special:{name:"焰尾",   dmgMul:3.0, interval:[3,5], interruptThreshold:0.18, desc:"九尾扬起——烈焰即将席卷！"}},
+  {spd:18, crit:0.10, karma:-2, special:{name:"缠绞",   dmgMul:3.0, interval:[3,5], interruptThreshold:0.20, desc:"蟒身蜷缩——将以全力缠绞！"}},
+  {spd:25, crit:0.15, karma:-5, special:{name:"血煞掌", dmgMul:3.5, interval:[3,5], interruptThreshold:0.22, desc:"双掌血光大盛——血煞大法即将爆发！"}},
+  {spd:35, crit:0.18, karma:-2, special:{name:"妖术",   dmgMul:3.5, interval:[3,4], interruptThreshold:0.25, desc:"掐诀念咒——妖力汇聚，大术将成！"}},
+  {spd:45, crit:0.22, karma:-2, special:{name:"龙息",   dmgMul:4.0, interval:[3,5], interruptThreshold:0.28, desc:"深吸一口——蛟龙之息即将喷薄！"}},
+  {spd:55, crit:0.25, karma:-3, special:{name:"元婴爆", dmgMul:4.0, interval:[3,4], interruptThreshold:0.30, desc:"元婴虚影浮现——自爆之势！"}},
+  {spd:80, crit:0.30, karma:-5, special:{name:"剑域",   dmgMul:5.0, interval:[3,4], interruptThreshold:0.35, desc:"万剑归宗——剑域即将展开！"}},
 ];
 // 注：karma 为负数表示「击杀此怪可获得正业力」（杀邪得善），
 //     妖兽类绝对值小，邪修类大；详见 onKarma 入口
@@ -2321,6 +3073,13 @@ function newPlayer(name,rootName,elements){
     // —— v7 · 道侣 NPC 系统 ——
     partners: [],                              // 已相识的道侣 NPC
     partnerFlags: {},                          // 道侣共同 flag（已婚/生离等全局标记）
+    // —— v8 · 体验优化 ——
+    streak: 0,                                 // 累计闭关次数（里程碑用）
+    streakBest: 0,                             // 历史最高连修（保留兼容）
+    fortune: 0,                                // 气运值 -100~+100（否极泰来）
+    eventChains: {},                           // 多步事件链进度
+    cultRun: 0,                                // 连续闭关次数（交替奖励）
+    advRun: 0,                                 // 连续历练次数（交替奖励）
   };
   recalcStats(p);
   // 初始化后按当前 maxHp/maxMp 满血满蓝
@@ -2636,13 +3395,95 @@ function getBuff(p){
 
 function gainCult(p,base,reason){
   const buff = getBuff(p);
-  const amt=Math.floor(base*rootMul(p)*TECHS[p.tech][0]*gearCultBonus(p)*buff.cultMul);
+  // v8 · 突破余韵：30天内修为 ×1.5
+  let bkMul = 1;
+  if(p.flags && p.flags._bkBuff && (p.days||0) < p.flags._bkBuff){
+    bkMul = 1.5;
+  }
+  // P0-1 · 交替奖励临时倍率
+  const altMul = p._advAltMul || 1;
+  const amt=Math.floor(base*rootMul(p)*TECHS[p.tech][0]*gearCultBonus(p)*buff.cultMul*bkMul*altMul);
+  const prevCult = p.cult;
   p.cult+=amt;
-  log(`【${reason||"修炼"}】 修为 +${amt}`,"good");
+  const tags = [];
+  if(bkMul > 1) tags.push("余韵×1.5");
+  if(altMul > 1) tags.push("交替×2");
+  const tagStr = tags.length ? " 【" + tags.join("·") + "】" : "";
+  log(`【${reason||"修炼"}】 修为 +${amt}${tagStr}`,"good");
+  // v8 · 里程碑检查
+  checkMilestones(p, prevCult);
+  // P0-1 · 小境界检查
+  checkMiniBk(p, prevCult);
 }
+function checkMilestones(p, prevCult){
+  for(const [threshold, msg, rewards] of MILESTONES){
+    const flagKey = "_ms_" + threshold;
+    if(p.cult >= threshold && prevCult < threshold && !(p.flags||{})[flagKey]){
+      if(!p.flags) p.flags = {};
+      p.flags[flagKey] = true;
+      log(`✦✦ 【里程碑】${msg} ✦✦`, "epic"); SFX.milestone(); vfx("gold");
+      if(rewards.ti){ p.ti = (p.ti||0) + rewards.ti; log(`体魄 +${rewards.ti}（永久）`, "good"); }
+      if(rewards.ling){ p.ling = (p.ling||0) + rewards.ling; log(`灵力 +${rewards.ling}（永久）`, "good"); }
+      if(rewards.shen){ p.shen = (p.shen||0) + rewards.shen; log(`神识 +${rewards.shen}（永久）`, "good"); }
+      if(rewards.wu){ p.wu = (p.wu||0) + rewards.wu; log(`悟性 +${rewards.wu}（永久）`, "good"); }
+      if(rewards.yun){ p.yun = (p.yun||0) + rewards.yun; log(`气运 +${rewards.yun}（永久）`, "good"); }
+      if(rewards.dao){ p.dao = (p.dao||0) + rewards.dao; log(`道行 +${rewards.dao}（永久）`, "good"); }
+      if(rewards.lifespan){ p.lifespan += rewards.lifespan; log(`阳寿 +${rewards.lifespan} 年`, "good"); }
+      if(rewards.items){
+        for(const [item,cnt] of Object.entries(rewards.items)){
+          p.bag[item] = (p.bag[item]||0) + cnt;
+          log(`获得 ${item} ×${cnt}`, "epic");
+        }
+      }
+      recalcStats(p);
+    }
+  }
+}
+
+/* P0-1 · 小境界突破（每跨过当前→下阶 20% 门槛触发一次，共4档） */
+const MINI_BK_TEXTS = [
+  "经脉又通一处，灵气运转更加顺畅。",
+  "丹田容量似乎又扩大了些许。",
+  "修为精进，已能隐约感应下一层境界的门槛。",
+  "突破近在咫尺，体内灵力蠢蠢欲动！"
+];
+const MINI_BK_STATS = ["ti","ling","shen","wu","yun","dao"];
+function checkMiniBk(p, prevCult){
+  if(p.realmIdx + 1 >= REALMS.length) return;
+  const curThresh = REALMS[p.realmIdx][1];
+  const nxtThresh = REALMS[p.realmIdx + 1][1];
+  const gap = nxtThresh - curThresh;
+  if(gap <= 0) return;
+  for(let i = 1; i <= 4; i++){
+    const mark = curThresh + Math.floor(gap * i * 0.2);
+    const flagKey = `_mbk_${p.realmIdx}_${i}`;
+    if(p.cult >= mark && prevCult < mark && !p.flags[flagKey]){
+      p.flags[flagKey] = true;
+      const pct = i * 20;
+      log(`✧ 【${pct}%】${MINI_BK_TEXTS[i-1]}`, "good"); SFX.milestone(); vfx("blue");
+      // +1 随机属性
+      const stat = choice(MINI_BK_STATS);
+      const statNames = {ti:"体魄",ling:"灵力",shen:"神识",wu:"悟性",yun:"气运",dao:"道行"};
+      p[stat] = (p[stat]||0) + 1;
+      log(`${statNames[stat]} +1`, "good");
+      recalcStats(p);
+    }
+  }
+}
+
 function takeDmg(p,d){
   p.hp=Math.max(0,p.hp-d);
   log(`受到 ${d} 点伤害（${p.hp}/${p.maxHp}）`,"bad");
+  // v8 · 濒死时道侣惊呼（每次战斗仅触发一次）
+  if(p.hp > 0 && p.hp < p.maxHp * 0.15 && !p._nearDeathLine){
+    p._nearDeathLine = true;
+    const pts = (p.partners||[]).filter(x=>!x.deceased && x.fondness >= 30);
+    if(pts.length){
+      const pt = choice(pts);
+      const lines = PARTNER_LINES.nearDeath[pt.key];
+      if(lines) log(choice(lines), "hint");
+    }
+  }
 }
 function heal(p,a){
   p.hp=Math.min(p.maxHp,p.hp+a);
@@ -3056,14 +3897,56 @@ function actCultivate(){
   for(let i=0;i<days;i++) total += base + rand(-2,4);
   total = Math.floor(total * stateMul);
 
-  log(`◇ 闭关 ${days} 日，心境：『${stateName}』 ×${stateMul.toFixed(1)}`, stateClass);
+  // —— P0-1 · 交替奖励系统（替代旧连修惩罚） ——
+  P.streak = (P.streak||0) + 1;  // 累计闭关次数（里程碑用）
+  P.cultRun = (P.cultRun||0) + 1;
+  // 连续历练 >=3 次后切回闭关 → 交替奖励 ×2
+  let altMul = 1;
+  if((P.advRun||0) >= 3){
+    altMul = 2;
+    log(`⚡ 游历归来，感悟颇深！修炼效率翻倍！`, "epic");
+  }
+  P.advRun = 0;
+  total = Math.floor(total * altMul);
+
+  // v8 · 叙事文本（40%概率替代机械log）
+  const narrPool = NARRATIVE.cultState[stateName];
+  if(narrPool && Math.random() < 0.4){
+    log(choice(narrPool), stateClass);
+    log(`（闭关 ${days} 日 · ×${stateMul.toFixed(1)}${altMul>1?" · 交替×2":""}）`, "hint");
+  } else {
+    log(`◇ 闭关 ${days} 日，心境：『${stateName}』 ×${stateMul.toFixed(1)}${altMul>1?" · 交替×2":""}`, stateClass);
+  }
+  if(P.cultRun >= 3){
+    log(`💡 连续闭关 ${P.cultRun} 次，下次历练将获双倍收益！`, "hint");
+  }
+  // 累计闭关里程碑奖励（一次性）
+  if(P.streak === 5 && !P.flags._sk5){
+    P.wu = (P.wu||0) + 1; P.flags._sk5 = true;
+    log("✦ 累计闭关五次，悟性有所精进（悟性 +1 永久）", "epic");
+    recalcStats(P);
+  } else if(P.streak === 10 && !P.flags._sk10){
+    P.ling = (P.ling||0) + 2; P.flags._sk10 = true;
+    log("✦ 累计闭关十次，灵力根基大增（灵力 +2 永久）", "epic");
+    recalcStats(P);
+  } else if(P.streak === 15 && !P.flags._sk15){
+    P.dao = (P.dao||0) + 3; P.flags._sk15 = true;
+    log("✦ 累计闭关十五次，道行深厚（道行 +3 永久）", "epic");
+    recalcStats(P);
+  }
+
   gainCult(P, total, `闭关${days}日`);
   passDays(P, days);
   sectTaskAdvance("cult", days);
 
-  // —— 闭关随机事件（30% 概率触发；境界越高、闭关越长越易触发） ——
-  const evRate = 0.25 + Math.min(0.35, days*0.02 + P.realmIdx*0.01);
+  // —— 闭关随机事件（P0-1：提高事件密度，减少空等待） ——
+  const evRate = 0.40 + Math.min(0.50, days*0.03);
   if(Math.random() < evRate){
+    // v8：60% 概率触发选择型事件（需有满足条件的事件）
+    if(Math.random() < 0.6 && triggerChoiceEvent()){
+      // 选择事件通过 modal 展示，玩家点击后触发 afterAction
+      refresh(); saveGame(true); return;
+    }
     triggerCultEvent(days);
     if(!alive(P)){ afterAction(); return; }
     // 战斗事件已自行调用 startBattle
@@ -3074,6 +3957,14 @@ function actCultivate(){
   if(P.dx < P.maxDx){
     const recover = Math.min(P.maxDx - P.dx, Math.floor(days * 1.5));
     P.dx += recover;
+  }
+
+  // v8 · 事件链：检查新触发 + 推进已有链
+  checkNewEventChains();
+  if(Object.keys(P.eventChains||{}).length){
+    advanceEventChains();
+    if(!alive(P)){ afterAction(); return; }
+    if(typeof isModalShowing==="function" && isModalShowing()){ refresh(); saveGame(true); return; }
   }
 
   afterAction();
@@ -3264,20 +4155,522 @@ const CULT_EVENTS = [
       const m = choice(cands.length?cands:[MONSTERS[0]]);
       startBattle(m);
     }},
+
+  // ============ v8 · 🌟 大奖事件（Jackpot） ============
+  {tag:"epic", w:1, cond:p=>p.realmIdx>=6, t:"仙 人 遗 府",
+    fn:p=>{
+      const nxt = nextThreshold(p) || 100000;
+      const bonus = Math.floor(nxt * 0.25);
+      log("✦✦ 闭关中灵识忽然触及一处隐蔽的空间裂缝——你误入上古仙人遗留的洞府！", "epic"); SFX.chime(); vfx("gold");
+      log("府中丹方、法宝、灵药一应俱全，你逐一收取传承。", "epic");
+      gainCult(p, bonus, "仙人遗府传承");
+      p.wu = (p.wu||0) + 5;
+      log("悟性 +5（永久·仙人传承）", "good");
+      recalcStats(p);
+    }},
+  {tag:"epic", w:1, cond:p=>p.realmIdx>=4 && (p.streak||0)>=5, t:"天 地 共 鸣",
+    fn:p=>{
+      const bonus = (p.streak||5) * 500;
+      log("✦✦ 连续修炼引发天地共鸣！方圆百里灵气如潮水般汇聚，草木为之俯首！", "epic"); SFX.chime(); vfx("gold");
+      gainCult(p, bonus, "天地共鸣");
+      for(const k of ["ti","ling","shen","wu","yun","dao"]){ p[k] = (p[k]||0) + 3; }
+      log("六根骨全属性 +3（永久·天地馈赠）", "good");
+      recalcStats(p);
+    }},
+  {tag:"epic", w:1, cond:p=>p.realmIdx>=8 && (p.karma||0)>0, t:"道 果 降 临",
+    fn:p=>{
+      const bonus = Math.floor(p.cult * 0.10);
+      log("✦✦ 冥冥之中，你感应到前世修行的道果在此生降临！", "epic"); SFX.chime(); vfx("gold");
+      log("刹那间参悟天机，修为暴涨！", "epic");
+      gainCult(p, bonus, "道果降临");
+      p.dao = (p.dao||0) + 10;
+      log("道行 +10（永久·前世道果）", "good");
+      recalcStats(p);
+    }},
 ];
+
+/* ==========================================================
+ *  v8 · 叙事文本库
+ * ========================================================== */
+const NARRATIVE = {
+  cultState: {
+    "心 浮 气 躁": [
+      "周遭灵气如浊水般沉滞，你的心神难以集中。",
+      "静室中你辗转难安，蒲团上的灰尘似乎也在嘲笑你的急躁。",
+    ],
+    "心 神 不 宁": [
+      "灵气时聚时散，你的心湖泛起层层涟漪，始终无法入定。",
+      "窗外风声扰人，你的思绪飘向了远处，修炼事倍功半。",
+    ],
+    "心 平 气 和": [
+      "你静坐调息，灵气缓缓注入经脉，一切波澜不惊。",
+      "呼吸渐匀，灵气循经脉流转，不急不徐，恰如其分。",
+    ],
+    "心 如 止 水": [
+      "你的心境澄澈如镜，灵气纷至沓来，修炼效率倍增。",
+      "万念俱寂，灵台空明。你感到体内经脉微微发热，修为稳步攀升。",
+    ],
+    "灵 台 清 明": [
+      "恍惚间你似乎触摸到了某种玄妙的韵律，灵气运转如臂使指。",
+      "识海中浮现出功法的深层奥义，你如饮甘露，修炼大有裨益。",
+    ],
+    "天 人 合 一": [
+      "天地灵气如百川归海般涌入丹田。你分不清自己是人还是天，是风还是云。",
+      "你闭目端坐，忽觉此身即天地，天地即此身。方圆百里草木为你俯首。",
+    ],
+  },
+  breakthrough: [
+    "体内仿佛有什么东西碎裂了——不，是打开了。灵气第一次流经经脉，像初春的溪水流过枯涸的河床。你睁开眼，世界不一样了。",
+    "经脉中灵气从涓涓细流汇为湍急溪流。你能感觉到空气中每一丝灵气的流动，如同盲人第一次看见了光。",
+    "灵气在体内奔涌，三百六十五处窍穴依次亮起。你的感知范围骤然扩大了数倍，连蚁虫的心跳都清晰可闻。",
+    "丹田深处传来一声脆响——你的灵力凝成了第一缕真气。空气中弥漫着松脂与泥土的清香，那是天地对你的嘉许。",
+    "九转功成。你感到经脉中的灵气不再是借来的力量，而是你身体的一部分。你终于踏上了修仙之途。",
+    "轰——！你的精神如利剑破开一层无形的壁障。筑基初成，你能清晰地感觉到自己与天地之间那条若隐若现的纽带。",
+    "基台愈固，灵力运转之间已有了几分从容。你开始隐约理解，修仙之路不在于快，而在于稳。",
+    "你静坐三日未动，体内灵力自行运转，每一次循环都比上一次更加圆融。你知道，大圆满不远了。",
+    "灵力在丹田深处翻涌，忽然凝成一颗晶莹的光珠——筑基大圆满。你感到前所未有的充盈，仿佛整个世界都在你的呼吸之间。",
+    "丹田中那颗光珠缓缓旋转，发出温润的光芒——金丹已成。你闭目良久，睁眼时，瞳孔深处似有流光闪过。",
+    "金丹温润如玉，在丹田中缓缓转动。你感到灵力的质变——不再是溪流，而是深潭。深不见底，静谧而磅礴。",
+    "金丹龟裂——不是碎裂，而是蜕变。从裂隙中浮出一缕虚影，那是你的元神雏形。你第一次看见了自己灵魂的样子。",
+    "元婴如婴儿般蜷缩在丹田之中，面容与你一般无二。它睁开眼的那一刻，你感到天地都在微微颤抖。",
+    "元婴盘坐于金丹废墟之上，周身环绕着五色灵光。你的神识可以覆盖方圆十里，连飞鸟过境都逃不过感知。",
+    "元婴长成，法力深厚。你立于山巅，衣袂飘飘，隐约已有了几分仙人气度。来时路上的艰辛，此刻都化作了脚下的云海。",
+    "你的肉身在元神之力下重塑——每一寸肌肤、每一根骨骼都被灵力淬炼。化神，是凡与仙之间最后的分水岭。",
+    "虚空在你眼前层层剥开，露出隐藏在现实背后的道则纹路。炼虚，便是将这些纹路刻入灵魂。",
+    "你的身体与虚空融为一体，又从虚空中凝出。合体之境，你已能撕裂空间短距传送。世间少有敌手。",
+    "天地法则在你面前如翻开的书页。大乘期，你开始参悟属于自己的道。",
+    "九天之上，劫云翻涌。渡过此劫，便是飞升。你抬头望去，心中竟生出几分平静——这一路，值了。",
+    "仙——你终于触到了这个字的真意。不是长生，不是全知。是自在。是圆满。是回望来时路时，无怨无悔。",
+  ],
+  partnerDeath: [
+    "你站在她的墓前，久久不语。风吹过松林，发出呜咽般的声响。你忽然想起她第一次对你笑的那个午后。",
+    "你将她的遗物收入储物袋，手指触到那枚她常戴的玉簪时，指尖微微发颤。这条道，从此只剩你一人走了。",
+    "她走得很安详。最后一刻她握着你的手，说了一句你听不清的话。你后来想了很久，觉得她说的是'值得'。",
+  ],
+};
+
+/* ==========================================================
+ *  v8 · 选择型事件（闭关中触发，需玩家抉择）
+ * ========================================================== */
+const CHOICE_EVENTS = [
+  {cond:p=>p.realmIdx>=3, t:"古 修 残 魂",
+    desc:"闭关中你感到一缕上古修士残魂试图侵入识海，其中蕴含着浩瀚的修炼记忆。",
+    opts:[
+      {nm:"吞噬残魂", hint:"高风险·高回报",
+        fn:p=>{
+          if(Math.random()<0.6){
+            const bonus = (p.realmIdx+2)*300;
+            gainCult(p, bonus, "吞噬残魂");
+            p.ling = (p.ling||0) + 3;
+            log("残魂记忆融入识海，灵力根基大增（灵力 +3 永久）！", "epic");
+            recalcStats(p);
+          } else {
+            const dxLoss = 30 + p.realmIdx*2;
+            p.dx = Math.max(0, (p.dx||100) - dxLoss);
+            takeDmg(p, Math.floor(p.maxHp * 0.2));
+            log(`残魂反噬！识海震荡，道心 -${dxLoss}。`, "bad");
+          }
+        }},
+      {nm:"引导残魂", hint:"稳定·中回报",
+        fn:p=>{
+          p.dao = (p.dao||0) + 5;
+          p.wu = (p.wu||0) + 2;
+          log("你以温和之法引导残魂超度，从中领悟修行真谛（道行 +5，悟性 +2 永久）。", "good");
+          recalcStats(p);
+        }},
+      {nm:"驱散残魂", hint:"安全·回道心",
+        fn:p=>{
+          p.dx = Math.min(p.maxDx, (p.dx||100) + 15);
+          p.karma = Math.min(100, (p.karma||0) + 3);
+          log("你以正气驱散残魂，心境更加安宁（道心 +15，功德 +3）。", "good");
+        }},
+    ]},
+  {cond:p=>p.realmIdx>=2, t:"地 脉 宝 藏",
+    desc:"你感应到洞府下方深处有微弱的灵气波动，似乎埋藏着什么东西。",
+    opts:[
+      {nm:"全力探查", hint:"耗时·大奖",
+        fn:p=>{
+          passDays(p, 10);
+          const r = Math.random();
+          if(r < 0.4){
+            const bonus = (p.realmIdx+3)*250;
+            gainCult(p, bonus, "地脉宝藏");
+            log("你掘出一块蕴含浓郁灵气的矿石，修为大涨！", "epic");
+          } else if(r < 0.7){
+            const items = ["聚气丹","破障丹","凝神丹"];
+            const item = choice(items);
+            p.bag[item] = (p.bag[item]||0) + 3;
+            log(`你在地脉中找到了 ${item} ×3！`, "good");
+          } else {
+            gainCult(p, (p.realmIdx+1)*100, "地脉残余灵气");
+            log("地脉已近枯竭，仅余少许灵气。", "hint");
+          }
+        }},
+      {nm:"小心试探", hint:"安全·小奖",
+        fn:p=>{
+          passDays(p, 3);
+          gainCult(p, (p.realmIdx+1)*80, "地脉灵气");
+          log("你谨慎地汲取了一些地脉灵气，聊胜于无。", "good");
+        }},
+      {nm:"封印不动", hint:"无风险·回道心",
+        fn:p=>{
+          p.dx = Math.min(p.maxDx, (p.dx||100) + 10);
+          p.karma = Math.min(100, (p.karma||0) + 2);
+          log("你选择不贪，以禁制封印地脉。心境反而更加通透（道心 +10，功德 +2）。", "good");
+        }},
+    ]},
+  {cond:p=>p.realmIdx>=4, t:"过 路 修 士",
+    desc:"一名云游修士路过你的洞府，声称可以以物易物。",
+    opts:[
+      {nm:"以灵石换丹药", hint:"消耗灵石100",
+        fn:p=>{
+          if((p.bag["灵石"]||0) < 100){
+            log("你的灵石不足，修士摇头离去。", "hint"); return;
+          }
+          p.bag["灵石"] -= 100;
+          const pills = ["破障丹","天劫真血","凝神丹","蟠桃","万年灵芝精"];
+          const pill = choice(pills);
+          p.bag[pill] = (p.bag[pill]||0) + 1;
+          log(`修士笑而不语，留下 ${pill} ×1 后飘然而去。`, "epic");
+        }},
+      {nm:"以修为换机缘", hint:"失去500修为",
+        fn:p=>{
+          if(p.cult < 500){ log("你修为尚浅，修士叹息离去。", "hint"); return; }
+          p.cult -= 500;
+          const statKey = choice(["ti","ling","shen","wu","yun","dao"]);
+          const statNames = {ti:"体魄",ling:"灵力",shen:"神识",wu:"悟性",yun:"气运",dao:"道行"};
+          const gain = rand(3, 8);
+          p[statKey] = (p[statKey]||0) + gain;
+          log(`修为化为机缘——${statNames[statKey]} +${gain}（永久）。修士点头："此乃正道。"`, "good");
+          recalcStats(p);
+        }},
+      {nm:"闭门不见", hint:"无事发生",
+        fn:p=>{
+          log("你婉拒了修士。他叹了口气，转身消失在云雾中。", "hint");
+        }},
+    ]},
+  {cond:p=>p.realmIdx>=5 && p.cult >= (nextThreshold(p)||Infinity)*0.7, t:"天 劫 预 兆",
+    desc:"你隐约感到体内灵力开始与天地产生共鸣，天劫将临的气息若隐若现。",
+    opts:[
+      {nm:"提前感悟", hint:"+道行",
+        fn:p=>{
+          p.dao = (p.dao||0) + 3;
+          log("你静心体悟天劫的气息，从中参透几分大道真意（道行 +3 永久）。", "good");
+          recalcStats(p);
+        }},
+      {nm:"抗拒天意", hint:"+修为 -道心",
+        fn:p=>{
+          const nxt = nextThreshold(p)||10000;
+          const bonus = Math.floor(nxt * 0.10);
+          gainCult(p, bonus, "逆天蓄势");
+          const dxLoss = 20;
+          p.dx = Math.max(0, (p.dx||100) - dxLoss);
+          log(`你强行压下天劫预兆，以天地之力蓄势——但道心受损 -${dxLoss}。`, "bad");
+        }},
+      {nm:"顺其自然", hint:"+道心",
+        fn:p=>{
+          p.dx = Math.min(p.maxDx, (p.dx||100) + 15);
+          log("你不喜不惧，静待天意。道心愈发坚定（道心 +15）。", "good");
+        }},
+    ]},
+  {cond:p=>p.realmIdx>=6 && (p.dx||100) < (p.maxDx||100)*0.5, t:"心 魔 低 语",
+    desc:"道心低迷之际，你听到识海深处传来低沉的笑声……心魔正在觉醒。",
+    opts:[
+      {nm:"正面迎战", hint:"高风险·大奖",
+        fn:p=>{
+          if(Math.random() < 0.5){
+            p.dx = p.maxDx;
+            p.wu = (p.wu||0) + 5;
+            log("✦ 你在识海中与心魔殊死搏斗，最终将其降服！道心圆满，悟性大增（悟性 +5 永久）！", "epic");
+            recalcStats(p);
+          } else {
+            p.dx = Math.max(0, (p.dx||100) - 40);
+            takeDmg(p, Math.floor(p.maxHp * 0.3));
+            log("心魔之力远超预期，你被反噬！道心崩裂，气血大损。", "bad");
+          }
+        }},
+      {nm:"以静制动", hint:"稳定回复",
+        fn:p=>{
+          p.dx = Math.min(p.maxDx, (p.dx||100) + 25);
+          log("你以不变应万变，心魔在你的定力面前渐渐沉寂（道心 +25）。", "good");
+        }},
+      {nm:"与魔共舞", hint:"另类路线·+业力",
+        fn:p=>{
+          p.karma = Math.max(-100, (p.karma||0) - 10);
+          const bonus = (p.realmIdx+2)*200;
+          gainCult(p, bonus, "魔道修为");
+          p.ti = (p.ti||0) + 5;
+          log("你接纳了心魔的一部分力量，肉身得到淬炼——但业力加深（体魄 +5，业力 -10）。", "bad");
+          recalcStats(p);
+        }},
+    ]},
+];
+
+/* ==========================================================
+ *  v8 · 事件链（跨多次闭关的连续故事）
+ * ========================================================== */
+const EVENT_CHAINS = {
+  "灵泉异变": {
+    trigger: p => p.realmIdx >= 3 && Math.random() < 0.08,
+    steps: [
+      {desc:"你闭关时，忽然感到洞府角落的小溪泛起异光。水面浮现微弱的灵气波纹……",
+        fn: p => { log("洞府角落的小溪开始泛起异光……", "sys"); }},
+      {desc:"溪水已变为碧绿色，隐约能看到水底有什么东西在发光。似乎在召唤你。",
+        opts: [
+          {nm:"潜入水底", hint:"冒险",
+            fn: p => {
+              p.eventChains["灵泉异变"].chose = "dive";
+              log("你深吸一口气，纵身跃入碧绿的溪水中……", "sys");
+            }},
+          {nm:"继续观察", hint:"谨慎",
+            fn: p => {
+              p.eventChains["灵泉异变"].chose = "wait";
+              log("你按捺住好奇心，继续观察溪水的变化。", "hint");
+            }},
+        ]},
+      {desc:"",  // 结局根据选择不同
+        fn: p => {
+          const chose = (p.eventChains["灵泉异变"]||{}).chose;
+          if(chose === "dive"){
+            if(Math.random() < 0.65){
+              const bonus = (p.realmIdx+3)*400;
+              gainCult(p, bonus, "灵泉秘藏");
+              p.shen = (p.shen||0) + 5;
+              log("✦ 水底藏着一座上古传送阵的碎片！灵气灌体，神识大增（神识 +5 永久）！", "epic");
+              recalcStats(p);
+            } else {
+              takeDmg(p, Math.floor(p.maxHp * 0.25));
+              log("水底的是一只沉睡的水妖！它被惊醒后狠狠咬了你一口！", "bad");
+            }
+          } else {
+            const bonus = (p.realmIdx+2)*150;
+            gainCult(p, bonus, "灵泉自然馈赠");
+            p.dao = (p.dao||0) + 3;
+            log("溪水在第三日自行消散，留下一颗温润的灵珠。你从中领悟耐心之道（道行 +3 永久）。", "good");
+            recalcStats(p);
+          }
+          delete p.eventChains["灵泉异变"];
+        }},
+    ]},
+  "山中邻居": {
+    trigger: p => p.realmIdx >= 4 && Math.random() < 0.06,
+    steps: [
+      {desc:"你感到附近有修士的气息——似乎有人搬进了百里外的一座山洞。",
+        fn: p => { log("附近来了一位修士邻居……", "sys"); }},
+      {desc:"那位修士似乎在闭关炼丹，偶尔有丹香飘来。你要去拜访吗？",
+        opts: [
+          {nm:"登门拜访", hint:"结交",
+            fn: p => {
+              p.eventChains["山中邻居"].chose = "visit";
+              log("你带了一壶灵酒登门拜访，对方也是个健谈之人。", "good");
+            }},
+          {nm:"暗中观察", hint:"警惕",
+            fn: p => {
+              p.eventChains["山中邻居"].chose = "watch";
+              log("你暗中观察了几日，此人举止正派，但你仍保持警惕。", "hint");
+            }},
+        ]},
+      {desc:"那位邻居修士来回访你了。他手中提着一篮灵果，神色平和。",
+        opts: [
+          {nm:"互赠灵物", hint:"深交",
+            fn: p => {
+              p.eventChains["山中邻居"].chose2 = "gift";
+              p.bag["聚气丹"] = (p.bag["聚气丹"]||0) + 3;
+              log("你们交换了灵物，他赠你聚气丹 ×3。", "good");
+            }},
+          {nm:"婉言谢绝", hint:"保持距离",
+            fn: p => {
+              p.eventChains["山中邻居"].chose2 = "refuse";
+              log("你婉言谢绝了他的好意，他笑了笑便离去了。", "hint");
+            }},
+        ]},
+      {desc:"",
+        fn: p => {
+          const c1 = (p.eventChains["山中邻居"]||{}).chose;
+          const c2 = (p.eventChains["山中邻居"]||{}).chose2;
+          if(c1==="visit" && c2==="gift"){
+            // 盟友结局
+            gainCult(p, (p.realmIdx+2)*300, "道友切磋");
+            p.wu = (p.wu||0) + 3;
+            log("✦ 你们成为了挚交道友！他传了你一门辅修心法（悟性 +3 永久）。日后他搬走了，但留下了一枚传讯玉简。", "epic");
+            recalcStats(p);
+          } else if(c1==="watch"){
+            // 师父结局
+            p.dao = (p.dao||0) + 5;
+            log("他在离开前找到你：「你的警觉心不错。」他指点了你几句修行要诀（道行 +5 永久）。原来他是一位化神期前辈。", "epic");
+            recalcStats(p);
+          } else {
+            // 普通结局
+            gainCult(p, (p.realmIdx+1)*100, "邻居缘分");
+            log("那位修士不久后离开了。你们没有深交，但他的丹香仍留在记忆里。或许这也是一种缘分。", "hint");
+          }
+          delete p.eventChains["山中邻居"];
+        }},
+    ]},
+  "心魔萌芽": {
+    trigger: p => p.realmIdx >= 6 && (p.dx||100) < (p.maxDx||100)*0.45 && Math.random() < 0.12,
+    steps: [
+      {desc:"道心低迷之际，你的识海深处传来低沉的耳语：'放弃吧……修仙不过是另一种形式的执念。'",
+        fn: p => {
+          p.dx = Math.max(0, (p.dx||100) - 10);
+          log("识海深处传来低沉耳语，道心微颤（道心 -10）……", "bad");
+        }},
+      {desc:"耳语声越来越响。闭目之间，你看到了一个与自己一模一样的身影，站在识海的深渊边缘。",
+        opts: [
+          {nm:"正面对决", hint:"高风险·大奖",
+            fn: p => {
+              if(Math.random() < 0.55){
+                p.dx = p.maxDx;
+                p.wu = (p.wu||0) + 8;
+                p.dao = (p.dao||0) + 5;
+                log("✦✦ 你在识海中与心魔殊死搏斗——最终将其彻底降服！", "epic");
+                log("心魔化为你的力量，道心圆满，悟性大增（悟性 +8，道行 +5 永久）！", "epic");
+                recalcStats(p);
+              } else {
+                p.dx = Math.max(0, Math.floor((p.dx||100) * 0.3));
+                takeDmg(p, Math.floor(p.maxHp * 0.35));
+                log("心魔之力远超你的想象。你勉强逃出识海，但道心几近崩溃。", "bad");
+              }
+              delete p.eventChains["心魔萌芽"];
+            }},
+          {nm:"以道化魔", hint:"稳定·中回报",
+            fn: p => {
+              p.dx = Math.min(p.maxDx, (p.dx||100) + 30);
+              p.dao = (p.dao||0) + 3;
+              log("你不对抗，不逃避，以平常心直视心魔。它渐渐消散，化为你的一部分（道心 +30，道行 +3 永久）。", "good");
+              recalcStats(p);
+              delete p.eventChains["心魔萌芽"];
+            }},
+        ]},
+    ]},
+};
+
+/* 推进事件链 */
+function advanceEventChains(){
+  for(const [chainId, chain] of Object.entries(EVENT_CHAINS)){
+    if(!P.eventChains[chainId]) continue;
+    const state = P.eventChains[chainId];
+    const step = chain.steps[state.step];
+    if(!step) { delete P.eventChains[chainId]; continue; }
+    // 显示描述
+    if(step.desc) log(`【${chainId}】${step.desc}`, "sys");
+    if(step.opts){
+      // 选择事件 — 弹窗
+      let html = `<h3 style="color:var(--gold)">📜 ${chainId}（${state.step+1}/${chain.steps.length}）</h3>`;
+      if(step.desc) html += `<p style="text-align:left;line-height:1.8;margin:12px 0">${step.desc}</p>`;
+      html += `<div class="btns" style="flex-direction:column;gap:8px">`;
+      step.opts.forEach((opt, i) => {
+        html += `<button id="ec-${i}" class="${i===0?'epic':'primary'}" style="width:100%;text-align:left;padding:8px 12px">`;
+        html += `<b>${opt.nm}</b>`;
+        if(opt.hint) html += ` <span style="color:#a89c7c;font-size:12px">（${opt.hint}）</span>`;
+        html += `</button>`;
+      });
+      html += `</div>`;
+      showModal(html);
+      step.opts.forEach((opt, i) => {
+        const btn = $(`ec-${i}`);
+        if(btn) btn.onclick = () => {
+          closeModal();
+          opt.fn(P);
+          state.step++;
+          refresh(); saveGame(true);
+        };
+      });
+    } else {
+      // 自动推进
+      if(step.fn) step.fn(P);
+      state.step++;
+      // 如果已是最后一步，清理
+      if(state.step >= chain.steps.length){
+        delete P.eventChains[chainId];
+      }
+    }
+    break; // 每次只推进一个链
+  }
+}
+
+/* 检查是否有新事件链可触发 */
+function checkNewEventChains(){
+  for(const [chainId, chain] of Object.entries(EVENT_CHAINS)){
+    if(P.eventChains[chainId]) continue; // 已在进行中
+    if(P.flags && P.flags["_ec_done_"+chainId]) continue; // 已完成过
+    if(chain.trigger(P)){
+      P.eventChains[chainId] = {step: 0};
+      if(!P.flags) P.flags = {};
+      P.flags["_ec_done_"+chainId] = true; // 每条链只触发一次
+    }
+  }
+}
+
+function triggerChoiceEvent(){
+  const pool = CHOICE_EVENTS.filter(e=>!e.cond || e.cond(P));
+  if(!pool.length) return false;
+  const ev = choice(pool);
+  let html = `<h3 style="color:var(--gold)">⚡ ${ev.t}</h3>`;
+  html += `<p style="text-align:left;line-height:1.8;margin:12px 0">${ev.desc}</p>`;
+  html += `<div class="btns" style="flex-direction:column;gap:8px">`;
+  ev.opts.forEach((opt, i) => {
+    html += `<button id="ce-${i}" class="${i===0?'epic':'primary'}" style="width:100%;text-align:left;padding:8px 12px">`;
+    html += `<b>${opt.nm}</b>`;
+    if(opt.hint) html += ` <span style="color:#a89c7c;font-size:12px">（${opt.hint}）</span>`;
+    html += `</button>`;
+  });
+  html += `</div>`;
+  showModal(html);
+  ev.opts.forEach((opt, i) => {
+    const btn = $(`ce-${i}`);
+    if(btn) btn.onclick = () => { closeModal(); opt.fn(P); afterAction(); };
+  });
+  return true;
+}
 
 function triggerCultEvent(days){
   const pool = CULT_EVENTS.filter(e=>!e.cond || e.cond(P));
-  const ws = pool.map(e=>e.w);
+  // v8 · 气运偏移事件权重
+  const fortune = P.fortune || 0;
+  const ws = pool.map(e=>{
+    let w = e.w;
+    if(e.tag==="epic" || e.tag==="good") w *= (1 + fortune / 200);
+    if(e.tag==="bad" || e.tag==="disaster") w *= (1 - fortune / 200);
+    return Math.max(0.1, w);
+  });
   const idx = weighted(pool.map(e=>e.t), ws);
   const ev = pool[idx];
   log(`【闭关异事】${ev.t}`, ev.tag==="epic"?"epic":(ev.tag==="bad"||ev.tag==="disaster"?"bad":"sys"));
   ev.fn(P);
+  // v8 · 气运回转：凶事件积攒好运，吉事件消耗好运
+  if(ev.tag==="bad" || ev.tag==="disaster"){
+    P.fortune = Math.min(100, (P.fortune||0) + 15);
+    if(P.fortune >= 50) log("否极泰来，气运正在回转……", "epic");
+  } else if(ev.tag==="epic" || ev.tag==="good"){
+    P.fortune = Math.max(-100, (P.fortune||0) - 10);
+  }
+  // v8 · 凶事件：负面反馈保留但不影响交替系统
+  if(ev.tag==="bad" || ev.tag==="disaster"){
+    // 凶事件不再削减 streak（已改为累计制），但 fortune 系统已在处理
+  }
 }
 
 function actAdventure(){
   if(P.inBattle){log("战斗中无法外出。","hint");return}
+  // P0-1 · 交替奖励：连续闭关 >=3 次后历练 → 双倍收益
+  P.advRun = (P.advRun||0) + 1;
+  let advAltMul = 1;
+  if((P.cultRun||0) >= 3){
+    advAltMul = 2;
+    log(`⚡ 闭关蓄势已久，外出大有斩获！历练收益翻倍！`, "epic");
+  }
+  P.cultRun = 0;
+  if(P.advRun >= 3){
+    log(`💡 连续历练 ${P.advRun} 次，下次闭关将获双倍修为！`, "hint");
+  }
+  P._advAltMul = advAltMul;  // temp flag for gainCult to pick up
   passDays(P,3);
+  if(advAltMul > 1){
+    // 交替奖励：额外获得一笔基础修为
+    const altBonus = Math.floor((10 + P.realmIdx * 5) * 3 * advAltMul);
+    gainCult(P, altBonus, "交替奖励");
+  }
   if(Math.random()<0.55){
     // 过滤可触发的奇遇（满足 cond）
     const pool = ADVS.filter(e=>!e.cond || e.cond(P));
@@ -3322,9 +4715,11 @@ function actAdventure(){
     }else{
       ev.fn(P);
     }
+    delete P._advAltMul;
     afterAction();
   }else{
     // 战斗
+    delete P._advAltMul;
     const cands=MONSTERS.filter(m=>m[1]<=P.realmIdx+2);
     const m=choice(cands.length?cands:[MONSTERS[0]]);
     startBattle(m);
@@ -3389,7 +4784,7 @@ function actBreakthrough(){
         const dmg=30+P.realmIdx*15;
         takeDmg(P,dmg);
         P.cult=Math.floor(P.cult*0.7);
-        log("突破失败，经脉受损，修为倒退！","bad");
+        log("突破失败，经脉受损，修为倒退！","bad"); SFX.fail(); vfx("red"); screenShake();
       }
       afterAction();
     },800);
@@ -3478,19 +4873,28 @@ function checkBreakthroughGate(nextIdx){
 function doBreakthroughSuccess(){
   P.realmIdx++;
   const oldMax = P.maxHp;
-  // v3：突破不再直接加 maxHp/atk，由境界 BASE_STATS 自动跃升
-  //     额外永久 +1 体魄/灵力/道行（终身累积）
-  P.ti = (P.ti||0) + 1;
-  P.ling = (P.ling||0) + 1;
-  P.dao = (P.dao||0) + 1;
+  // v8：突破属性递增（取代固定+1），每3个境界提升一档
+  const bkBonus = Math.floor(P.realmIdx / 3) + 1;
+  P.ti = (P.ti||0) + bkBonus;
+  P.ling = (P.ling||0) + bkBonus;
+  P.dao = (P.dao||0) + bkBonus;
+  P.shen = (P.shen||0) + Math.floor(bkBonus / 2);
   recalcStats(P);
   P.hp = P.maxHp;
-  // v4：突破不再满真元（避免长线无消耗感），仅回 30% maxMp
-  P.mp = Math.max(P.mp||0, Math.floor(P.maxMp * 0.3));
+  // v8：突破满真元（爆发感）
+  P.mp = P.maxMp;
   // v4：突破仅小幅延寿（+30 + 境界×10），不再跳到 LIFESPAN[idx]，寿元真正稀缺
   const lifeGain = 30 + P.realmIdx * 10;
   P.lifespan += lifeGain;
   P.dx = P.maxDx = 100 + P.realmIdx*10;
+  // v8：突破余韵 — 30天内修为 ×1.5
+  P.flags._bkBuff = (P.days||0) + 30;
+  // v8：修为冲刺 — 获得下阶门槛5%作为起手势
+  const nextTh = (P.realmIdx < REALMS.length - 1) ? REALMS[P.realmIdx + 1][1] : 0;
+  const headStart = Math.floor(nextTh * 0.05);
+  if(headStart > 0){
+    P.cult += headStart;
+  }
   // 本命法宝温养
   if(P.relic){
     P.relicLv = (P.relicLv||0) + 1;
@@ -3501,8 +4905,25 @@ function doBreakthroughSuccess(){
   if(newSk.length){
     log(`✦ 解锁神通：${newSk.join("、")}！`,"epic");
   }
-  log(`轰隆——！突破成功！你已是【${REALMS[P.realmIdx][0]}】！`,"good");
-  log(`气血上限 ${oldMax} → ${P.maxHp}，寿元 +${lifeGain} 年（阳寿 ${P.age}/${P.lifespan}）`,"good");
+  // v8 · 境界专属突破叙事
+  const bkNarr = NARRATIVE.breakthrough[P.realmIdx];
+  if(bkNarr) log(bkNarr, "epic");
+  log(`—— 突破成功！你已是【${REALMS[P.realmIdx][0]}】！——`,"epic");
+  log(`体魄 +${bkBonus}，灵力 +${bkBonus}，道行 +${bkBonus}`, "good");
+  log(`气血 ${oldMax} → ${P.maxHp}，寿元 +${lifeGain}（阳寿 ${P.age}/${P.lifespan}）`,"good");
+  if(headStart > 0) log(`突破余势，修为 +${headStart}（下阶起手）`, "good");
+  log(`※ 突破余韵：30日内修为 ×1.5`, "epic");
+  // v8 · 道侣突破反应
+  const bkPartners = (P.partners||[]).filter(x=>!x.deceased && x.fondness >= 30);
+  if(bkPartners.length){
+    const pt = choice(bkPartners);
+    const lines = PARTNER_LINES.breakthrough[pt.key];
+    if(lines) log(choice(lines), "hint");
+  }
+  // v8 · 突破金光视觉效果 + P1-1 音效
+  const sceneEl = $("scene");
+  if(sceneEl){ sceneEl.classList.add("bk-flash"); setTimeout(()=>sceneEl.classList.remove("bk-flash"), 2600); }
+  vfx("gold"); SFX.thunder();
   // v6 · 飞升触发：达到仙人（最后一阶）→ 进入飞升流程
   if(P.realmIdx >= REALMS.length - 1){
     setTimeout(()=>actAscension(), 1200);
@@ -3588,7 +5009,7 @@ function startTribulation(trib, nextIdx, useDan){
   autoStop();
   if(useDan){ consume("破障丹"); log("丹药入腹，灵气如潮涌动……","sys"); }
   setScene("天 劫 降 临", `— ${trib.name} · ${trib.desc} —`, "tribulation");
-  log(`▓ 天地变色，【${trib.name}】已至！`, "epic");
+  log(`▓ 天地变色，【${trib.name}】已至！`, "epic"); SFX.rumble(); vfx("red"); screenShake();
   log(`▓ 共 ${trib.bolts} 道天雷，每道 ${trib.dmg[0]}~${trib.dmg[1]} 伤害。`, "sys");
   log(`▓ 可选【硬抗/祭宝抗雷/服丹】三种应对。每道雷独立结算。`, "sys");
   log(`※ v6 警示：硬扛此雷会反噬道基，每道折损 1 点【道行】（永久）；唯有以法宝抗雷方可采得【天劫真血】，乃化神→仙人突破之至宝。`, "hint");
@@ -3799,11 +5220,19 @@ function castSkill(name){
 
   // 攻击类神通
   if(sk.dmg && sk.dmg>0){
-    // v3：用 calcDamage（神通 ele 覆盖默认 attEl）
+    // 连击 + 破防倍率
+    m.combo = (m.combo||0) + 1;
+    const comboMul = 1 + Math.min(10, m.combo) * 0.08;
+    if(m.combo > 1) log(`连击 \u00D7${m.combo} (+${Math.min(80, m.combo*8)}%)`, "hint");
+    const breakMul = m.breakRounds > 0 ? 2 : 1;
     const att = attackerOf(P, sk.ele?{attEl:sk.ele}:null);
-    const d = calcDamage(att, monsterDefender(m), {mul:sk.dmg});
+    const d = calcDamage(att, monsterDefender(m), {mul:sk.dmg * comboMul * breakMul});
+    // 克制元素 → 破绽条（神通+2）
+    const skEle = sk.ele || pickAttackElement(P);
+    if(skEle && m.ele && OVERCOME[skEle] === m.ele) addBreakGauge(m, 2);
     const killed = applyDamageToM(m, d, name);
     if(killed){ endBattle(true); return; }
+    tryInterrupt(m, d.dmg);
   }
   // 护盾
   if(sk.shield){
@@ -3812,6 +5241,7 @@ function castSkill(name){
   }
   // 逃跑
   if(sk.flee){
+    m.combo = 0;
     if(Math.random()<sk.flee){
       log(`【${name}】成功遁走！`,"sys");
       P.inBattle=false;P.monster=null;
@@ -3821,18 +5251,17 @@ function castSkill(name){
       return;
     }
   }
-  // 回血
+  // 回血（重置连击）
   if(sk.hp){
+    m.combo = 0;
     heal(P, Math.floor(P.maxHp*sk.hp));
   }
-  // v6.2 · 灵宠协攻（神通后也出手）
+  // 灵宠协攻
   const petResult = petAssistAttack();
   if(petResult === "killed"){ endBattle(true); return; }
-  // 怪物反击（v3 单一管线）
-  const md = computeMonsterDmg();
-  applyDamageToP(md, m.name);
-  if(P.hp<=0){ endBattle(false); return; }
-  refresh();
+  // 怪物反击（统一三分支）
+  if(monsterCounterPhase(m)){ endBattle(false); return; }
+  postActionPhase(m);
 }
 
 /* ==========================================================
@@ -4331,7 +5760,9 @@ function startBattle(m){
   // v3：定位怪物 idx（用于读 MONSTER_META 的 spd/crit/karma）
   const idx = MONSTERS.indexOf(m);
   P.inBattle=true;
-  P.monster={name,lvl,mhp,maxMhp:mhp,matk,cr,sr,ele:ele||null,rounds:0,idx};
+  P.monster={name,lvl,mhp,maxMhp:mhp,matk,cr,sr,ele:ele||null,rounds:0,idx,
+    breakGauge:0, breakMax:3+Math.floor(idx/2), breakRounds:0,
+    combo:0, telegraphing:false, telegraphCd:0};
   const eleTip = ele?`，属${ele}`:"";
   log(`※ 一只「${name}」拦住了你的去路！（HP ${mhp}, ATK ${matk}${eleTip}）`,"sys");
   // 五行提示
@@ -4354,6 +5785,96 @@ function computeMonsterDmg(){
   // v3：通过 calcDamage 算（带闪避/暴击/相克/破防），返回结构体
   const d = calcDamage(monsterAttacker(m), defenderOf(P), {});
   return d;
+}
+
+/* ============ 战斗深化：蓄力 / 破绽 / 连击 ============ */
+
+function gaugeBar(m){
+  const full = Math.floor(m.breakGauge);
+  const empty = (m.breakMax||3) - full;
+  return "\u2588".repeat(full) + "\u2591".repeat(Math.max(0, empty));
+}
+
+function addBreakGauge(m, amt){
+  if(!m || m.breakRounds > 0) return;
+  m.breakGauge = Math.min(m.breakMax||3, (m.breakGauge||0) + amt);
+  log(`破绽 [${gaugeBar(m)}] ${m.breakGauge}/${m.breakMax}`, "hint");
+  if(m.breakGauge >= (m.breakMax||3)){
+    m.breakRounds = 2;
+    m.breakGauge = 0;
+    m.telegraphing = false;
+    log(`※※「${m.name}」破绽大开！（2回合：伤害翻倍·无法反击）`, "epic");
+    SFX.thunder(); vfx("gold"); screenShake();
+  }
+}
+
+function checkTelegraph(m){
+  if(!m || m.breakRounds > 0 || m.telegraphing) return;
+  const meta = MONSTER_META[m.idx];
+  if(!meta || !meta.special) return;
+  m.telegraphCd = (m.telegraphCd||0) + 1;
+  const sp = meta.special;
+  const threshold = rand(sp.interval[0], sp.interval[1]);
+  if(m.telegraphCd >= threshold){
+    m.telegraphing = true;
+    m.telegraphCd = 0;
+    log(`\u26A0「${m.name}」${sp.desc}`, "bad");
+    SFX.rumble();
+  }
+}
+
+function tryInterrupt(m, dmgDealt){
+  if(!m || !m.telegraphing) return false;
+  const meta = MONSTER_META[m.idx];
+  if(!meta || !meta.special) return false;
+  if(dmgDealt >= (m.maxMhp||1) * meta.special.interruptThreshold){
+    m.telegraphing = false;
+    log(`※ 凌厉一击打断了「${m.name}」的蓄力！`, "epic");
+    SFX.chime();
+    return true;
+  }
+  return false;
+}
+
+function tickBreak(m){
+  if(!m || m.breakRounds <= 0) return;
+  m.breakRounds--;
+  if(m.breakRounds === 0){
+    log(`「${m.name}」恢复了姿态。`, "sys");
+  }
+}
+
+/* 统一怪物反击阶段（破防/蓄力/正常三分支） */
+function monsterCounterPhase(m){
+  if(!m) return false;
+  if(m.breakRounds > 0){
+    log(`「${m.name}」破绽大开，无力反击！`, "good");
+    return false;
+  }
+  if(m.telegraphing){
+    const meta = MONSTER_META[m.idx];
+    const sp = meta && meta.special;
+    const specialMul = sp ? sp.dmgMul : 2.0;
+    const md = calcDamage(monsterAttacker(m), defenderOf(P), {mul:specialMul});
+    log(`「${m.name}」施展【${sp?sp.name:"蓄力一击"}】！`, "crit");
+    SFX.rumble(); vfx("red"); screenShake();
+    applyDamageToP(md, m.name);
+    m.telegraphing = false;
+    m.combo = 0;
+    return P.hp <= 0;
+  }
+  const md = computeMonsterDmg();
+  applyDamageToP(md, m.name);
+  return P.hp <= 0;
+}
+
+/* 统一回合末处理 */
+function postActionPhase(m){
+  if(!m) return;
+  checkTelegraph(m);
+  tickBreak(m);
+  regenMp(P, 0.015);
+  refresh();
 }
 
 /* —— 选择玩家攻击属性（无属性返回 null，混沌返回"无"） —— */
@@ -4382,7 +5903,7 @@ function refreshBattleButtons(){
 function endBattle(win){
   const m=P.monster;
   const fromDg = m && m.fromDungeon;
-  P.inBattle=false;P.monster=null;
+  P.inBattle=false;P.monster=null;P._nearDeathLine=false;
   setScene("凡 人 修 仙 路","— 一 缕 神 识 自 虚 空 降 临 —","");
   // 恢复按钮
   bindMainButtons();
@@ -4460,30 +5981,37 @@ function endBattle(win){
 }
 function battleAttack(){
   const m=P.monster;
-  // v3：单一伤害入口
-  const d = calcDamage(attackerOf(P), monsterDefender(m), {mul:1.0});
+  // 连击计数
+  m.combo = (m.combo||0) + 1;
+  const comboMul = 1 + Math.min(10, m.combo) * 0.08;
+  if(m.combo > 1) log(`连击 \u00D7${m.combo} (+${Math.min(80, m.combo*8)}%)`, "hint");
+  // 破防翻倍
+  const breakMul = m.breakRounds > 0 ? 2 : 1;
+  const d = calcDamage(attackerOf(P), monsterDefender(m), {mul:comboMul * breakMul});
+  // 克制元素 → 破绽条
+  const myEle = pickAttackElement(P);
+  if(myEle && m.ele && OVERCOME[myEle] === m.ele) addBreakGauge(m, 1);
   const killed = applyDamageToM(m, d, null);
   if(killed){endBattle(true);return}
-  // v3：先手系统 — 玩家 spd 远超怪物 → 多打一次
+  // 打断蓄力检查
+  tryInterrupt(m, d.dmg);
+  // 先手系统
   const meta = MONSTER_META[m.idx]||{};
   const mSpd = meta.spd || 10;
   const mySpd = (P._d&&P._d.spd) || 10;
   if(mySpd >= mSpd*1.3){
     log("身法如电，连斩一击！","epic");
-    const d2 = calcDamage(attackerOf(P), monsterDefender(m), {mul:0.6});
+    const d2 = calcDamage(attackerOf(P), monsterDefender(m), {mul:0.6 * breakMul});
     const killed2 = applyDamageToM(m, d2, null);
     if(killed2){endBattle(true);return}
+    tryInterrupt(m, d2.dmg);
   }
-  // v6.2 · 灵宠协攻
+  // 灵宠协攻
   const petResult = petAssistAttack();
   if(petResult === "killed"){ endBattle(true); return; }
-  // 怪物反击
-  const md = computeMonsterDmg();
-  applyDamageToP(md, m.name);
-  if(P.hp<=0){endBattle(false);return}
-  // v4：每回合回 1.5% 真元（原 5% 过快导致真元无消耗感）
-  regenMp(P, 0.015);
-  refresh();
+  // 怪物反击（统一三分支）
+  if(monsterCounterPhase(m)){endBattle(false);return}
+  postActionPhase(m);
 }
 function battleHeal(){
   // v4：智能选药 — hp 缺值多则选回血丹，否则选真元丹；都不缺则提示
@@ -4506,15 +6034,19 @@ function battleHeal(){
     pick = mpHerbs[0];
   }
   if(!pick){log("气血与真元皆已充盈，无需服丹！","hint");return}
+  // 嗑药重置连击
+  if(P.monster) P.monster.combo = 0;
   useItem(pick);
-  // 妖兽行动
-  const md = computeMonsterDmg();
-  applyDamageToP(md, P.monster.name);
-  if(P.hp<=0){endBattle(false);return}
-  refresh();
+  // 怪物反击（统一三分支）
+  const m = P.monster;
+  if(m){
+    if(monsterCounterPhase(m)){endBattle(false);return}
+    postActionPhase(m);
+  }
 }
 function battleFlee(){
   const m=P.monster;
+  if(m) m.combo = 0;
   const bonus = gearFleeBonus(P);
   const buff = getBuff(P);
   const baseRate = 0.5+0.05*(P.realmIdx-m.lvl)+bonus;
@@ -4526,10 +6058,8 @@ function battleFlee(){
     afterAction();
   }else{
     log("逃跑失败！","bad");
-    const md = computeMonsterDmg();
-    applyDamageToP(md, m.name);
-    if(P.hp<=0){endBattle(false);return}
-    refresh();
+    if(monsterCounterPhase(m)){endBattle(false);return}
+    postActionPhase(m);
   }
 }
 
@@ -5145,7 +6675,10 @@ function saveGame(silent){
   c.tribulation=null;c.curDungeon=null;
   c.shield=0;
   c._d=null;                 // 派生属性不持久化（运行时重算）
+  delete c._advAltMul;        // 交替奖励临时标记
+  delete c._nearDeathLine;    // 濒死台词临时标记
   c._saveVer = SAVE_VERSION; // v3 版本号
+  c._lastSaveTs = Date.now(); // P0-3 离线结算时间戳
   localStorage.setItem("xiuxian_save",JSON.stringify(c));
   if(!silent) log("※ 已记录于玉简之中。","sys");
 }
@@ -5214,6 +6747,14 @@ function loadGame(){
     // v7 字段（道侣 NPC 系统）
     if(!Array.isArray(d.partners)) d.partners = [];
     if(!d.partnerFlags) d.partnerFlags = {};
+    // v8 字段（体验优化：连修/气运/事件链）
+    if(d.streak===undefined) d.streak = 0;
+    if(d.streakBest===undefined) d.streakBest = 0;
+    if(d.fortune===undefined) d.fortune = 0;
+    if(!d.eventChains) d.eventChains = {};
+    // P0-1 字段（交替奖励）
+    if(d.cultRun===undefined) d.cultRun = 0;
+    if(d.advRun===undefined) d.advRun = 0;
     // v4 寿元迁移：移除强制拉满逻辑（避免覆盖新机制），仅做异常兜底
     if(d.lifespan===undefined || d.lifespan<=0){
       d.lifespan = 80 + (d.realmIdx||0)*30;
@@ -5297,25 +6838,69 @@ function autoTick(){
 function autoBattleStep(){
   const m = P.monster;
   if(!m) return;
-  // v6.3 · 战斗弹窗保护（如收服契约/灵宠起名）—— 等玩家关掉弹窗
   if(typeof isModalShowing === "function" && isModalShowing()) return;
   m.rounds = (m.rounds||0) + 1;
   const expDmg = Math.max(1, m.matk + 4 - P.realmIdx*2);
   const myDmg  = Math.max(1, totalAtk(P));
   const heals  = Object.keys(P.bag).filter(k=>ITEMS[k]&&ITEMS[k].hp);
   const lowHp  = P.hp <= expDmg || P.hp < P.maxHp*0.3;
-  const tooStrong = m.mhp / Math.max(1,myDmg) > 25;  // 25 回合都打不死
+  const tooStrong = m.mhp / Math.max(1,myDmg) > 25;
 
+  // 蓄力预警应对
+  if(m.telegraphing){
+    const sp = (MONSTER_META[m.idx]||{}).special;
+    const specialDmg = m.matk * (sp ? sp.dmgMul : 3);
+    // 有护盾神通 → 用
+    const shieldSk = Object.entries(SKILLS).find(([k,v])=>
+      v.shield && v.unlock<=P.realmIdx && P.cult>=v.cult);
+    if(shieldSk){
+      log("【自动】蓄力预警！祭出护体罡气！","hint");
+      castSkill(shieldSk[0]); return;
+    }
+    // 蓄力伤害致死 → 逃
+    if(specialDmg >= P.hp && !P.shield){
+      log("【自动】蓄力太强，脚踏遁光！","hint");
+      battleFlee(); return;
+    }
+    // 尝试用最强神通打断
+    const bestSk = Object.entries(SKILLS)
+      .filter(([k,v])=>v.dmg && v.dmg>1 && v.unlock<=P.realmIdx && P.cult>=v.cult)
+      .sort((a,b)=>b[1].dmg-a[1].dmg)[0];
+    if(bestSk){
+      log("【自动】尝试打断蓄力！","hint");
+      castSkill(bestSk[0]); return;
+    }
+    battleAttack(); return;
+  }
+
+  // 怪物破防中 → 趁机猛攻
+  if(m.breakRounds > 0 && P.hp > P.maxHp*0.15){
+    battleAttack(); return;
+  }
+
+  // 常规：血少嗑药/逃跑
   if(lowHp && heals.length){
     log("【自动】气血告急，服用丹药……","hint");
-    battleHeal();
-    return;
+    battleHeal(); return;
   }
   if((lowHp && !heals.length) || tooStrong){
     log("【自动】此战凶险，脚踏遁光！","hint");
-    battleFlee();
-    return;
+    battleFlee(); return;
   }
+
+  // 破绽条接近满 → 用克制神通加速
+  if((m.breakGauge||0) >= (m.breakMax||3) - 2 && m.ele){
+    const myEle = pickAttackElement(P);
+    if(myEle && OVERCOME[myEle] === m.ele){
+      const eleSk = Object.entries(SKILLS).find(([k,v])=>
+        v.ele && OVERCOME[v.ele]===m.ele && v.unlock<=P.realmIdx && P.cult>=v.cult);
+      if(eleSk){
+        log("【自动】破绽将满，施展克制神通！","hint");
+        castSkill(eleSk[0]); return;
+      }
+    }
+  }
+
   battleAttack();
 }
 
@@ -5420,12 +7005,57 @@ $("btn-help").onclick = ()=>{
   $("hp-ok").onclick = closeModal;
 };
 
+/* P0-3 · 离线修炼结算 */
+function settleOffline(p){
+  const lastTs = p._lastSaveTs;
+  delete p._lastSaveTs;
+  if(!lastTs) return;
+  const offlineSec = Math.floor((Date.now() - lastTs) / 1000);
+  if(offlineSec < 120) return;  // 不到2分钟不结算
+  const capSec = Math.min(offlineSec, 24 * 3600);  // 上限24h
+  // 每2分钟一个离线修炼周期
+  const ticks = Math.floor(capSec / 120);
+  if(ticks <= 0) return;
+  const base = 10 + p.realmIdx * 5;
+  const mul = rootMul(p) * TECHS[p.tech][0] * 0.3;  // 30% 效率（无装备/心境加成）
+  const cultPerTick = Math.floor(base * mul);
+  const totalCult = cultPerTick * ticks;
+  const gameDays = ticks * 5;  // 每周期5游戏日
+  const prevCult = p.cult;
+  p.cult += totalCult;
+  // 推进游戏天数（不触发节庆等复杂逻辑）
+  p.days += gameDays;
+  const expectAge = 16 + Math.floor(p.days / 360);
+  if(expectAge > p.age) p.age = expectAge;
+  // 检查里程碑和小境界
+  checkMilestones(p, prevCult);
+  checkMiniBk(p, prevCult);
+  // 格式化时间
+  const hrs = Math.floor(capSec / 3600);
+  const mins = Math.floor((capSec % 3600) / 60);
+  const timeStr = hrs > 0 ? `${hrs} 时 ${mins} 分` : `${mins} 分`;
+  const capped = offlineSec > 24*3600 ? "（上限 24 时辰）" : "";
+  showModal(`<h3 style="color:#d4b46a">🌙 离 线 修 炼 结 算</h3>
+    <div style="text-align:left;line-height:2;margin:15px 0;font-size:14px">
+      <p>你离去 <b style="color:#7fc7a3">${timeStr}</b> ${capped}</p>
+      <p>闭关 <b style="color:#d4b46a">${gameDays}</b> 日，修为增长 <b style="color:#d4b46a">+${totalCult}</b></p>
+      <p style="color:#888;font-size:12px">（离线效率 30%，无装备/心境加成）</p>
+    </div>
+    <div class="btns"><button id="offline-ok" class="primary">继 续 修 行</button></div>`);
+  $("offline-ok").onclick = ()=>{
+    closeModal();
+    saveGame(true);
+  };
+}
+
 function bootstrap(){
   bindMainButtons();
   setAutoStatus();
   const s=loadGame();
   if(s){
     P=s;
+    // P0-3 · 离线结算（在显示回梦之前处理）
+    settleOffline(P);
     log(`回梦：${P.name} · ${REALMS[P.realmIdx][0]} · 修行 ${P.days} 天`,"sys");
     // v2 新系统提示（仅老存档首次）
     if(!P.flags._v2_welcomed){

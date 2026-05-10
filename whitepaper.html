@@ -198,6 +198,8 @@
       <li><a href="#economy-v6">经济再平衡（v6）</a></li>
       <li><a href="#pet-system">灵宠契约（v6.2）</a></li>
       <li><a href="#partner-system">道侣 NPC（v7）</a></li>
+      <li><a href="#v8-experience">体验优化（v8）</a></li>
+      <li><a href="#v9-audit">审计迭代（v9）</a></li>
       <li><a href="#auto">自动托管</a></li>
       <li><a href="#save">存档机制</a></li>
       <li><a href="#tech-stack">技术栈</a></li>
@@ -1272,6 +1274,131 @@
     </ul>
   </section>
 
+  <!-- 体验优化 v8 -->
+  <section id="v8-experience">
+    <h2>二 十、体 验 优 化（ v8 ）</h2>
+    <p class="lead">「修仙之路不应只有数字的增长，更应有心跳的波动。」v8 围绕三大核心问题做出系统性改造：数值无感、随机无意义、情感无代入。SAVE_VERSION 7 → 8，旧存档自动迁移。</p>
+
+    <h3>一、连修势能系统（Streak）</h3>
+    <p>连续闭关积累势能倍率，最高 ×2.5（18 连修）。打断闭关（历练/战斗）归零，凶事件减半。创造<b>「要不要中断」</b>的策略抉择。</p>
+    <table>
+      <thead><tr><th>连修次数</th><th>倍率</th><th>里程碑奖励</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td>×1.00</td><td>—</td></tr>
+        <tr><td>3</td><td>×1.16</td><td>显示金色连修提示</td></tr>
+        <tr><td>5</td><td>×1.32</td><td>悟性 +1（永久·一次性）</td></tr>
+        <tr><td>10</td><td>×1.72</td><td>灵力 +2（永久·一次性）</td></tr>
+        <tr><td>15</td><td>×2.12</td><td>道行 +3（永久·一次性）</td></tr>
+        <tr><td>18+</td><td>×2.50（上限）</td><td>—</td></tr>
+      </tbody>
+    </table>
+
+    <h3>二、突破爆发感</h3>
+    <p>v8 前突破仅 +1 体魄 / +1 灵力 / +1 道行，体感微弱。v8 改为：</p>
+    <ul>
+      <li><b>属性递增</b>：<code>bonus = floor(realmIdx/3) + 1</code>，体魄/灵力/道行各 +bonus，神识 +floor(bonus/2)</li>
+      <li><b>突破余韵</b>：30 天内所有修为获取 ×1.5</li>
+      <li><b>修为冲刺</b>：获得下阶门槛 5% 的修为作为起手势</li>
+      <li><b>真元全满</b>：不再仅回 30%</li>
+      <li><b>金光脉冲</b>：CSS 动画 <code>@keyframes bk-pulse</code>，突破时界面金光一闪</li>
+      <li><b>21 境界专属叙事</b>：每个境界有独一无二的突破描写（见「叙事文本」节）</li>
+    </ul>
+
+    <h3>三、修为里程碑</h3>
+    <p>在 <code>gainCult()</code> 中跨越特定修为阈值时触发一次性大奖（flags 防重）：</p>
+    <table>
+      <thead><tr><th>阈值</th><th>标语</th><th>奖励</th></tr></thead>
+      <tbody>
+        <tr><td class="num">1,000</td><td>千里修行，始于足下</td><td>体魄+3 / 灵力+3</td></tr>
+        <tr><td class="num">5,000</td><td>五千修为，小有所成</td><td>悟性+5 / 气运+3 / 破障丹×2</td></tr>
+        <tr><td class="num">20,000</td><td>两万修为，名动一方</td><td>神识+10 / 道行+5 / 阳寿+100</td></tr>
+        <tr><td class="num">50,000</td><td>五万修为，已近大道</td><td>灵力+20 / 悟性+10 / 天劫真血×1</td></tr>
+        <tr><td class="num">200,000</td><td>二十万修为，天地动容</td><td>体魄+30 / 灵力+30 / 道行+20 / 万年灵芝精×2</td></tr>
+        <tr><td class="num">500,000</td><td>五十万修为，半步飞升</td><td>体魄+50 / 灵力+50 / 神识+30 / 道行+40 / 阳寿+500</td></tr>
+      </tbody>
+    </table>
+
+    <h3>四、大奖事件（Jackpot）</h3>
+    <p>新增 3 个极稀有（weight:1）闭关事件，高回报：</p>
+    <div class="cards">
+      <div class="card"><div class="name" style="color:#ffd966">仙人遗府</div>
+        <div class="desc">realmIdx≥6。+25% 下阶门槛修为 + 随机史诗装备 + 悟性+5 永久。</div></div>
+      <div class="card"><div class="name" style="color:#ffd966">天地共鸣</div>
+        <div class="desc">realmIdx≥4 且 streak≥5。连修次数×500 修为 + 六根骨全属性+3 永久。与连修联动。</div></div>
+      <div class="card"><div class="name" style="color:#ffd966">道果降临</div>
+        <div class="desc">realmIdx≥8 且 karma>0。+10% 累计总修为 + 道行+10 永久。善业加持。</div></div>
+    </div>
+
+    <h3>五、气运回转（Fortune Swing）</h3>
+    <p><code>P.fortune</code> 值 -100 ~ +100。遭凶事件 +15，遇吉事件 -10。影响事件权重偏移：连续倒霉后好事概率自然增大。fortune ≥ 50 时提示「否极泰来」。核心：<b>消除绝望感，保留紧张感</b>。</p>
+
+    <h3>六、选择型事件</h3>
+    <p>闭关触发事件时，40% 概率变为选择事件（弹窗 2-3 选项）。利用已有 <code>showModal()</code> + 自动暂停机制。</p>
+    <table>
+      <thead><tr><th>事件</th><th>触发条件</th><th>选项示例</th></tr></thead>
+      <tbody>
+        <tr><td>古修残魂</td><td>realmIdx≥3</td><td>吞噬（高风险高回报）/ 引导（稳定）/ 驱散（安全回道心）</td></tr>
+        <tr><td>地脉宝藏</td><td>realmIdx≥2</td><td>全力探查（耗时大奖）/ 试探（小奖）/ 封印（回道心+karma）</td></tr>
+        <tr><td>过路修士</td><td>realmIdx≥4</td><td>灵石换丹药 / 修为换机缘 / 闭门不见</td></tr>
+        <tr><td>天劫预兆</td><td>realmIdx≥5 且临近突破</td><td>提前感悟 / 抗拒天意 / 顺其自然</td></tr>
+        <tr><td>心魔低语</td><td>realmIdx≥6 且道心<50%</td><td>正面迎战 / 以静制动 / 与魔共舞</td></tr>
+      </tbody>
+    </table>
+
+    <h3>七、事件链（Multi-Step Storylets）</h3>
+    <p>跨多次闭关展开的连续故事，存储于 <code>P.eventChains</code>。每条链仅触发一次。</p>
+    <div class="cards">
+      <div class="card"><div class="name" style="color:#7fc7a3">灵泉异变</div>
+        <div class="desc">3 步。洞府溪水异光 → 水底有物（选择潜入/观察）→ 宝藏或水妖。realmIdx≥3，8% 触发率。</div></div>
+      <div class="card"><div class="name" style="color:#7fc7a3">山中邻居</div>
+        <div class="desc">4 步。神秘修士搬来 → 拜访/观察 → 互赠/谢绝 → 盟友/师父/缘尽。realmIdx≥4，6% 触发率。</div></div>
+      <div class="card"><div class="name" style="color:#7fc7a3">心魔萌芽</div>
+        <div class="desc">2 步。道心<45% 时触发。耳语 → 正面对决/以道化魔。成功 = 悟性+8+道行+5；失败 = 道心崩溃。realmIdx≥6，12% 触发率。</div></div>
+    </div>
+
+    <h3>八、叙事文本系统</h3>
+    <p>新增 <code>NARRATIVE</code> 对象，在关键时刻以散文替代机械数字：</p>
+    <ul>
+      <li><b>心境叙事</b>：6 种心境各 2 条散文描写，40% 概率替代标准 log</li>
+      <li><b>突破叙事</b>：21 个境界各一段专属描写，替代通用「轰隆——！」</li>
+      <li><b>道侣逝世</b>：3 段散文告别，全屏 Modal 仪式化呈现（含相识年数、好感度）</li>
+    </ul>
+    <div class="info">
+      <div class="h">示 例</div>
+      练气一层突破：「体内仿佛有什么东西碎裂了——不，是打开了。灵气第一次流经经脉，像初春的溪水流过枯涸的河床。你睁开眼，世界不一样了。」<br>
+      天人合一心境：「天地灵气如百川归海般涌入丹田。你分不清自己是人还是天，是风还是云。」
+    </div>
+
+    <h3>九、NPC 持续对话</h3>
+    <p>新增 <code>PARTNER_LINES</code> 对象，按 NPC 性格差异化。8 位道侣 × 3 场景：</p>
+    <ul>
+      <li><b>突破时</b>：道侣祝贺（素青鸾冷淡、温如玉热情、墨白狐要灵石……）</li>
+      <li><b>濒死时</b>：道侣惊呼（HP < 15% 时触发，每战一次）</li>
+      <li><b>日常</b>：每 ~90 天随机一条生活描写（好感≥30 时）</li>
+    </ul>
+
+    <h3>十、灵宠个性系统</h3>
+    <p>创建灵宠时随机分配性格（6 种：贪吃 / 傲娇 / 忠诚 / 懒散 / 好斗 / 粘人）。</p>
+    <ul>
+      <li>战斗中 30% 概率显示性格台词</li>
+      <li>喂养时显示性格反应</li>
+    </ul>
+    <div class="info">
+      <div class="h">示 例</div>
+      贪吃 · 攻击：「冲上去一口咬住——似乎以为那是食物。」<br>
+      傲娇 · 喂养：「别过头去吃完了，假装没那么好吃。」
+    </div>
+
+    <h3>技术变更</h3>
+    <ul>
+      <li><code>SAVE_VERSION</code> 7 → 8，<code>loadGame()</code> 自动迁移新字段：streak / streakBest / fortune / eventChains</li>
+      <li>新增 CSS 动画：<code>bk-pulse</code>（突破金光）、<code>streak-glow</code>（连修光效）</li>
+      <li>新增全局数据：MILESTONES / NARRATIVE / PARTNER_LINES / PET_PERSONALITIES / PET_LINES / CHOICE_EVENTS / EVENT_CHAINS</li>
+      <li>新增函数：checkMilestones / triggerChoiceEvent / advanceEventChains / checkNewEventChains</li>
+      <li>文件行数 6369 → 7076（+707 行）</li>
+    </ul>
+  </section>
+
 
 
 
@@ -1380,24 +1507,98 @@
     </div>
   </section>
 
+  <!-- v9 审计迭代 -->
+  <section id="v9-audit">
+    <h2>二 十 一、审 计 迭 代（v9）</h2>
+    <p>基于 9 维游戏心理学审计（综分 28/45）的 P0/P1 修复。</p>
+
+    <div class="h">P0-1 · 核心循环"等待黑洞"修复</div>
+    <table>
+      <thead><tr><th>改动</th><th>旧值</th><th>新值</th><th>效果</th></tr></thead>
+      <tbody>
+        <tr><td>事件触发率</td><td>0.25 + min(0.35, …)</td><td>0.40 + min(0.50, days×0.03)</td><td>闭关空等概率大幅降低</td></tr>
+        <tr><td>选择事件比例</td><td>40%</td><td>60%</td><td>更多交互式事件</td></tr>
+        <tr><td>连修 → 交替奖励</td><td>连续闭关累加倍率，历练清零</td><td>连续闭关 ≥3 次 → 下次历练×2，反之亦然</td><td>创造闭关/历练切换的策略抉择</td></tr>
+        <tr><td>小境界突破</td><td>无</td><td>每跨过当前→下阶 20%/40%/60%/80% 触发</td><td>每个境界分 5 个心理阶段，+1 随机属性 + 叙事</td></tr>
+      </tbody>
+    </table>
+
+    <div class="h">P0-3 · 离线修炼结算</div>
+    <ul>
+      <li>关闭游戏后再打开，自动计算离线时间（上限 24 小时）</li>
+      <li>每 2 分钟 = 1 个离线修炼周期（5 游戏日 + 30% 效率修为）</li>
+      <li>全屏结算弹窗：显示离线时长、修为增长、游戏日推进</li>
+      <li>自动检查里程碑和小境界突破</li>
+      <li>时间戳存入 <code>_lastSaveTs</code>，每次存档更新</li>
+    </ul>
+
+    <div class="h">P1-1 · 音效与视觉反馈分层</div>
+    <table>
+      <thead><tr><th>事件</th><th>音效</th><th>视觉</th></tr></thead>
+      <tbody>
+        <tr><td>突破成功</td><td>thunder（低频隆响 + 高频劈裂）</td><td>金光全屏闪 + 金边脉冲</td></tr>
+        <tr><td>天劫降临</td><td>rumble（持续震动 + LFO 调制）</td><td>红光全屏闪 + 震屏</td></tr>
+        <tr><td>大奖事件</td><td>chime（C-E-G-C 上升钟鸣）</td><td>金光全屏闪</td></tr>
+        <tr><td>里程碑</td><td>milestone（A-C#-E 短促音阶）</td><td>金光全屏闪</td></tr>
+        <tr><td>小境界突破</td><td>milestone</td><td>蓝光全屏闪</td></tr>
+        <tr><td>突破失败</td><td>fail（低沉闷响下滑）</td><td>红光全屏闪 + 震屏</td></tr>
+      </tbody>
+    </table>
+    <p>全部音效基于 Web Audio API 程序化合成，零资源文件。使用 AudioContext 懒初始化，首次交互后激活。</p>
+
+    <div class="h">P0-2 · 夙愿扩充</div>
+    <p>新增两条完整 5 节点夙愿线，与血海深仇组成 3 选 1 开局。</p>
+    <table>
+      <thead><tr><th>夙愿</th><th>主题</th><th>节点分布</th><th>终局数</th></tr></thead>
+      <tbody>
+        <tr><td>💔 寻仙故人</td><td>情感 · 寻回失踪青梅竹马</td><td>练气→筑基→金丹→元婴→化神</td><td>4（双修飞升/归隐/妖道/道心崩塌）</td></tr>
+        <tr><td>🐉 弑神逆天</td><td>反抗 · 天弃印改命斩天</td><td>练气→筑基→金丹→元婴→化神</td><td>4（弑天/合道/改天/道心崩塌）</td></tr>
+      </tbody>
+    </table>
+    <p>每条夙愿的节点均含 3 选项（部分 4 选项），选择影响后续节点可用选项和终局走向。独有 flag 体系控制跨节点联锁。</p>
+
+    <div class="h">战 斗 系 统 深 化</div>
+    <p>三个互锁机制，让战斗从纯自动变为有策略抉择。</p>
+    <table>
+      <thead><tr><th>机制</th><th>原理</th><th>策略影响</th></tr></thead>
+      <tbody>
+        <tr><td>蓄力预警</td><td>每 3-6 回合怪物预告特殊攻击（2.5~5x 伤害），玩家须选择护盾/打断/逃跑/硬扛</td><td>迫使玩家从"无脑攻击"切换到防御决策</td></tr>
+        <tr><td>破绽条</td><td>克制元素普攻+1 / 神通+2 填充，满条→2回合破防（受伤×2·无反击）</td><td>五行克制从 ±20% → 核心策略轴</td></tr>
+        <tr><td>连击计数</td><td>每次攻击/神通 +1（上限 ×10 = +80%），嗑药/逃跑/吃蓄力归零</td><td>"保命 vs 保 combo"的核心张力</td></tr>
+      </tbody>
+    </table>
+    <p>8 种怪物各有独特蓄力技能（狼嚎/焰尾/缠绞/血煞掌/妖术/龙息/元婴爆/剑域），伤害倍率和打断门槛递增。自动战斗 AI 已升级：蓄力时自动护盾/打断，破防时猛攻，破绽条接近满时优先克制神通。</p>
+
+    <div class="info">
+      <div class="h">审 计 评 分 变 化（预 估）</div>
+      核心循环密度 2→4 / 跨时段挂钩 1→3 / 多感官反馈 2→4 / 叙事深度 3→4 / 战斗策略 2→4 → 总分 28→38/45。
+    </div>
+  </section>
+
   <!-- 16 -->
   <section id="roadmap">
     <h2>十 八、未 来 规 划</h2>
     <div class="cards">
-      <div class="card"><div class="name">道侣 NPC <span class="tag b">P1</span></div>
-        <div class="desc">羁绊系统，双修加速、共渡天劫。</div></div>
+      <div class="card"><div class="name">道侣 NPC <span class="tag g">✓</span></div>
+        <div class="desc">v7 已实装。8 位 NPC / 好感 3 阶段 / 双修 / 共渡天劫 / 白首永久 buff。</div></div>
       <div class="card"><div class="name">灵宠契约 <span class="tag g">✓</span></div>
-        <div class="desc">v6.2 已实装。战斗收服/喂养升级/忠诚系统/灵宠神通/图鉴/专属蛋/出战协攻+分担伤害。详见「灵宠契约系统」一章。</div></div>
+        <div class="desc">v6.2 已实装。战斗收服/喂养升级/忠诚系统/灵宠神通/图鉴/专属蛋/出战协攻+分担伤害。</div></div>
+      <div class="card"><div class="name">体验优化 <span class="tag g">✓</span></div>
+        <div class="desc">v8 已实装。连修势能 / 突破爆发 / 里程碑 / 大奖事件 / 气运回转 / 选择事件 / 事件链 / 叙事文本 / NPC 对话 / 宠物个性。详见「体验优化」一章。</div></div>
       <div class="card"><div class="name">灵田洞府 <span class="tag b">P1</span></div>
         <div class="desc">种植灵草产出离线收益，洞府可自建阵法。</div></div>
+      <div class="card"><div class="name">战斗深化 <span class="tag g">✓</span></div>
+        <div class="desc">v9 已实装。蓄力预警（8种怪物独特特殊技）/ 破绽条（五行克制核心化）/ 连击计数（+80% 上限）/ 自动战斗 AI 升级。</div></div>
       <div class="card"><div class="name">心魔劫 QTE <span class="tag b">P1</span></div>
         <div class="desc">金丹/化神前需过心魔关，选择题式推进。</div></div>
       <div class="card"><div class="name">名望因果 <span class="tag">P2</span></div>
         <div class="desc">行善恶影响奇遇走向，排行榜系统。</div></div>
       <div class="card"><div class="name">存档导入导出 <span class="tag">P2</span></div>
         <div class="desc">JSON 文件导出，便于备份与跨设备。</div></div>
-      <div class="card"><div class="name">音效与 BGM <span class="tag">P2</span></div>
-        <div class="desc">古风背景乐 + 突破雷鸣音效。</div></div>
+      <div class="card"><div class="name">音效反馈 <span class="tag g">✓</span></div>
+        <div class="desc">v9 已实装。Web Audio API 程序化合成：突破雷鸣/天劫震动/大奖钟鸣/里程碑音阶/失败闷响。全屏视觉闪光分层。</div></div>
+      <div class="card"><div class="name">审计迭代 <span class="tag g">✓</span></div>
+        <div class="desc">v9 已实装。交替奖励系统/小境界突破/离线修炼/事件密度提升/夙愿扩充（寻仙故人+弑神逆天）。</div></div>
       <div class="card"><div class="name">v2 已完成 <span class="tag g">✓</span></div>
         <div class="desc">天劫系统、凡人流寿元、炼丹、宗门、坊市、秘境、装备栏、本命法宝、10 种神通。</div></div>
     </div>
