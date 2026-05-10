@@ -26,6 +26,9 @@ generated-images/
 *.bak
 *.tmp
 
+# ===== Claude Code =====
+.claude/
+
 # ===== CodeBuddy 说明 =====
 # .codebuddy/ 整体保留（记录开发过程），但排除运行时缓存：
 .codebuddy/cache/

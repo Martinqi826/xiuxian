@@ -677,12 +677,12 @@ function formatDate(days){
 }
 
 const REALMS = [
-  ["凡人",0],["练气一层",100],["练气三层",300],["练气六层",700],["练气九层",1200],
-  ["筑基初期",2000],["筑基中期",3500],["筑基后期",5500],["筑基大圆满",8000],
-  ["金丹初期",12000],["金丹中期",18000],["金丹后期",26000],
-  ["元婴初期",40000],["元婴中期",60000],["元婴后期",90000],
-  ["化神期",140000],["炼虚期",220000],["合体期",340000],
-  ["大乘期",520000],["渡劫期",800000],["仙人",1200000],
+  ["凡人",0],["练气一层",100],["练气三层",350],["练气六层",800],["练气九层",1500],
+  ["筑基初期",2800],["筑基中期",5000],["筑基后期",8000],["筑基大圆满",13000],
+  ["金丹初期",22000],["金丹中期",35000],["金丹后期",55000],
+  ["元婴初期",90000],["元婴中期",140000],["元婴后期",210000],
+  ["化神期",320000],["炼虚期",500000],["合体期",780000],
+  ["大乘期",1200000],["渡劫期",1800000],["仙人",2800000],
 ];
 
 /* v8 · 修为里程碑（一次性奖励） */
@@ -2055,14 +2055,14 @@ const ITEMS = {
 };
 const MONSTERS = [
   // 名, 等级要求, HP, 攻, 修为奖, 灵石奖, 属性
-  ["黑风狼",   0,  30,   5,  20,  5,   "木"],
-  ["赤焰狐",   3,  80,   10, 60,  15,  "火"],
-  ["玄铁蟒",   6,  200,  20, 150, 40,  "金"],
-  ["血煞修士", 9,  400,  35, 300, 80,  "火"],
-  ["筑基妖修", 12, 800,  55, 600, 200, "水"],
-  ["化形蛟龙", 15, 2000, 90, 1500,500, "水"],
-  ["元婴老怪", 18, 5000, 150,4000,1200,"土"],
-  ["散修剑仙", 20, 10000,250,9000,3000,"金"],
+  ["黑风狼",   0,  120,  15,  20,  5,   "木"],
+  ["赤焰狐",   3,  400,  35,  60,  15,  "火"],
+  ["玄铁蟒",   6,  1500, 80,  150, 40,  "金"],
+  ["血煞修士", 9,  5000, 140, 300, 80,  "火"],
+  ["筑基妖修", 12, 15000,220, 600, 200, "水"],
+  ["化形蛟龙", 15, 25000,350, 1500,500, "水"],
+  ["元婴老怪", 18, 50000,600, 4000,1200,"土"],
+  ["散修剑仙", 20,100000,900, 9000,3000,"金"],
 ];
 
 /* ============================================================
@@ -3779,7 +3779,7 @@ function calcDamage(atk, def, opt){
   const penRate = Math.min(0.85, (atk.pen||0)/100);
   const effDef = (def.def||0) * (1 - penRate);
   // 非线性减伤：dmg = raw * (1 - effDef/(effDef+K))
-  const K = 600;
+  const K = 300;
   let dmg = raw * (1 - effDef/(effDef + K));
   if(isCrit) dmg *= (atk.critDmg || 1.5);
   dmg = Math.max(1, Math.floor(dmg));
@@ -3867,6 +3867,14 @@ function applyDamageToM(m, d, srcName){
 /* ============ 行动 ============ */
 function actCultivate(){
   if(P.inBattle){log("战斗中无法闭关。","hint");return}
+  // v9：闭关需消耗灵石布设聚灵法阵
+  const cultCost = 10 + P.realmIdx * 20;
+  if((P.bag["灵石"]||0) < cultCost){
+    log(`灵石不足！闭关需 ${cultCost} 灵石布设聚灵法阵，当前仅 ${P.bag["灵石"]||0}。`,"bad");
+    return;
+  }
+  addItem(P, "灵石", -cultCost);
+  log(`· 消耗 ${cultCost} 灵石布设聚灵法阵`, "hint");
 
   // —— 闭关时长：3~21 天，按概率分布 ——
   const r0 = Math.random();
@@ -4718,21 +4726,40 @@ function actAdventure(){
     delete P._advAltMul;
     afterAction();
   }else{
-    // 战斗
+    // 战斗 — v10：权重偏向同级怪物（越接近玩家等级越常见）
     delete P._advAltMul;
     const cands=MONSTERS.filter(m=>m[1]<=P.realmIdx+2);
-    const m=choice(cands.length?cands:[MONSTERS[0]]);
-    startBattle(m);
+    const weighted = cands.map(m => {
+      const gap = Math.max(0, P.realmIdx - m[1]);
+      return { m, w: gap <= 2 ? 4 : gap <= 5 ? 2 : 1 };
+    });
+    const totalW = weighted.reduce((s,x) => s+x.w, 0);
+    let roll = Math.random() * totalW;
+    let picked = weighted[0].m;
+    for(const x of weighted){ roll -= x.w; if(roll <= 0){ picked = x.m; break; } }
+    startBattle(picked);
   }
 }
 
 function actBreakthrough(){
   if(P.inBattle){log("战斗中无法突破。","hint");return}
+  // v10：突破冷却 — 失败后经脉需恢复30天
+  if(P._bkCooldown && (P.days||0) < P._bkCooldown){
+    const remain = P._bkCooldown - (P.days||0);
+    log(`经脉尚未复原，需静养 ${remain} 日方可再次冲关。`,"hint");
+    return;
+  }
   const t=nextThreshold(P);
   if(t===null){log("你已达修真巅峰，再无可破之境。","sys");return}
   if(P.cult<t){log(`修为不足，距【${REALMS[P.realmIdx+1][0]}】还差 ${t-P.cult}。`,"hint");return}
 
   const nextIdx = P.realmIdx+1;
+  // v10：突破需要最低击杀数（以战养道，不可纯闭关飞升）
+  const reqKills = nextIdx * 3;
+  if((P.stats?.kill||0) < reqKills){
+    log(`道基不稳！需历经至少 ${reqKills} 场斩杀方可冲击下一境界（当前 ${P.stats?.kill||0} 场）。`,"bad");
+    return;
+  }
   // v6 · 突破五维化：检查必需品 / 装备 / 法宝 / 道行 / 天劫真血
   const gate = checkBreakthroughGate(nextIdx);
   if(gate.blocked){
@@ -4784,7 +4811,13 @@ function actBreakthrough(){
         const dmg=30+P.realmIdx*15;
         takeDmg(P,dmg);
         P.cult=Math.floor(P.cult*0.7);
+        // v9：突破失败折寿
+        const lifeLoss = 5 + P.realmIdx * 3;
+        P.lifespan -= lifeLoss;
+        // v10：突破冷却30天
+        P._bkCooldown = (P.days||0) + 30;
         log("突破失败，经脉受损，修为倒退！","bad"); SFX.fail(); vfx("red"); screenShake();
+        log(`经脉反噬，折寿 ${lifeLoss} 年！需静养30日方可再次冲关。（剩余寿元 ${Math.max(0, P.lifespan - P.age)} 年）`,"bad");
       }
       afterAction();
     },800);
@@ -4883,8 +4916,8 @@ function doBreakthroughSuccess(){
   P.hp = P.maxHp;
   // v8：突破满真元（爆发感）
   P.mp = P.maxMp;
-  // v4：突破仅小幅延寿（+30 + 境界×10），不再跳到 LIFESPAN[idx]，寿元真正稀缺
-  const lifeGain = 30 + P.realmIdx * 10;
+  // v10：延寿减半，寿元更稀缺（原 30+idx*10，现 15+idx*5）
+  const lifeGain = 15 + P.realmIdx * 5;
   P.lifespan += lifeGain;
   P.dx = P.maxDx = 100 + P.realmIdx*10;
   // v8：突破余韵 — 30天内修为 ×1.5
@@ -5756,13 +5789,21 @@ function setScene(title, sub, cls){
 
 /* ============ 战斗 ============ */
 function startBattle(m){
-  const [name,lvl,mhp,matk,cr,sr,ele]=m;
+  let [name,lvl,mhp,matk,cr,sr,ele]=m;
   // v3：定位怪物 idx（用于读 MONSTER_META 的 spd/crit/karma）
   const idx = MONSTERS.indexOf(m);
+  // v10：怪物动态缩放 — 玩家境界越高于怪物等级，怪物指数增强
+  const gap = Math.max(0, P.realmIdx - lvl);
+  if(gap > 0){
+    const hpScale  = Math.pow(1.25, gap);  // 每级差 ×1.25 HP（指数）
+    const atkScale = Math.pow(1.18, gap);  // 每级差 ×1.18 ATK（指数）
+    mhp  = Math.floor(mhp * hpScale);
+    matk = Math.floor(matk * atkScale);
+  }
   P.inBattle=true;
   P.monster={name,lvl,mhp,maxMhp:mhp,matk,cr,sr,ele:ele||null,rounds:0,idx,
     breakGauge:0, breakMax:3+Math.floor(idx/2), breakRounds:0,
-    combo:0, telegraphing:false, telegraphCd:0};
+    combo:0, telegraphing:false, telegraphCd:0, healCount:0};
   const eleTip = ele?`，属${ele}`:"";
   log(`※ 一只「${name}」拦住了你的去路！（HP ${mhp}, ATK ${matk}${eleTip}）`,"sys");
   // 五行提示
@@ -5921,11 +5962,14 @@ function endBattle(win){
     if(Math.random()<0.15*lootMul){
       addItem(P, choice(["聚灵草","凝血花","破障花","千年灵芝"].slice(0, Math.min(4, 1+Math.floor(P.realmIdx/4)))), 1);
     }
-    if(Math.random()<0.03*lootMul){
+    P.stats.kill_noEquip = (P.stats.kill_noEquip||0) + 1;
+    const equipGuarantee = P.stats.kill_noEquip >= 8;  // 每8场保底
+    if(equipGuarantee || Math.random()<0.12*lootMul){
       const tier = Math.min(5, 1+Math.floor(P.realmIdx/4));
       const pool = Object.entries(EQUIPS).filter(([k,v])=>v.tier<=tier);
       const [nm] = choice(pool);
       addItem(P, nm, 1);
+      P.stats.kill_noEquip = 0;
     }
     // v4：天材地宝（延寿丹）按境界 & 秘境加成掉落
     {
@@ -6014,6 +6058,12 @@ function battleAttack(){
   postActionPhase(m);
 }
 function battleHeal(){
+  // v9：每战最多服丹2次（丹毒限制）
+  const bm = P.monster;
+  if(bm && (bm.healCount||0) >= 2){
+    log("本战已服丹两次，丹毒积聚，无法再服！","bad");
+    return;
+  }
   // v4：智能选药 — hp 缺值多则选回血丹，否则选真元丹；都不缺则提示
   const hpLack = (P.maxHp||1) - (P.hp||0);
   const mpLack = (P.maxMp||1) - (P.mp||0);
@@ -6034,8 +6084,8 @@ function battleHeal(){
     pick = mpHerbs[0];
   }
   if(!pick){log("气血与真元皆已充盈，无需服丹！","hint");return}
-  // 嗑药重置连击
-  if(P.monster) P.monster.combo = 0;
+  // 嗑药重置连击 + 计数丹毒
+  if(P.monster){ P.monster.combo = 0; P.monster.healCount = (P.monster.healCount||0) + 1; }
   useItem(pick);
   // 怪物反击（统一三分支）
   const m = P.monster;
@@ -6058,6 +6108,11 @@ function battleFlee(){
     afterAction();
   }else{
     log("逃跑失败！","bad");
+    // v10：逃跑失败被追击，受一次怪物攻击
+    const chaseDmg = m.matk;
+    takeDmg(P, chaseDmg);
+    log(`被追击！受到 ${chaseDmg} 点伤害。`,"bad");
+    if(!alive(P)){endBattle(false); gameOver(); return}
     if(monsterCounterPhase(m)){endBattle(false);return}
     postActionPhase(m);
   }
@@ -6507,19 +6562,51 @@ function afterAction(){
 
 function gameOver(){
   autoStop();
-  const reason = P.age>=P.lifespan
-    ? `寿元已尽，${P.name} 在【${REALMS[P.realmIdx][0]}】之境飘然坐化。`
-    : `${P.name} 道陨于此，魂归天地。`;
+  // v9：寿终正寝 = 永久死亡（删档）；战斗死亡 = 重罚但可继续
+  if(P.age >= P.lifespan){
+    // —— 寿元耗尽：不可逆 ——
+    showModal(`
+      <h3>🕯 道 途 终 焉</h3>
+      <p>寿元已尽，${P.name} 在【${REALMS[P.realmIdx][0]}】之境飘然坐化。</p>
+      <p class="hint">修行 ${P.days} 天，最终境界 ${REALMS[P.realmIdx][0]}</p>
+      <div class="btns"><button id="m-restart" class="primary">再 入 轮 回</button></div>
+    `);
+    $("m-restart").onclick = ()=>{
+      localStorage.removeItem("xiuxian_save");
+      closeModal();
+      bootstrap();
+    };
+    return;
+  }
+  // —— 战斗死亡：重生但代价沉重 ——
+  const lostStones = Math.floor((P.bag["灵石"]||0) * 0.3);
+  const cultLoss = Math.floor(P.cult * 0.2);
+  const agePenalty = 3 + P.realmIdx;
+  P.bag["灵石"] = (P.bag["灵石"]||0) - lostStones;
+  P.cult = Math.max(0, P.cult - cultLoss);
+  P.age += agePenalty;
+  P.hp = Math.floor((P.maxHp||100) * 0.3);
+  P.mp = Math.floor((P.maxMp||50) * 0.3);
+  P.inBattle = false;
+  P.monster = null;
+  P.dx = Math.max(0, (P.dx||100) - 20);
+  SFX.fail(); vfx("red"); screenShake();
   showModal(`
-    <h3>🕯 道 途 终 焉</h3>
-    <p>${reason}</p>
-    <p class="hint">修行 ${P.days} 天，最终境界 ${REALMS[P.realmIdx][0]}</p>
-    <div class="btns"><button id="m-restart" class="primary">再 入 轮 回</button></div>
+    <h3>⚡ 道 陨 重 生</h3>
+    <p>${P.name} 重伤垂死，一缕残魂侥幸归体。</p>
+    <p class="hint">
+      灵石散落 -${lostStones}<br>
+      修为倒退 -${cultLoss}<br>
+      元气大伤 +${agePenalty} 岁<br>
+      道心动摇 -20
+    </p>
+    <div class="btns"><button id="m-revive" class="primary">艰 难 恢 复</button></div>
   `);
-  $("m-restart").onclick = ()=>{
-    localStorage.removeItem("xiuxian_save");
+  $("m-revive").onclick = ()=>{
     closeModal();
-    bootstrap();
+    setScene("凡 人 修 仙 路","— 一 缕 神 识 自 虚 空 降 临 —","");
+    bindMainButtons();
+    refresh();
   };
 }
 
@@ -6873,17 +6960,18 @@ function autoBattleStep(){
     battleAttack(); return;
   }
 
-  // 怪物破防中 → 趁机猛攻
-  if(m.breakRounds > 0 && P.hp > P.maxHp*0.15){
+  // 怪物破防中 → 趁机猛攻（v9：阈值提高，怪更疼）
+  if(m.breakRounds > 0 && P.hp > P.maxHp*0.30){
     battleAttack(); return;
   }
 
-  // 常规：血少嗑药/逃跑
-  if(lowHp && heals.length){
+  // 常规：血少嗑药/逃跑（v9：丹毒上限感知）
+  const canHeal = heals.length && (m.healCount||0) < 2;
+  if(lowHp && canHeal){
     log("【自动】气血告急，服用丹药……","hint");
     battleHeal(); return;
   }
-  if((lowHp && !heals.length) || tooStrong){
+  if((lowHp && !canHeal) || tooStrong){
     log("【自动】此战凶险，脚踏遁光！","hint");
     battleFlee(); return;
   }

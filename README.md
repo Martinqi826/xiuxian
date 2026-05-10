@@ -69,7 +69,9 @@ python -m http.server 8000
 
 ```
 xiuxian/
-├── index.html         # 游戏主文件（单文件 ~280KB，所有逻辑）
+├── index.html         # 游戏主文件（单文件 ~370KB，所有逻辑）
+├── CLAUDE.md          # AI Agent 开发指南（架构/函数索引/数值体系/规范）
+├── CHANGELOG.md       # 版本迭代日志（v1-v10，含改动原因）
 ├── whitepaper.html    # 项目白皮书（19 章详细设计文档）
 ├── xiuxian.py         # 早期 CLI 原型（已废弃，保留纪念）
 └── .codebuddy/        # 开发过程记录（对话计划 / artifact）
@@ -89,6 +91,9 @@ xiuxian/
 | **v6.3** | 自动暂停 | 弹窗时自动模式暂停等玩家决断 |
 | **v6.5** | 回退形象 | SVG 形象因不符古风水墨调性，回退至无形象方案 |
 | **v7** | 道侣 NPC | 8 位道侣 × 3 阶段关系 × 双修/共度天劫 |
+| **v8** | 灵宠性格 + 里程碑 | 灵宠性格系统 / 修为里程碑 / 突破余韵 / 小境界 |
+| **v9** | 战斗深化 | 蓄力预警 / 破绽破防 / 连击 / 怪物AI |
+| **v10** | 数值再平衡 | 怪物强化 / 治疗上限 / 修炼消耗 / 突破折寿冷却 / 死亡重生 |
 
 ### 🛠 开发控制台（DEV 面板）
 
@@ -158,6 +163,9 @@ python -m http.server 8000
 | v6.3 | Auto-pause | Auto mode pauses for decision modals |
 | v6.5 | Portrait rollback | SVG portrait rolled back due to Q-style mismatch |
 | v7   | Partner NPCs | 8 partners × 3-stage relationship × dual cultivation |
+| v8   | Pet personality + milestones | Pet personality / cultivation milestones / breakthrough afterglow |
+| v9   | Combat depth | Telegraph / break gauge / combo / monster AI |
+| v10  | Numerical rebalance | Monster scaling / heal cap / cultivation cost / breakthrough penalties |
 
 ### 📝 License
 
