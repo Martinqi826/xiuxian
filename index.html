@@ -240,6 +240,50 @@
     .term-row{grid-template-columns:repeat(4,1fr)}
   }
 
+  /* v12 · 浮动伤害数字 */
+  .dmg-float{
+    position:fixed;pointer-events:none;z-index:200;
+    font-weight:bold;font-size:18px;
+    animation:dmgUp .9s ease-out forwards;
+    text-shadow:0 0 6px rgba(0,0,0,.8);
+  }
+  @keyframes dmgUp{
+    0%{opacity:1;transform:translateY(0) scale(1)}
+    60%{opacity:1;transform:translateY(-40px) scale(1.2)}
+    100%{opacity:0;transform:translateY(-60px) scale(0.8)}
+  }
+  .dmg-float.crit{font-size:24px;color:#ff6b6b}
+  .dmg-float.heal{color:#7fc7a3}
+  .dmg-float.dodge{color:#7ab0d4;font-size:14px;font-style:italic}
+
+  /* v12 · 成就弹出 */
+  .achieve-toast{
+    position:fixed;top:60px;left:50%;transform:translateX(-50%);z-index:300;
+    background:linear-gradient(135deg,rgba(30,25,15,.95),rgba(40,35,20,.95));
+    border:1px solid var(--gold);border-radius:8px;
+    padding:10px 20px;color:var(--gold);font-size:14px;letter-spacing:2px;
+    box-shadow:0 0 20px rgba(212,180,106,.4);
+    animation:achieveIn .5s ease-out, achieveOut .5s ease-in 2.5s forwards;
+  }
+  @keyframes achieveIn{0%{opacity:0;transform:translateX(-50%) translateY(-20px)}100%{opacity:1;transform:translateX(-50%) translateY(0)}}
+  @keyframes achieveOut{0%{opacity:1}100%{opacity:0;transform:translateX(-50%) translateY(-10px)}}
+
+  /* v12 · 成就面板 */
+  .ach-item{padding:6px 0;border-bottom:1px dashed rgba(212,180,106,.12);line-height:1.7}
+  .ach-item.locked{opacity:.4}
+  .ach-item .ach-name{color:var(--gold);font-size:13px}
+  .ach-item .ach-desc{color:#a89c7c;font-size:11px}
+  .ach-item .ach-reward{color:var(--jade);font-size:11px}
+
+  /* v12 · 仙榜面板 */
+  .hall-entry{padding:6px 0;border-bottom:1px dashed rgba(212,180,106,.12);line-height:1.7}
+  .hall-entry .hall-rank{color:var(--gold);font-size:15px;font-weight:bold;min-width:24px;display:inline-block}
+  .hall-entry .hall-name{font-size:13px}
+  .hall-entry .hall-info{color:#a89c7c;font-size:11px}
+
+  /* v12 · HP条平滑动画 */
+  .bar i{transition:width .3s ease-out}
+
   /* === 扩展样式：v2 新增模块 === */
   .bar.age > i{background:linear-gradient(90deg,#c0a8d4,#e0cff0)}
   .v.blue{color:#7ab0d4}
@@ -446,6 +490,8 @@
       <button data-tab="skill">✨ 神通</button>
       <button data-tab="pet">🐉 灵宠</button>
       <button data-tab="partner">💞 道侣</button>
+      <button data-tab="achieve">🏆 成就</button>
+      <button data-tab="hall">📜 仙榜</button>
     </div>
 
     <div class="tab-pane active" id="pane-bag">
@@ -493,6 +539,16 @@
       <div style="font-size:11px;color:#a89c7c;line-height:1.7;margin-top:8px">
         道侣 NPC 系统：外出历练、闭关异事有概率相逢。好感 ≥30「相知」可双修加修为；≥60「道侣」；≥80 可共度天劫减伤 30%，三劫共度即结为「白首」。道侣有寿元，若不带她度劫，终将先你而去。
       </div>
+    </div>
+
+    <!-- v12 · 成就面板 -->
+    <div class="tab-pane" id="pane-achieve">
+      <div id="achieve-list" style="font-size:12px"></div>
+    </div>
+
+    <!-- v12 · 仙榜面板 -->
+    <div class="tab-pane" id="pane-hall">
+      <div id="hall-list" style="font-size:12px"></div>
     </div>
   </aside>
 </div>
@@ -620,6 +676,56 @@ const SFX = (function(){
         gain.gain.exponentialRampToValueAtTime(0.001, now+0.6);
         osc.connect(gain); gain.connect(c.destination);
         osc.start(now); osc.stop(now+0.6);
+      });
+    },
+    /* v12: 攻击命中 */
+    hit(){
+      play(c=>{
+        const now = c.currentTime;
+        const n = c.createBufferSource();
+        const buf = c.createBuffer(1, c.sampleRate*0.08, c.sampleRate);
+        const d = buf.getChannelData(0);
+        for(let i=0;i<d.length;i++) d[i]=(Math.random()*2-1)*Math.exp(-i/(c.sampleRate*0.02));
+        n.buffer = buf;
+        const g = c.createGain(); g.gain.setValueAtTime(0.12, now);
+        n.connect(g); g.connect(c.destination); n.start(now);
+      });
+    },
+    /* v12: 治疗 */
+    heal(){
+      play(c=>{
+        const now = c.currentTime;
+        [392, 523, 659].forEach((f,i)=>{
+          const o = c.createOscillator(), g = c.createGain();
+          o.type="sine"; o.frequency.value=f;
+          const t=now+i*0.1;
+          g.gain.setValueAtTime(0.1,t); g.gain.exponentialRampToValueAtTime(0.001,t+0.3);
+          o.connect(g); g.connect(c.destination); o.start(t); o.stop(t+0.3);
+        });
+      });
+    },
+    /* v12: 闪避 */
+    dodge(){
+      play(c=>{
+        const now = c.currentTime;
+        const o = c.createOscillator(), g = c.createGain();
+        o.type="sine"; o.frequency.setValueAtTime(800,now);
+        o.frequency.exponentialRampToValueAtTime(400,now+0.15);
+        g.gain.setValueAtTime(0.08,now); g.gain.exponentialRampToValueAtTime(0.001,now+0.2);
+        o.connect(g); g.connect(c.destination); o.start(now); o.stop(now+0.2);
+      });
+    },
+    /* v12: 成就解锁 */
+    achieve(){
+      play(c=>{
+        const now = c.currentTime;
+        [523,659,784,1047,1319].forEach((f,i)=>{
+          const o = c.createOscillator(), g = c.createGain();
+          o.type="sine"; o.frequency.value=f;
+          const t=now+i*0.08;
+          g.gain.setValueAtTime(0.12,t); g.gain.exponentialRampToValueAtTime(0.001,t+0.6);
+          o.connect(g); g.connect(c.destination); o.start(t); o.stop(t+0.6);
+        });
       });
     }
   };
@@ -3072,6 +3178,59 @@ const DUNGEON_EVENTS = [
   {name:"悟道石", prob:0.08, fn:p=>{const c=30+p.realmIdx*15;p.cult+=c;return `悟道石前静坐片刻，修为 +${c}！`;}},
 ];
 
+/* ==========================================================
+ *  v12 · 成就系统
+ * ========================================================== */
+const ACHIEVEMENTS = [
+  {id:"first_kill",   nm:"初试锋芒", desc:"首次击败妖兽",            reward:"灵石×50",   check:p=>(p.stats?.kill||0)>=1},
+  {id:"kill_10",      nm:"十战十捷", desc:"累计击败 10 只妖兽",      reward:"聚气丹×3",  check:p=>(p.stats?.kill||0)>=10},
+  {id:"kill_100",     nm:"百战不殆", desc:"累计击败 100 只妖兽",     reward:"破障丹×2",  check:p=>(p.stats?.kill||0)>=100},
+  {id:"kill_500",     nm:"修罗战神", desc:"累计击败 500 只妖兽",     reward:"天劫真血×1",check:p=>(p.stats?.kill||0)>=500},
+  {id:"bk_1",        nm:"踏入修途", desc:"首次突破境界",             reward:"灵石×100",  check:p=>p.realmIdx>=1},
+  {id:"bk_5",        nm:"筑基有成", desc:"达到筑基期",              reward:"筑基丹×1",  check:p=>p.realmIdx>=5},
+  {id:"bk_9",        nm:"金丹大道", desc:"达到金丹期",              reward:"灵石×2000", check:p=>p.realmIdx>=9},
+  {id:"bk_12",       nm:"元婴出窍", desc:"达到元婴期",              reward:"灵石×5000", check:p=>p.realmIdx>=12},
+  {id:"bk_18",       nm:"渡劫飞仙", desc:"达到渡劫期",              reward:"九转还魂丹×1",check:p=>p.realmIdx>=18},
+  {id:"ascend",      nm:"羽化登仙", desc:"完成飞升",                reward:"传承加强",   check:p=>p.flags?._ach_ascended},
+  {id:"first_dg",    nm:"秘境初探", desc:"首次通关秘境",             reward:"灵石×200",  check:p=>(p.stats?.dungeon||0)>=1},
+  {id:"dg_all",      nm:"秘境宗师", desc:"通关全部 6 个秘境",        reward:"混沌蛋×1",  check:p=>Object.keys(p.dungeonRec||{}).length>=6},
+  {id:"alchemy_10",  nm:"丹道入门", desc:"累计炼丹 10 次",           reward:"千年灵芝×2",check:p=>(p.stats?.alchemy||0)>=10},
+  {id:"alchemy_50",  nm:"丹道宗师", desc:"累计炼丹 50 次",           reward:"万年玄参×3",check:p=>(p.stats?.alchemy||0)>=50},
+  {id:"pet_3",       nm:"万兽通灵", desc:"签约 3 只灵宠",            reward:"灵石×500",  check:p=>(p.pets||[]).length>=3},
+  {id:"pet_8",       nm:"御兽天尊", desc:"签约 8 只灵宠",            reward:"混沌蛋×1",  check:p=>(p.pets||[]).length>=8},
+  {id:"partner_1",   nm:"有缘千里", desc:"结识首位道侣",             reward:"灵石×100",  check:p=>(p.partners||[]).filter(x=>x.fondness>=15).length>=1},
+  {id:"partner_dao", nm:"白首偕老", desc:"与道侣达到「白首」",        reward:"蟠桃×1",    check:p=>(p.partners||[]).some(x=>x.fondness>=80)},
+  {id:"rich",        nm:"富甲一方", desc:"持有灵石超过 10000",        reward:"悟道茶×3",  check:p=>(p.bag?.["灵石"]||0)>=10000},
+  {id:"dao_50",      nm:"道心通明", desc:"道行达到 50",              reward:"灵石×1000", check:p=>(p.dao||0)>=50},
+  {id:"near_death",  nm:"九死一生", desc:"气血降至 1% 以下后存活",    reward:"回元丹×3",  check:p=>p.flags?._ach_nearDeath},
+  {id:"no_equip_win",nm:"赤手空拳", desc:"不穿装备击败一只怪",       reward:"灵石×200",  check:p=>p.flags?._ach_bareWin},
+  {id:"combo_10",    nm:"连击无双", desc:"单场战斗达成 10 连击",      reward:"灵石×300",  check:p=>p.flags?._ach_combo10},
+  {id:"lifespan_500",nm:"长生久视", desc:"寿元超过 500 年",           reward:"蟠桃×1",    check:p=>(p.lifespan||0)>=500},
+];
+
+/* v12 · 秘境词缀 */
+const DUNGEON_MODS = [
+  {nm:"炼狱",  desc:"怪物攻击 +40%",          apply:(m)=>{m.matk=Math.floor(m.matk*1.4)}},
+  {nm:"富矿",  desc:"灵石掉落 +100%",         apply:null, flag:"richLoot"},
+  {nm:"迷雾",  desc:"每层额外触发一个随机事件", apply:null, flag:"extraEvent"},
+  {nm:"祝福",  desc:"每层恢复 10% 气血",       apply:null, flag:"blessing"},
+  {nm:"诅咒",  desc:"怪物血量 +50%",           apply:(m)=>{m.mhp=Math.floor(m.mhp*1.5);m.hp=m.mhp}},
+];
+
+/* v12 · 仙榜 */
+const HALL_KEY = "xiuxian_hall";
+
+/* v12 · 道侣战斗协助 */
+const PARTNER_BATTLE_SKILLS = {
+  "cult+":{nm:"灵光加护",  desc:"+15% 修为", chance:0.3},
+  "heal": {nm:"丹心疗伤",  desc:"战后回复 20% HP", chance:0.4},
+  "atk+": {nm:"双剑合璧",  desc:"攻击 +20%", chance:0.3},
+  "yun+": {nm:"狐运加持",  desc:"暴击率 +15%", chance:0.25},
+  "dao+": {nm:"仙灵点化",  desc:"+道行", chance:0.15},
+  "dx+":  {nm:"心灵慰藉",  desc:"战后道心 +5", chance:0.35},
+  "lifespan":{nm:"凡心守护",desc:"受伤减免 10%", chance:0.4},
+};
+
 /* ============================================================
  *   v3 · 三层属性体系（六根骨 + 八派生 + 修仙特色）
  * ============================================================ */
@@ -4104,9 +4263,11 @@ function applyDamageToP(d, src){
 function applyDamageToM(m, d, srcName){
   if(d.isDodge){
     log(`「${m.name}」身形飘忽，避开了你的攻击！`,"dodge");
+    SFX.dodge(); floatDmg("闪避","dodge");
     return false;
   }
   m.mhp -= d.dmg;
+  SFX.hit(); floatDmg("-"+d.dmg, d.isCrit?"crit":"");
   // v10.3 · 绝境暴击 → 用 epic 染色 + 特效
   const hpRatio = (P.hp||0) / Math.max(1, P.maxHp||1);
   const isDesperateCrit = d.isCrit && hpRatio < 0.25;
@@ -4119,6 +4280,8 @@ function applyDamageToM(m, d, srcName){
     const cls = d.isCrit ? "crit" : (d.elBonus>1?"el":"good");
     log(`${tag}${srcName?"【"+srcName+"】":""}打出 ${d.dmg} 点伤害（${Math.max(0,m.mhp)}/${m.maxMhp}）`, cls);
   }
+  // v12: 濒死成就标记
+  if(P.hp > 0 && P.hp <= P.maxHp*0.01){ if(!P.flags) P.flags={}; P.flags._ach_nearDeath = true; }
   return m.mhp <= 0;
 }
 
@@ -5243,6 +5406,10 @@ function saveLineage(L){ try{ localStorage.setItem(LINEAGE_KEY, JSON.stringify(L
 
 function actAscension(){
   autoStop();
+  // v12: 飞升成就 + 仙榜
+  if(!P.flags) P.flags={}; P.flags._ach_ascended = true;
+  checkAchievements();
+  recordHall("羽化飞升");
   // 计算本周目成就
   const L = loadLineage();
   L.runs = (L.runs||0) + 1;
@@ -5418,6 +5585,32 @@ function processBolt(mul, tag){
     return;
   }
 
+  // v12: 阶段间隙 — 每3道雷暂歇一次（非最后一道），仅大天劫
+  if(!tr.isMini && tr.idx < tr.trib.bolts && tr.idx % 3 === 0 && tr.trib.bolts >= 6){
+    log(`— 第 ${tr.idx} 道雷后，天劫短暂收敛 —`,"epic");
+    showModal(`
+      <h3>⚡ 劫 间 喘 息</h3>
+      <p>气血：${P.hp}/${P.maxHp}（已过 ${tr.idx}/${tr.trib.bolts} 道）</p>
+      <div class="btns">
+        <button id="tp-heal" class="primary">🧘 调息（+20% HP）</button>
+        <button id="tp-relic">🔮 法宝温养（+1级）</button>
+        <button id="tp-brace">💪 蓄势（下道减伤 25%）</button>
+      </div>
+    `);
+    $("tp-heal").onclick=()=>{
+      closeModal(); const h=Math.floor(P.maxHp*0.2);P.hp=Math.min(P.maxHp,P.hp+h);
+      log(`调息回复 ${h} 气血。`,"good"); SFX.heal(); showTribButtons();
+    };
+    $("tp-relic").onclick=()=>{
+      closeModal();
+      if(P.relic){P.relicLv=(P.relicLv||0)+1;log(`法宝温养 +1！`,"good");}
+      else log("无法宝。","hint"); showTribButtons();
+    };
+    $("tp-brace").onclick=()=>{
+      closeModal(); tr.bonus=(tr.bonus||0)+0.25; log("蓄势待发，下道雷减伤 25%。","good"); showTribButtons();
+    };
+    refresh(); return;
+  }
   if(tr.idx >= tr.trib.bolts){
     // 渡劫成功
     const wasMini = !!tr.isMini;
@@ -6026,8 +6219,10 @@ function openDungeon(){
 }
 function startDungeon(idx){
   const d = DUNGEONS[idx];
-  P.curDungeon = {def:d, floor:0};
+  const mod = rollDungeonMod();
+  P.curDungeon = {def:d, floor:0, mod};
   log(`※ 你踏入【${d.n}】，共 ${d.floors} 层。`,"epic");
+  if(mod) log(`◆ 秘境词缀：「${mod.nm}」— ${mod.desc}`,"epic");
   dungeonNextFloor();
 }
 function dungeonNextFloor(){
@@ -6072,6 +6267,12 @@ function dungeonNextFloor(){
     refresh();saveGame(true);
     return;
   }
+  const dgMod = dg.mod;
+  // v12: 词缀「祝福」每层回血
+  if(dgMod && dgMod.flag==="blessing"){
+    const h=Math.floor(P.maxHp*0.1); P.hp=Math.min(P.maxHp,P.hp+h);
+    log(`✦ 祝福之力：恢复 ${h} 气血。`,"good");
+  }
   const isBoss = dg.floor === dg.def.floors && dg.def.boss != null;
   if(isBoss){
     log(`— 秘境第 ${dg.floor}/${dg.def.floors} 层 · ★ BOSS ★ —`,"epic");
@@ -6082,6 +6283,7 @@ function dungeonNextFloor(){
     P.monster.mhp  = Math.floor(P.monster.mhp * 1.8);
     P.monster.hp   = P.monster.mhp;
     P.monster.matk = Math.floor(P.monster.matk * 1.4);
+    if(dgMod && dgMod.apply) dgMod.apply(P.monster);
   }else{
     if(dg.floor > 1 && typeof DUNGEON_EVENTS !== "undefined"){
       for(const ev of DUNGEON_EVENTS){
@@ -6091,12 +6293,19 @@ function dungeonNextFloor(){
           break;
         }
       }
+      // v12: 词缀「迷雾」额外事件
+      if(dgMod && dgMod.flag==="extraEvent"){
+        const ev = DUNGEON_EVENTS[Math.floor(Math.random()*DUNGEON_EVENTS.length)];
+        const msg = ev.fn(P);
+        log(`✦ 迷雾奇遇 · ${ev.name}：${msg}`,"good");
+      }
     }
     log(`— 秘境第 ${dg.floor}/${dg.def.floors} 层 —`,"sys");
     const pool = dg.def.monster.map(i=>MONSTERS[i]);
     const m = choice(pool);
     startBattle(m);
     P.monster.fromDungeon = true;
+    if(dgMod && dgMod.apply) dgMod.apply(P.monster);
   }
 }
 
@@ -6278,7 +6487,8 @@ function endBattle(win){
   if(win){
     log(`※ 你击败了「${m.name}」！`,"good");
     gainCult(P,m.cr,"斩妖");
-    addItem(P,"灵石",m.sr);
+    const dgRichMul = (m.fromDungeon && P.curDungeon?.mod?.flag==="richLoot") ? 2 : 1;
+    addItem(P,"灵石",m.sr * dgRichMul);
     // v4：节气 lootMul 加成掉落概率（小满+10%）
     const buff = getBuff(P);
     const lootMul = buff.lootMul || 1;
@@ -6325,6 +6535,26 @@ function endBattle(win){
       }
     }
     P.stats.kill++;
+    // v12: 成就标记
+    if(!P.equips.weapon && !P.equips.armor && !P.equips.accessory && !P.equips.mount){
+      if(!P.flags) P.flags={}; P.flags._ach_bareWin = true;
+    }
+    if(m.combo >= 10){ if(!P.flags) P.flags={}; P.flags._ach_combo10 = true; }
+    // v12: 道侣战后协助
+    const pAssist = partnerBattleAssist("postBattle");
+    if(pAssist){
+      const sk = pAssist.skill;
+      if(pAssist.pDef.speciality==="heal"){
+        const h=Math.floor(P.maxHp*0.2); P.hp=Math.min(P.maxHp,P.hp+h);
+        log(`💞 ${pAssist.partner.key}施展「${sk.nm}」，恢复 ${h} 气血！`,"good");
+      } else if(pAssist.pDef.speciality==="dx+"){
+        P.dx=Math.min(P.maxDx||100,(P.dx||0)+5);
+        log(`💞 ${pAssist.partner.key}的「${sk.nm}」，道心 +5。`,"good");
+      } else if(pAssist.pDef.speciality==="dao+"){
+        P.dao=(P.dao||0)+1;
+        log(`💞 ${pAssist.partner.key}施展「${sk.nm}」，道行 +1！`,"epic");
+      }
+    }
     sectTaskAdvance("monster");
     // v3：业力结算 — MONSTER_META.karma 为负数表示「击杀此怪可获得善业（杀邪得善）」
     const meta = MONSTER_META[m.idx]||{};
@@ -6420,6 +6650,7 @@ function battleHeal(){
   if(!pick){log("气血与真元皆已充盈，无需服丹！","hint");return}
   // 嗑药重置连击 + 计数丹毒
   if(P.monster){ P.monster.combo = 0; P.monster.healCount = (P.monster.healCount||0) + 1; }
+  SFX.heal(); floatDmg("+回复","heal");
   useItem(pick);
   // 怪物反击（统一三分支）
   const m = P.monster;
@@ -6435,7 +6666,7 @@ function battleFlee(){
   const buff = getBuff(P);
   const baseRate = 0.5+0.05*(P.realmIdx-m.lvl)+bonus;
   if(Math.random()<baseRate*buff.fleeMul){
-    log("你脚踏遁光，成功逃离。","sys");
+    log("你脚踏遁光，成功逃离。","sys"); SFX.dodge();
     P.inBattle=false;P.monster=null;
     setScene("凡 人 修 仙 路","— 一 缕 神 识 自 虚 空 降 临 —","");
     bindMainButtons();
@@ -6838,6 +7069,9 @@ function refresh(){
   if(typeof renderPartnerPanel === "function"){
     renderPartnerPanel();
   }
+  // v12：成就 + 仙榜面板
+  if(typeof renderAchievePanel === "function") renderAchievePanel();
+  if(typeof renderHallPanel === "function") renderHallPanel();
 }
 
 /* v3：渲染玄机详情面板 HTML */
@@ -6890,6 +7124,7 @@ function renderStatsPanel(){
 function afterAction(){
   refresh();
   saveGame(true);
+  checkAchievements();
   if(!alive(P)){
     setTimeout(gameOver,400);
     return;
@@ -6908,8 +7143,210 @@ function afterAction(){
   }
 }
 
+/* ==========================================================
+ *  v12 · 成就系统
+ * ========================================================== */
+function checkAchievements(){
+  if(!P) return;
+  if(!P.achievements) P.achievements = {};
+  for(const a of ACHIEVEMENTS){
+    if(P.achievements[a.id]) continue;
+    try{ if(!a.check(P)) continue; }catch{ continue; }
+    P.achievements[a.id] = Date.now();
+    grantAchievementReward(a);
+    showAchieveToast(a.nm);
+    SFX.achieve();
+    log(`🏆 成就解锁：${a.nm} — ${a.desc}`,"epic");
+  }
+}
+function grantAchievementReward(a){
+  const r = a.reward;
+  const m = r.match(/^(.+?)×(\d+)$/);
+  if(m) addItem(P, m[1], parseInt(m[2],10));
+}
+function showAchieveToast(name){
+  const el = document.createElement("div");
+  el.className = "achieve-toast";
+  el.textContent = `🏆 ${name}`;
+  document.body.appendChild(el);
+  setTimeout(()=>el.remove(), 3200);
+}
+function renderAchievePanel(){
+  const el = document.getElementById("achieve-list");
+  if(!el) return;
+  const achs = P?.achievements || {};
+  const total = ACHIEVEMENTS.length;
+  const done = ACHIEVEMENTS.filter(a=>achs[a.id]).length;
+  let h = `<div style="color:var(--gold);font-size:13px;margin-bottom:8px">已解锁 ${done}/${total}</div>`;
+  for(const a of ACHIEVEMENTS){
+    const unlocked = !!achs[a.id];
+    h += `<div class="ach-item${unlocked?"":" locked"}">
+      <div class="ach-name">${unlocked?"🏆":"🔒"} ${a.nm}</div>
+      <div class="ach-desc">${a.desc}</div>
+      <div class="ach-reward">奖励：${a.reward}</div>
+    </div>`;
+  }
+  el.innerHTML = h;
+}
+
+/* ==========================================================
+ *  v12 · 浮动伤害
+ * ========================================================== */
+function floatDmg(text, type){
+  const el = document.createElement("div");
+  el.className = "dmg-float" + (type?" "+type:"");
+  el.textContent = text;
+  const logEl = document.getElementById("log");
+  if(!logEl) return;
+  const rect = logEl.getBoundingClientRect();
+  el.style.left = (rect.left + rect.width*0.3 + Math.random()*rect.width*0.4) + "px";
+  el.style.top = (rect.top + 20 + Math.random()*40) + "px";
+  document.body.appendChild(el);
+  setTimeout(()=>el.remove(), 1000);
+}
+
+/* ==========================================================
+ *  v12 · 仙榜（排行榜）
+ * ========================================================== */
+function loadHall(){
+  try{ return JSON.parse(localStorage.getItem(HALL_KEY)) || []; }catch{ return []; }
+}
+function saveHall(h){ try{ localStorage.setItem(HALL_KEY, JSON.stringify(h)); }catch{} }
+function recordHall(reason){
+  if(!P) return;
+  const hall = loadHall();
+  hall.push({
+    name: P.name, root: P.rootName, realm: REALMS[P.realmIdx][0], realmIdx: P.realmIdx,
+    kills: P.stats?.kill||0, days: P.days, age: P.age, lifespan: P.lifespan,
+    reason: reason, ts: Date.now(),
+    dungeons: P.stats?.dungeon||0, alchemy: P.stats?.alchemy||0,
+    achievements: Object.keys(P.achievements||{}).length,
+  });
+  hall.sort((a,b)=>b.realmIdx-a.realmIdx || b.kills-a.kills || a.days-b.days);
+  if(hall.length > 20) hall.length = 20;
+  saveHall(hall);
+}
+function renderHallPanel(){
+  const el = document.getElementById("hall-list");
+  if(!el) return;
+  const hall = loadHall();
+  if(!hall.length){ el.innerHTML = '<div style="color:#a89c7c;padding:10px">尚无记录。每次坐化或飞升皆留名仙榜。</div>'; return; }
+  let h = '<div style="color:var(--gold);margin-bottom:8px;font-size:13px">修仙世代录</div>';
+  hall.forEach((e,i)=>{
+    const medal = i===0?"🥇":i===1?"🥈":i===2?"🥉":`${i+1}.`;
+    h += `<div class="hall-entry">
+      <span class="hall-rank">${medal}</span>
+      <span class="hall-name">${e.name}</span>
+      <span style="color:var(--gold);font-size:11px">【${e.realm}】</span>
+      <div class="hall-info">${e.root} · ${e.reason} · ${e.days}天 · ${e.kills}杀 · ${e.achievements||0}成就</div>
+    </div>`;
+  });
+  el.innerHTML = h;
+}
+
+/* ==========================================================
+ *  v12 · 道侣战斗协助
+ * ========================================================== */
+function partnerBattleAssist(context){
+  if(!P || !P.partners) return null;
+  const active = P.partners.filter(x=>!x.deceased && x.fondness>=30);
+  if(!active.length) return null;
+  const pt = active[Math.floor(Math.random()*active.length)];
+  const pDef = PARTNERS[pt.key];
+  if(!pDef) return null;
+  const skill = PARTNER_BATTLE_SKILLS[pDef.speciality];
+  if(!skill || Math.random()>skill.chance) return null;
+  return {partner:pt, pDef, skill};
+}
+
+/* ==========================================================
+ *  v12 · 秘境词缀
+ * ========================================================== */
+function rollDungeonMod(){
+  if(Math.random()<0.4) return null;
+  return DUNGEON_MODS[Math.floor(Math.random()*DUNGEON_MODS.length)];
+}
+
+/* ==========================================================
+ *  v12 · 天劫重做 — 内嵌式战斗天劫
+ * ========================================================== */
+function startInlineTribulation(trib, nextIdx, hasPartner){
+  autoStop();
+  P.tribulation = {
+    trib, nextIdx, idx:0, bonus:0, hpStart:P.hp,
+    tally:{raw:0,pill:0,relic:0}, isMini:false,
+    phase: 1, maxPhase: Math.min(3, Math.ceil(trib.bolts/3)),
+    boltInPhase: 0, boltsPerPhase: Math.ceil(trib.bolts / Math.min(3, Math.ceil(trib.bolts/3))),
+    hasPartner,
+  };
+  P.inBattle = true;
+  setScene(`${trib.name}`,"— 天 雷 降 临 ·  第 一 阶 段 —","tribulation");
+  SFX.rumble();
+  log(`▓ ${trib.desc}`, "epic");
+  log(`▓ 共 ${trib.bolts} 道天雷，分 ${P.tribulation.maxPhase} 阶段降临。`, "sys");
+  if(hasPartner) log(`※ 道侣在侧，减伤 30%！`, "good");
+  log("▓ 阶段间可选择：调息回血 / 祭法宝凝真血 / 服丹蓄力。", "hint");
+  showTribButtons();
+  refresh();
+}
+function showTribButtons(){
+  $("btn-cult").textContent = "🛡 硬抗此雷";
+  $("btn-adv").textContent  = "💊 服丹护体";
+  $("btn-bk").textContent   = "🔮 祭出法宝";
+  $("btn-cult").onclick = tribBoltRaw;
+  $("btn-adv").onclick  = tribBoltPill;
+  $("btn-bk").onclick   = tribBoltRelic;
+}
+function showTribPhaseChoice(){
+  const tr = P.tribulation;
+  log(`— 第 ${tr.phase} 阶段天雷散去，短暂喘息 —`,"epic");
+  showModal(`
+    <h3>⚡ 阶 段 间 隙</h3>
+    <p>天雷暂歇，你有片刻喘息之机。</p>
+    <p>气血：${P.hp}/${P.maxHp}</p>
+    <div class="btns">
+      <button id="tp-heal" class="primary">🧘 调息（恢复 25% HP）</button>
+      <button id="tp-relic">🔮 温养法宝（法宝+1级）</button>
+      <button id="tp-pill">💊 服丹蓄力（下阶段减伤 20%）</button>
+    </div>
+  `);
+  $("tp-heal").onclick = ()=>{
+    closeModal();
+    const heal = Math.floor(P.maxHp*0.25);
+    P.hp = Math.min(P.maxHp, P.hp+heal);
+    log(`调息片刻，恢复 ${heal} 气血。`,"good");
+    SFX.heal();
+    nextTribPhase();
+  };
+  $("tp-relic").onclick = ()=>{
+    closeModal();
+    if(P.relic){ P.relicLv=(P.relicLv||0)+1; log(`以雷力温养【${P.relic}】，等级 +1！`,"good"); }
+    else log("无法宝可温养。","hint");
+    nextTribPhase();
+  };
+  $("tp-pill").onclick = ()=>{
+    closeModal();
+    tr.bonus = (tr.bonus||0) + 0.2;
+    log("丹力护体，下阶段减伤 20%。","good");
+    nextTribPhase();
+  };
+}
+function nextTribPhase(){
+  const tr = P.tribulation;
+  tr.phase++;
+  tr.boltInPhase = 0;
+  tr.bonus = Math.max(0, (tr.bonus||0) - 0.1);
+  setScene(`${tr.trib.name}`,`— 第 ${tr.phase}/${tr.maxPhase} 阶 段 —`,"tribulation");
+  SFX.rumble();
+  log(`▓ 第 ${tr.phase} 阶段天雷降临！`,"epic");
+  showTribButtons();
+}
+
 function gameOver(){
   autoStop();
+  // v12: 记录仙榜
+  if(P.age >= P.lifespan) recordHall("寿终正寝");
+  else recordHall("战殁");
   // v9：寿终正寝 = 永久死亡（删档）；战斗死亡 = 重罚但可继续
   if(P.age >= P.lifespan){
     // —— 寿元耗尽：不可逆 ——
@@ -7190,6 +7627,8 @@ function loadGame(){
     // P0-1 字段（交替奖励）
     if(d.cultRun===undefined) d.cultRun = 0;
     if(d.advRun===undefined) d.advRun = 0;
+    // v12 字段（成就系统）
+    if(!d.achievements) d.achievements = {};
     // v4 寿元迁移：移除强制拉满逻辑（避免覆盖新机制），仅做异常兜底
     if(d.lifespan===undefined || d.lifespan<=0){
       d.lifespan = 80 + (d.realmIdx||0)*30;
@@ -7486,35 +7925,53 @@ function settleOffline(p){
   delete p._lastSaveTs;
   if(!lastTs) return;
   const offlineSec = Math.floor((Date.now() - lastTs) / 1000);
-  if(offlineSec < 120) return;  // 不到2分钟不结算
-  const capSec = Math.min(offlineSec, 24 * 3600);  // 上限24h
-  // 每2分钟一个离线修炼周期
+  if(offlineSec < 120) return;
+  const capSec = Math.min(offlineSec, 24 * 3600);
   const ticks = Math.floor(capSec / 120);
   if(ticks <= 0) return;
   const base = 10 + p.realmIdx * 5;
-  const mul = rootMul(p) * TECHS[p.tech][0] * 0.3;  // 30% 效率（无装备/心境加成）
+  const mul = rootMul(p) * TECHS[p.tech][0] * 0.3;
   const cultPerTick = Math.floor(base * mul);
   const totalCult = cultPerTick * ticks;
-  const gameDays = ticks * 5;  // 每周期5游戏日
+  const gameDays = ticks * 5;
   const prevCult = p.cult;
   p.cult += totalCult;
-  // 推进游戏天数（不触发节庆等复杂逻辑）
   p.days += gameDays;
   const expectAge = 16 + Math.floor(p.days / 360);
   if(expectAge > p.age) p.age = expectAge;
-  // 检查里程碑和小境界
   checkMilestones(p, prevCult);
   checkMiniBk(p, prevCult);
-  // 格式化时间
+  // v12: 离线战斗收益
+  const offBattles = Math.floor(ticks * 0.3);
+  let offKills=0, offStones=0, offItems=[];
+  for(let i=0;i<offBattles;i++){
+    if(Math.random()<0.6){ offKills++; offStones += 3+p.realmIdx*5; }
+    if(Math.random()<0.08) offItems.push(choice(["金创药","聚气丹","凝神丹"]));
+  }
+  p.stats.kill = (p.stats?.kill||0)+offKills;
+  p.bag["灵石"] = (p.bag["灵石"]||0)+offStones;
+  for(const it of offItems) p.bag[it]=(p.bag[it]||0)+1;
+  // v12: 离线奇遇
+  let offEvent = "";
+  if(ticks > 5 && Math.random()<0.3){
+    const evts = ["闭关入定，偶有所悟，道行 +1","遇游商，得一枚聚气丹","偶拾灵石若干"];
+    const pick = Math.floor(Math.random()*evts.length);
+    if(pick===0){ p.dao=(p.dao||0)+1; offEvent=evts[0]; }
+    else if(pick===1){ p.bag["聚气丹"]=(p.bag["聚气丹"]||0)+1; offEvent=evts[1]; }
+    else { const s=20+p.realmIdx*10; p.bag["灵石"]=(p.bag["灵石"]||0)+s; offEvent=`偶拾灵石 ${s} 枚`; }
+  }
   const hrs = Math.floor(capSec / 3600);
   const mins = Math.floor((capSec % 3600) / 60);
   const timeStr = hrs > 0 ? `${hrs} 时 ${mins} 分` : `${mins} 分`;
   const capped = offlineSec > 24*3600 ? "（上限 24 时辰）" : "";
+  const battleLine = offKills>0 ? `<p>历练斩妖 <b style="color:#d96a6a">${offKills}</b> 只，获灵石 <b style="color:#d4b46a">+${offStones}</b>${offItems.length?`，丹药 ×${offItems.length}`:""}</p>` : "";
+  const eventLine = offEvent ? `<p style="color:#7fc7a3">✦ ${offEvent}</p>` : "";
   showModal(`<h3 style="color:#d4b46a">🌙 离 线 修 炼 结 算</h3>
     <div style="text-align:left;line-height:2;margin:15px 0;font-size:14px">
       <p>你离去 <b style="color:#7fc7a3">${timeStr}</b> ${capped}</p>
       <p>闭关 <b style="color:#d4b46a">${gameDays}</b> 日，修为增长 <b style="color:#d4b46a">+${totalCult}</b></p>
-      <p style="color:#888;font-size:12px">（离线效率 30%，无装备/心境加成）</p>
+      ${battleLine}${eventLine}
+      <p style="color:#888;font-size:12px">（离线效率 30%，战斗×30%概率）</p>
     </div>
     <div class="btns"><button id="offline-ok" class="primary">继 续 修 行</button></div>`);
   $("offline-ok").onclick = ()=>{
