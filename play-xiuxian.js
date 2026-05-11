@@ -150,7 +150,9 @@ function flushTimeouts(max=50){
 }
 
 // ============ LOAD GAME ============
-const html = fs.readFileSync('/Users/martin/xiuxian/index.html','utf8');
+const path = require('path');
+// 相对脚本目录定位 index.html，避免硬编码路径
+const html = fs.readFileSync(path.join(__dirname, 'index.html'),'utf8');
 const scripts = [];
 html.replace(/<script[^>]*>([\s\S]*?)<\/script>/g, (m, code) => {
   scripts.push(code);
