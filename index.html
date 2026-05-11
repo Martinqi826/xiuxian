@@ -3794,6 +3794,43 @@ TECH_META["灭世剑意"]   = {el:"金", mp:12, passive:"bloodthirst"};
 TECH_META["造化圣功"]   = {el:"木", mp:10, passive:"gardenBoost"};
 TECH_META["无上天魔经"] = {el:null, mp:20, passive:"demonic"};
 
+// v24 · 天道法则 — 每一世随机抽取的全局修饰规则
+const WORLD_RULES = [
+  {id:"barren",  nm:"灵气枯竭", desc:"修炼速度 -20%，掉率 +30%",  cultMul:0.80, lootMul:1.30, color:"#d96a6a"},
+  {id:"killing", nm:"杀劫降世", desc:"怪物攻击 +25%，修为奖励 +40%",monAtkMul:1.25, crMul:1.40, color:"#cc6666"},
+  {id:"blessed", nm:"福地洞天", desc:"寿元 +100，怪物血量 +15%",  lifeAdd:100, monHpMul:1.15, color:"#7fc7a3"},
+  {id:"chaos",   nm:"天道混沌", desc:"暴击率 +8%，防御 -15%",     critAdd:0.08, defMul:0.85, color:"#c0a8d4"},
+  {id:"rich",    nm:"灵石如雨", desc:"灵石奖励 ×2，闭关成本 ×2",  srMul:2.0, cultCostMul:2.0, color:"#d4b46a"},
+  {id:"ascetic", nm:"苦修之世", desc:"闭关修为 +30%，历练奖励 -20%",cultMul:1.30, advMul:0.80, color:"#7ab0d4"},
+  {id:"demon",   nm:"魔气弥漫", desc:"心魔蓄积速度 ×2，道心回复 +50%",demonMul:2.0, dxRegen:1.50, color:"#9c6a9c"},
+  {id:"lucky",   nm:"天命眷顾", desc:"稀有怪概率 ×2，机缘 +30%",  rareMul:2.0, fortuneMul:1.30, color:"#e8c547"},
+];
+
+function rollWorldRules(){
+  const pool = [...WORLD_RULES];
+  const count = Math.random() < 0.3 ? 2 : 1;
+  const picked = [];
+  for(let i=0; i<count && pool.length; i++){
+    const idx = Math.floor(Math.random()*pool.length);
+    picked.push(pool[idx].id);
+    pool.splice(idx,1);
+  }
+  return picked;
+}
+
+function getWorldRule(key){
+  if(!P || !P.worldRules || !P.worldRules.length) return 0;
+  let sum = 0;
+  for(const id of P.worldRules){
+    const r = WORLD_RULES.find(w=>w.id===id);
+    if(r && r[key] !== undefined) sum += (r[key] - (key.endsWith("Mul") ? 1 : 0));
+  }
+  return sum;
+}
+function worldRuleMul(key){
+  return 1 + getWorldRule(key);
+}
+
 function checkTechMutation(p){
   if(!p.tech) return;
   const mut = TECH_MUTATIONS.find(m => m.from === p.tech);
@@ -4029,6 +4066,8 @@ function newPlayer(name,rootName,elements){
     dailies: null,
     // —— v23 · 功法突变 ——
     _techCultCount: 0,
+    // —— v24 · 天道法则 ——
+    worldRules: [],
   };
   recalcStats(p);
   // 初始化后按当前 maxHp/maxMp 满血满蓝
@@ -4188,6 +4227,11 @@ function recalcStats(p){
     d.atk  = Math.floor(d.atk * (1 + talentStat(p,"atkMul")));
     d.def  = Math.floor(d.def * (1 + talentStat(p,"defMul")));
     d.crit += talentStat(p,"critAdd");
+    // v24 · 天道法则加成
+    if(typeof worldRuleMul==="function"){
+      d.def  = Math.floor(d.def * worldRuleMul("defMul"));
+      d.crit += getWorldRule("critAdd");
+    }
     const dxBonus = talentStat(p,"dxMax");
     if(dxBonus) p.maxDx = (p.maxDx||100) + dxBonus;
     const lifeBonus = talentStat(p,"lifeAdd");
@@ -4411,7 +4455,8 @@ function gainCult(p,base,reason){
   const weCultMul = (weEffect.cultMul || 1) * (1 + fmnCult);
   const tCultMul = 1 + (typeof talentStat==="function" ? talentStat(p,"cultMul") : 0);
   const dScholar = typeof disciplePassive==="function" ? disciplePassive("scholar")*0.05 : 0;
-  const amt=Math.floor(base*rootMul(p)*TECHS[p.tech][0]*gearCultBonus(p)*buff.cultMul*bkMul*altMul*sectMul*weCultMul*tCultMul*(1+dScholar));
+  const wrCultMul = typeof worldRuleMul==="function" ? worldRuleMul("cultMul") : 1;
+  const amt=Math.floor(base*rootMul(p)*TECHS[p.tech][0]*gearCultBonus(p)*buff.cultMul*bkMul*altMul*sectMul*weCultMul*tCultMul*(1+dScholar)*wrCultMul);
   const prevCult = p.cult;
   p.cult+=amt;
   const tags = [];
@@ -4981,7 +5026,8 @@ function applyDamageToM(m, d, srcName){
 function actCultivate(){
   if(P.inBattle){log("战斗中无法闭关。","hint");return}
   // v9：闭关需消耗灵石布设聚灵法阵
-  const cultCost = 10 + P.realmIdx * 20;
+  const wrCostMul = typeof worldRuleMul==="function" ? worldRuleMul("cultCostMul") : 1;
+  const cultCost = Math.floor((10 + P.realmIdx * 20) * wrCostMul);
   if((P.bag["灵石"]||0) < cultCost){
     log(`灵石不足！闭关需 ${cultCost} 灵石布设聚灵法阵，当前仅 ${P.bag["灵石"]||0}。`,"bad");
     return;
@@ -5761,6 +5807,155 @@ const EVENT_CHAINS = {
               delete p.eventChains["心魔萌芽"];
             }},
         ]},
+    ]},
+  // v24 · 新增奇遇链
+  "古修传承": {
+    trigger: p => p.realmIdx >= 5 && Math.random() < 0.06,
+    steps: [
+      {desc:"闭关中，你忽然感到大地微颤。洞府墙壁裂开一条缝隙，露出一块刻满古文的玉简。",
+        fn: p => { log("墙壁裂缝中露出一块古玉简……", "sys"); }},
+      {desc:"玉简上记载着一位远古大能的修炼心得，但文字晦涩难懂。你需要选择如何参悟。",
+        opts: [
+          {nm:"强行参悟", hint:"快但有风险",
+            fn: p => {
+              p.eventChains["古修传承"].chose = "force";
+              log("你运转全部神识，强行解读古文……头痛欲裂。", "bad");
+            }},
+          {nm:"慢慢参透", hint:"稳定",
+            fn: p => {
+              p.eventChains["古修传承"].chose = "slow";
+              log("你耐心逐字研读，虽然缓慢但感触良多。", "hint");
+            }},
+        ]},
+      {desc:"",
+        fn: p => {
+          const chose = (p.eventChains["古修传承"]||{}).chose;
+          if(chose === "force"){
+            if(Math.random() < 0.5){
+              const bonus = (p.realmIdx+3)*500;
+              gainCult(p, bonus, "古修顿悟");
+              p.ling = (p.ling||0) + 8;
+              p.shen = (p.shen||0) + 5;
+              log("✦✦ 古修的毕生修为在你识海中炸开！灵力和神识暴涨（灵力 +8，神识 +5 永久）！", "epic");
+              recalcStats(p);
+            } else {
+              takeDmg(p, Math.floor(p.maxHp * 0.3));
+              p.dx = Math.max(0, (p.dx||100) - 25);
+              log("古修的残留意志反噬！你受到重创，道心动摇（道心 -25）。", "bad");
+            }
+          } else {
+            const bonus = (p.realmIdx+2)*250;
+            gainCult(p, bonus, "古修渐悟");
+            p.wu = (p.wu||0) + 5;
+            p.dao = (p.dao||0) + 3;
+            log("✦ 数日苦读，你终于参透了古修的核心理念。悟性和道行大增（悟性 +5，道行 +3 永久）。", "good");
+            recalcStats(p);
+          }
+          addChronicle("参悟古修传承玉简。");
+          delete p.eventChains["古修传承"];
+        }},
+    ]},
+  "仙人遗宝": {
+    trigger: p => p.realmIdx >= 8 && Math.random() < 0.05,
+    steps: [
+      {desc:"一道流光从天而降，落在你洞府百里外。空气中弥漫着浓郁的仙气。",
+        fn: p => { log("天降流光！百里外有宝物坠落……", "epic"); }},
+      {desc:"你循着仙气找到了一座小型遗迹。入口被禁制封锁，但禁制已经松动。",
+        opts: [
+          {nm:"强行破禁", hint:"快速但消耗大",
+            fn: p => {
+              p.eventChains["仙人遗宝"].chose = "break";
+              const cost = Math.floor(p.mp * 0.6);
+              p.mp = Math.max(0, p.mp - cost);
+              log(`你以真元强行破开禁制（真元 -${cost}）！`, "bad");
+            }},
+          {nm:"寻找机关", hint:"需要悟性",
+            fn: p => {
+              p.eventChains["仙人遗宝"].chose = "puzzle";
+              log("你仔细搜索遗迹四周，发现几处隐蔽的阵眼机关。", "hint");
+            }},
+        ]},
+      {desc:"遗迹内部金光闪烁，正中央悬浮着一件散发仙气的宝物。",
+        opts: [
+          {nm:"取走宝物", hint:"贪婪",
+            fn: p => {
+              p.eventChains["仙人遗宝"].chose2 = "take";
+              log("你伸手握住了悬浮的宝物，仙气涌入体内！", "epic");
+            }},
+          {nm:"参悟仙气", hint:"无执",
+            fn: p => {
+              p.eventChains["仙人遗宝"].chose2 = "study";
+              log("你盘坐在遗迹中，吸纳弥漫的仙气修炼。", "good");
+            }},
+        ]},
+      {desc:"",
+        fn: p => {
+          const c1 = (p.eventChains["仙人遗宝"]||{}).chose;
+          const c2 = (p.eventChains["仙人遗宝"]||{}).chose2;
+          if(c2 === "take"){
+            const items = ["蟠桃","天劫真血","九转还魂丹"];
+            const item = items[Math.floor(Math.random()*items.length)];
+            addItem(p, item, 1);
+            p.ti = (p.ti||0) + 5;
+            log(`✦ 仙人遗宝化为【${item}】×1！体魄也因仙气淬炼大增（体魄 +5 永久）。`, "epic");
+            if(c1 === "break") p.karma = Math.max(-100, (p.karma||0) - 5);
+            recalcStats(p);
+          } else {
+            const bonus = (p.realmIdx+3)*600;
+            gainCult(p, bonus, "仙气洗礼");
+            p.dao = (p.dao||0) + 8;
+            p.dx = p.maxDx;
+            log("✦✦ 你在仙气中顿悟！道行暴增，道心圆满（道行 +8 永久，道心满）！", "epic");
+            recalcStats(p);
+          }
+          addChronicle("探索仙人遗迹。");
+          delete p.eventChains["仙人遗宝"];
+        }},
+    ]},
+  "妖族血脉": {
+    trigger: p => p.realmIdx >= 7 && (p.stats?.kill||0) >= 50 && Math.random() < 0.05,
+    steps: [
+      {desc:"闭关时你感到血脉中有异样的躁动。击杀过的妖兽灵气似乎在你体内汇聚，形成了某种……血脉印记。",
+        fn: p => {
+          log("血脉中有异样的力量在觉醒……", "sys");
+        }},
+      {desc:"血脉印记越来越清晰，你能感受到三种不同的妖族之力。只能选择接纳一种。",
+        opts: [
+          {nm:"蛟龙血脉", hint:"+体魄+防御",
+            fn: p => {
+              p.eventChains["妖族血脉"].chose = "dragon";
+              p.ti = (p.ti||0) + 12;
+              p.karma = Math.max(-100, (p.karma||0) - 8);
+              log("✦ 蛟龙血脉觉醒！体魄大增，但妖气入体，业力加深（体魄 +12，业力 -8）。", "epic");
+              recalcStats(p);
+            }},
+          {nm:"天狐血脉", hint:"+神识+悟性",
+            fn: p => {
+              p.eventChains["妖族血脉"].chose = "fox";
+              p.shen = (p.shen||0) + 8;
+              p.wu = (p.wu||0) + 6;
+              p.karma = Math.max(-100, (p.karma||0) - 5);
+              log("✦ 天狐血脉觉醒！神识通明，悟性大增（神识 +8，悟性 +6，业力 -5）。", "epic");
+              recalcStats(p);
+            }},
+          {nm:"凤凰血脉", hint:"+灵力+寿元",
+            fn: p => {
+              p.eventChains["妖族血脉"].chose = "phoenix";
+              p.ling = (p.ling||0) + 10;
+              p.lifespan += 80;
+              p.karma = Math.max(-100, (p.karma||0) - 6);
+              log("✦ 凤凰血脉觉醒！灵力涌动，寿元延长（灵力 +10，寿元 +80，业力 -6）。", "epic");
+              recalcStats(p);
+            }},
+        ]},
+      {desc:"",
+        fn: p => {
+          const chose = (p.eventChains["妖族血脉"]||{}).chose;
+          const names = {dragon:"蛟龙", fox:"天狐", phoenix:"凤凰"};
+          addChronicle(`觉醒${names[chose]||"妖族"}血脉。`);
+          log(`${names[chose]||"妖族"}血脉彻底融入你的身体。你感到自己与天地之间多了一层联系。`, "good");
+          delete p.eventChains["妖族血脉"];
+        }},
     ]},
 };
 
@@ -8042,6 +8237,11 @@ function startBattle(m){
     mhp  = Math.floor(mhp * hpScale);
     matk = Math.floor(matk * atkScale);
   }
+  // v24 · 天道法则修饰
+  if(typeof worldRuleMul==="function"){
+    mhp  = Math.floor(mhp * worldRuleMul("monHpMul"));
+    matk = Math.floor(matk * worldRuleMul("monAtkMul"));
+  }
   P.inBattle=true;
   P.monster={name,lvl,mhp,maxMhp:mhp,matk,cr,sr,ele:ele||null,rounds:0,idx,
     breakGauge:0, breakMax:3+Math.floor(idx/2), breakRounds:0,
@@ -8194,16 +8394,19 @@ function endBattle(win){
   bindMainButtons();
   if(win){
     log(`※ 你击败了「${m.name}」！`,"good");
-    gainCult(P,m.cr,"斩妖");
+    const wrCrMul = typeof worldRuleMul==="function" ? worldRuleMul("crMul") : 1;
+    gainCult(P,Math.floor(m.cr * wrCrMul),"斩妖");
     const dgRichMul = (m.fromDungeon && P.curDungeon?.mod?.flag==="richLoot") ? 2 : 1;
     const tStoneMul = 1 + (typeof talentStat==="function" ? talentStat(P,"stoneMul") : 0);
-    addItem(P,"灵石",Math.floor(m.sr * dgRichMul * tStoneMul));
+    const wrSrMul = typeof worldRuleMul==="function" ? worldRuleMul("srMul") : 1;
+    addItem(P,"灵石",Math.floor(m.sr * dgRichMul * tStoneMul * wrSrMul));
     // v4：节气 lootMul 加成掉落概率（小满+10%）
     const buff = getBuff(P);
     const weEff = typeof getWorldEventEffect==="function" ? getWorldEventEffect() : {};
     const tDropAdd = typeof talentStat==="function" ? talentStat(P,"dropAdd") : 0;
     const dLucky = typeof disciplePassive==="function" ? disciplePassive("lucky")*0.05 : 0;
-    const lootMul = (buff.lootMul || 1) * (weEff.lootMul || 1) * (1 + tDropAdd + dLucky);
+    const wrLootMul = typeof worldRuleMul==="function" ? worldRuleMul("lootMul") : 1;
+    const lootMul = (buff.lootMul || 1) * (weEff.lootMul || 1) * (1 + tDropAdd + dLucky) * wrLootMul;
     // 25% 丹药 / 5% 灵草 / 2% 装备
     if(Math.random()<0.25*lootMul){
       addItem(P,choice(["金创药","聚气丹","凝神丹","回元丹"]),1);
@@ -8904,8 +9107,19 @@ function renderStatsPanel(){
       <div>宗门：<b style="color:#e8e3d3">${P.sect?SECTS[P.sect]?.nm||P.sect:"无"}</b> · 贡献 <b>${P.contrib||0}</b></div>
     </div>
   </div>`;
+  // v24: 天道法则
+  let wrHtml = "";
+  if(P.worldRules && P.worldRules.length){
+    const wrTags = P.worldRules.map(id=>{
+      const wr = WORLD_RULES.find(w=>w.id===id);
+      return wr ? `<span style="color:${wr.color};font-size:11px">【${wr.nm}】${wr.desc}</span>` : "";
+    }).filter(Boolean).join("<br>");
+    wrHtml = `<div style="margin-top:8px;border-top:1px dashed rgba(212,180,106,.2);padding-top:6px">
+      <div style="color:#d4b46a;font-size:12px;letter-spacing:2px;margin-bottom:4px">⚖ 天道法则</div>
+      <div style="font-size:11px;line-height:1.6">${wrTags}</div></div>`;
+  }
   return `<div style="background:rgba(0,0,0,.2);padding:6px;border:1px solid rgba(255,230,180,.15);border-radius:4px">
-    ${rows}${der}${karmaBar}${elTag}${statsHtml}</div>`;
+    ${rows}${der}${karmaBar}${elTag}${statsHtml}${wrHtml}</div>`;
 }
 
 function afterAction(){
@@ -9330,6 +9544,19 @@ function rollRoot(name){
   $("rr-ok").onclick = ()=>{
     closeModal();
     P=newPlayer(name, rootName, elements);
+    // v24 · 天道法则抽取
+    if(typeof rollWorldRules === "function"){
+      P.worldRules = rollWorldRules();
+      if(P.worldRules.length){
+        for(const id of P.worldRules){
+          const wr = WORLD_RULES.find(w=>w.id===id);
+          if(wr){
+            log(`◆ 天道法则【${wr.nm}】：${wr.desc}`, "epic");
+            if(wr.lifeAdd) P.lifespan += wr.lifeAdd;
+          }
+        }
+      }
+    }
     log(`《${P.name}》自此踏上修仙之路……`,"sys");
     log(`灵根：${rootName}（${r.desc}），修炼速度 ×${r.mul}`,"sys");
     log(`五行：${elements.join("、")||"无"}`,"sys");
@@ -9468,6 +9695,7 @@ function loadGame(){
     if(!d.arena) d.arena = {pts:0, wins:0, todayDate:"", todayCnt:0};
     if(!d.dailies) d.dailies = null;
     if(d._techCultCount === undefined) d._techCultCount = 0;
+    if(!d.worldRules) d.worldRules = [];
     // v4 寿元迁移：移除强制拉满逻辑（避免覆盖新机制），仅做异常兜底
     if(d.lifespan===undefined || d.lifespan<=0){
       d.lifespan = 80 + (d.realmIdx||0)*30;
