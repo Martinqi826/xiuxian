@@ -3,7 +3,7 @@
 ## 项目概述
 
 单文件浏览器修仙挂机游戏。**零依赖**（纯 HTML+CSS+JS），双击 `index.html` 即玩。
-当前 ~9900 行，所有逻辑在一个 `<script>` 块内。存档用 localStorage。
+当前 ~10100 行，所有逻辑在一个 `<script>` 块内。存档用 localStorage。
 
 ## 技术架构
 
@@ -65,6 +65,8 @@ L8950-9900   DEV面板 + 帮助弹窗
 | `BOUNTY_TEMPLATES` | 5 种悬赏令模板 |
 | `FORTUNE_ENCOUNTERS` | 7 种机缘遭遇 |
 | `SECT_RANKS` | 6 阶宗门声望等级 |
+| `SYNTHESIS` | 16 条道具合成配方 |
+| `DUNGEON_CHOICE_EVENTS` | 3 种秘境互动选择事件 |
 | `ACHIEVEMENTS` | 24 个成就 |
 | `PETS_META` | 灵宠元数据 |
 | `RELICS` | 本命法宝 |
@@ -99,6 +101,8 @@ L8950-9900   DEV面板 + 帮助弹窗
   // v17+ 新增
   formation,                     // 当前启用阵法名
   knownFormations: [],           // 已学阵法列表
+  // v18+ 新增
+  chronicle: [{day,age,realm,text}], // 修行纪要
 }
 ```
 

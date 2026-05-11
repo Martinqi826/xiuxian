@@ -495,13 +495,15 @@
         <button id="btn-dungeon">🏔 秘 境</button>
         <button id="btn-bounty">📋 悬 赏</button>
         <button id="btn-formation">🔮 阵 法</button>
+        <button id="btn-synthesis">⚗ 合 成</button>
       </div>
 
       <!-- 第 3 组：故事 / 工具 -->
       <div class="action-group action-grid-4" data-group="tools">
         <button id="btn-quest">🌙 夙 愿</button>
         <button id="btn-calendar">📅 道 历</button>
-        <button id="btn-save">📜 存 档</button>
+        <button id="btn-chronicle">📜 纪 要</button>
+        <button id="btn-save">💾 存 档</button>
         <button id="btn-help">📖 指 引</button>
       </div>
     </div>
@@ -2025,6 +2027,7 @@ function tryMeetPartner(forceKey){
   const meta = PARTNERS[key];
   const pt = createPartner(key);
   P.partners.push(pt);
+  addChronicle(`萍水相逢：结识${meta.nm}（${meta.root}·${meta.ele}属）。`);
   showModal(`
     <h3 style="color:${meta.color}">💞 萍 水 相 逢</h3>
     <p style="text-align:center;font-size:12px;color:#a89c7c;letter-spacing:2px">— 修 仙 路 漫 ， 有 人 同 行 —</p>
@@ -3205,6 +3208,30 @@ const RECIPES = {
   "九转还魂丹":{herbs:{"九叶玄参":2,"万年玄参":5,"蟠桃":1},        rate:0.15, lv:6},
 };
 
+// v18 · 道具合成配方
+const SYNTHESIS = [
+  // 丹药升级
+  {from:{"聚气丹":3},       to:"凝神丹",   cnt:1, tier:1, desc:"三枚聚气凝为一枚凝神"},
+  {from:{"凝神丹":3},       to:"筑基丹",   cnt:1, tier:2, desc:"三枚凝神炼为筑基丹"},
+  {from:{"金创药":3},       to:"回元丹",   cnt:1, tier:2, desc:"三枚金创融合为回元丹"},
+  {from:{"聚灵丹":3},       to:"玄元丹",   cnt:1, tier:3, desc:"三枚聚灵凝为玄元丹"},
+  {from:{"玄元丹":3},       to:"紫府丹",   cnt:1, tier:4, desc:"三枚玄元化为紫府丹"},
+  {from:{"蟠桃":3},         to:"万年灵芝精",cnt:1,tier:5, desc:"三枚蟠桃精炼为灵芝精"},
+  // 灵草升级
+  {from:{"聚灵草":5},       to:"凝血花",   cnt:1, tier:1, desc:"五株聚灵草萃取凝血花"},
+  {from:{"凝血花":5},       to:"破障花",   cnt:1, tier:2, desc:"五朵凝血花炼化破障花"},
+  {from:{"破障花":3},       to:"千年灵芝", cnt:1, tier:3, desc:"三朵破障花融生千年灵芝"},
+  {from:{"千年灵芝":3},     to:"万年玄参", cnt:1, tier:4, desc:"三株灵芝化为万年玄参"},
+  {from:{"万年玄参":3},     to:"九叶玄参", cnt:1, tier:5, desc:"三根玄参蜕变九叶玄参"},
+  // 符箓升级
+  {from:{"火符":2,"聚灵草":1},to:"雷符",   cnt:1, tier:3, desc:"二火符以灵草为引炼雷符"},
+  {from:{"盾符":2,"凝血花":1},to:"疗伤符", cnt:1, tier:3, desc:"二盾符以凝血花炼疗伤符"},
+  // 种子升级
+  {from:{"聚灵草种":3},     to:"凝血花种", cnt:1, tier:1, desc:"三粒草种杂交为花种"},
+  {from:{"凝血花种":3},     to:"破障花种", cnt:1, tier:2, desc:"三粒花种杂交为破障花种"},
+  {from:{"千年灵芝孢":3},   to:"万年玄参苗",cnt:1,tier:4, desc:"三枚灵芝孢培育玄参苗"},
+];
+
 /* —— 宗门 —— */
 const SECTS = {
   // v11: 宗门差异化 — 每宗门有专属被动 buff
@@ -3306,10 +3333,73 @@ const DUNGEONS = [
   {n:"仙古墓",    need:18, floors:9, ele:"金", reward:{cult:200000,stone:100000,item:"化神丹"},      monster:[12,13,14], boss:14, bossItem:"虚空挪移符"},
 ];
 const DUNGEON_EVENTS = [
-  {name:"灵泉",   prob:0.20, fn:p=>{const h=Math.floor(p.maxHp*0.3);p.hp=Math.min(p.maxHp,p.hp+h);return `发现灵泉，恢复 ${h} 气血！`;}},
-  {name:"宝箱",   prob:0.15, fn:p=>{const s=50+p.realmIdx*30;p.bag["灵石"]=(p.bag["灵石"]||0)+s;return `打开宝箱，获得 ${s} 灵石！`;}},
+  {name:"灵泉",   prob:0.18, fn:p=>{const h=Math.floor(p.maxHp*0.3);p.hp=Math.min(p.maxHp,p.hp+h);return `发现灵泉，恢复 ${h} 气血！`;}},
+  {name:"宝箱",   prob:0.14, fn:p=>{const s=50+p.realmIdx*30;p.bag["灵石"]=(p.bag["灵石"]||0)+s;return `打开宝箱，获得 ${s} 灵石！`;}},
   {name:"陷阱",   prob:0.12, fn:p=>{const d=Math.floor(p.maxHp*0.15);p.hp=Math.max(1,p.hp-d);return `触发阵法陷阱，受到 ${d} 伤害！`;}},
   {name:"悟道石", prob:0.08, fn:p=>{const c=30+p.realmIdx*15;p.cult+=c;return `悟道石前静坐片刻，修为 +${c}！`;}},
+  {name:"灵脉节点",prob:0.15, fn:p=>{const m=Math.floor(p.maxMp*0.4);p.mp=Math.min(p.maxMp,p.mp+m);return `灵脉涌动，真元恢复 ${m}！`;}},
+  {name:"仙草丛", prob:0.12, fn:p=>{const herbs=["聚灵草","凝血花","破障花","千年灵芝"];const h=herbs[Math.min(herbs.length-1,Math.floor(p.realmIdx/5))];const n=1+Math.floor(Math.random()*2);addItem(p,h,n);return `发现一丛仙草，采得${h} ×${n}！`;}},
+  {name:"古修遗骸",prob:0.06, fn:p=>{const gain=Math.floor(Math.random()*3)+1;p.dao=(p.dao||0)+gain;return `一具远古修士遗骸，残留道韵入体，道行 +${gain}！`;}},
+  {name:"毒雾",   prob:0.10, fn:p=>{const d=Math.floor(p.maxHp*0.08);p.hp=Math.max(1,p.hp-d);const m=Math.floor(p.maxMp*0.1);p.mp=Math.max(0,p.mp-m);return `毒雾弥漫，气血 -${d}，真元 -${m}！`;}},
+  {name:"残破阵眼",prob:0.05, fn:p=>{if(p.knownFormations&&p.knownFormations.length<Object.keys(FORMATIONS).length){const pool=Object.keys(FORMATIONS).filter(f=>!p.knownFormations.includes(f));if(pool.length){const f=pool[0];p.knownFormations.push(f);return `阵眼中残留阵法精要，习得【${f}】！`;}}const c=100+p.realmIdx*50;p.cult+=c;return `阵眼残余灵力化为修为 +${c}！`;}},
+  {name:"符箓匣", prob:0.10, fn:p=>{const ts=["火符","盾符","雷符","疗伤符","遁地符"];const t=ts[Math.floor(Math.random()*ts.length)];addItem(p,t,1);return `拾得一只玉匣，内有【${t}】×1！`;}},
+  {name:"传送漩涡",prob:0.04, fn:p=>{if(p.curDungeon){p.curDungeon.floor++;return `踏入传送漩涡，直接跳过一层！`;}return `传送阵已失效。`;}},
+  {name:"落石",   prob:0.08, fn:p=>{const d=Math.floor(p.maxHp*0.1);p.hp=Math.max(1,p.hp-d);return `头顶碎石崩落，气血 -${d}！`;}},
+];
+// v18 · 秘境互动事件（需 modal 选择）
+const DUNGEON_CHOICE_EVENTS = [
+  {name:"游商",   prob:0.12, trigger:(p,dg)=>{
+    const cost = 30 + p.realmIdx*15;
+    const herbs = ["聚灵草","凝血花","破障花","千年灵芝"];
+    const herb = herbs[Math.min(herbs.length-1,Math.floor(p.realmIdx/4))];
+    showModal(`<h3>🏮 秘 境 游 商</h3>
+      <p>一位蒙面散修在角落摆摊，向你招手。</p>
+      <div class="btns">
+        <button data-dgc="buy">💰 购买${herb}×2（${cost}灵石）</button>
+        <button data-dgc="heal">💊 买疗伤药（${cost}灵石，回30%HP）</button>
+        <button data-dgc="skip">离开</button>
+      </div>`);
+    document.querySelectorAll(".modal [data-dgc]").forEach(b=>{b.onclick=()=>{
+      const a=b.dataset.dgc; closeModal();
+      if(a==="buy"&&(p.bag["灵石"]||0)>=cost){p.bag["灵石"]-=cost;addItem(p,herb,2);log(`从游商处购得${herb} ×2`,"good");}
+      else if(a==="heal"&&(p.bag["灵石"]||0)>=cost){p.bag["灵石"]-=cost;const h=Math.floor(p.maxHp*0.3);p.hp=Math.min(p.maxHp,p.hp+h);log(`购得疗伤药，恢复 ${h} 气血。`,"good");}
+      else if(a!=="skip"){log("灵石不足。","hint");}
+      dg._choiceDone=true; dungeonNextFloor();
+    };});
+  }},
+  {name:"试炼碑", prob:0.08, trigger:(p,dg)=>{
+    const cultGain = 80 + p.realmIdx*40;
+    const dmg = Math.floor(p.maxHp*0.25);
+    showModal(`<h3>🪨 试 炼 石 碑</h3>
+      <p>石碑上刻着远古功法残篇，以血为引方可参悟。</p>
+      <div class="btns">
+        <button data-dgc="risk">🩸 以血祭碑（-${dmg}HP → +${cultGain}修为 +1道行）</button>
+        <button data-dgc="safe">📖 默默观摩（+${Math.floor(cultGain/3)}修为）</button>
+        <button data-dgc="skip">离开</button>
+      </div>`);
+    document.querySelectorAll(".modal [data-dgc]").forEach(b=>{b.onclick=()=>{
+      const a=b.dataset.dgc; closeModal();
+      if(a==="risk"){takeDmg(p,dmg);p.cult+=cultGain;p.dao=(p.dao||0)+1;log(`鲜血洒上石碑，功法感悟涌入识海！修为 +${cultGain}，道行 +1。`,"epic");}
+      else if(a==="safe"){const g=Math.floor(cultGain/3);p.cult+=g;log(`默默观摩，领悟些许。修为 +${g}。`,"good");}
+      dg._choiceDone=true; dungeonNextFloor();
+    };});
+  }},
+  {name:"密室宝藏",prob:0.06, trigger:(p,dg)=>{
+    const items=["破障丹","筑基丹","金丹玉露","蟠桃"];
+    const item=items[Math.min(items.length-1,Math.floor(p.realmIdx/5))];
+    const cost=Math.floor(p.maxHp*0.2);
+    showModal(`<h3>🗝 密 室 宝 藏</h3>
+      <p>一扇石门后隐约有灵光流转，但需以真元破开封印。</p>
+      <div class="btns">
+        <button data-dgc="open">🔓 强行破封（-${cost}HP → 获${item}）</button>
+        <button data-dgc="skip">放弃</button>
+      </div>`);
+    document.querySelectorAll(".modal [data-dgc]").forEach(b=>{b.onclick=()=>{
+      const a=b.dataset.dgc; closeModal();
+      if(a==="open"){takeDmg(p,cost);addItem(p,item,1);log(`石门碎裂，拾得【${item}】！`,"epic");}
+      dg._choiceDone=true; dungeonNextFloor();
+    };});
+  }},
 ];
 
 /* ==========================================================
@@ -3669,6 +3759,8 @@ function newPlayer(name,rootName,elements){
     // —— v17 · 阵法/符箓 ——
     formation: null,                           // 当前启用的阵法名
     knownFormations: [],                       // 已学阵法列表
+    // —— v18 · 修行纪要 ——
+    chronicle: [],                             // [{day,age,realm,text}]
   };
   recalcStats(p);
   // 初始化后按当前 maxHp/maxMp 满血满蓝
@@ -4239,6 +4331,7 @@ function triggerNextQuest(){
       P.questFlags = P.questFlags || {};
       P.questFlags["_node_"+idx+"_done"] = 1;
       P.questProgress = Math.max((P.questProgress|0), idx+1);
+      addChronicle(`${q.nm} · ${node.title}：选择「${o.nm.replace(/[\s]/g,"")}」`);
       closeModal();
       recalcStats(P); refresh();
       // 若 hp 已被夙愿失败掉到 0，afterAction 会接管 gameOver
@@ -4365,6 +4458,7 @@ function pickInitialQuest(cb){
       P.questFlags = {};
       log(`◆ 立 下 夙 愿：${q.nm}`,"epic");
       log(q.flavor||"","hint");
+      addChronicle(`立下夙愿：${q.nm}。${q.flavor||""}`);
       closeModal();
       // 立刻检查首节点（若开局境界已达条件，例如 realmIdx>=2 的练气中后期老档）
       checkQuestTrigger(P);
@@ -5655,6 +5749,7 @@ function doBreakthroughSuccess(){
   if(bkNarr) log(bkNarr, "epic");
   log(`—— 突破成功！你已是【${REALMS[P.realmIdx][0]}】！——`,"epic");
   log(`体魄 +${bkBonus}，灵力 +${bkBonus}，道行 +${bkBonus}`, "good");
+  addChronicle(`突破至【${REALMS[P.realmIdx][0]}】，延寿 ${lifeGain} 年。`);
   log(`气血 ${oldMax} → ${P.maxHp}，寿元 +${lifeGain}（阳寿 ${P.age}/${P.lifespan}）`,"good");
   if(headStart > 0) log(`突破余势，修为 +${headStart}（下阶起手）`, "good");
   log(`※ 突破余韵：30日内修为 ×1.5`, "epic");
@@ -5733,6 +5828,7 @@ function actAscension(){
   const deed = `${P.name} · ${P.rootName}${P.elements.join("、")} · 修行 ${P.days} 天 · 飞升`;
   L.deeds = (L.deeds||[]).slice(-9).concat(deed);
   saveLineage(L);
+  addChronicle(`羽化飞升！修行 ${P.days} 天，享年 ${P.age} 岁。`);
 
   // 飞升弹窗
   const questName = P.quest && QUESTS[P.quest] ? QUESTS[P.quest].nm : "—";
@@ -5926,6 +6022,7 @@ function processBolt(mul, tag){
       log("✦ 你将【雷源符】引下的天雷尽数化解。", "epic");
     }else{
       log(`✦ 十几道天雷皆被你挺过，【${tr.trib.name}】消散！`,"epic");
+      addChronicle(`渡过【${tr.trib.name}】${tr.trib.bolts} 道天雷，劫后余生。`);
     }
     // v6：根据 tally 给差异化奖励
     const ta = tr.tally || {raw:0,pill:0,relic:0};
@@ -6154,6 +6251,70 @@ function alchemyMake(name){
     if(P.hp<=0) setTimeout(gameOver,400);
     else openAlchemy();
   }, 600);
+}
+
+/* ==========================================================
+ *   v18 · 修行纪要
+ * ========================================================== */
+function addChronicle(text){
+  if(!P.chronicle) P.chronicle=[];
+  P.chronicle.push({day:P.days, age:P.age, realm:REALMS[P.realmIdx][0], text});
+  if(P.chronicle.length > 200) P.chronicle.shift();
+}
+function openChronicle(){
+  if(!P.chronicle || !P.chronicle.length){
+    showModal(`<h3>📜 修 行 纪 要</h3><p>你的修行之路尚未留下痕迹。</p><div class="btns"><button onclick="closeModal()">退</button></div>`);
+    return;
+  }
+  const rows = P.chronicle.slice().reverse().map(e=>{
+    const d = getDate(e.day);
+    return `<div style="margin:4px 0;padding:4px 0;border-bottom:1px solid rgba(168,156,124,0.2)">
+      <span style="color:#a89c7c;font-size:11px">紫微${d.year}年 · ${e.realm} · 年${e.age}</span><br>
+      <span style="font-size:13px">${e.text}</span>
+    </div>`;
+  }).join("");
+  showModal(`<h3>📜 修 行 纪 要</h3>
+    <p style="font-size:12px;color:#a89c7c">${P.name}的修行履历，共 ${P.chronicle.length} 事。</p>
+    <div class="box left" style="padding:6px;border:none;background:none;max-height:55vh;overflow-y:auto">${rows}</div>
+    <div class="btns"><button id="chr-close">合上</button></div>`);
+  $("chr-close").onclick = closeModal;
+}
+
+/* ==========================================================
+ *   v18 · 道具合成系统
+ * ========================================================== */
+function openSynthesis(){
+  if(P.inBattle){log("战斗中不可合成。","hint");return}
+  const rows = SYNTHESIS.map((r,i)=>{
+    const mats = Object.entries(r.from).map(([k,n])=>`${k}×${n}（${P.bag[k]||0}）`).join(" + ");
+    const can = Object.entries(r.from).every(([k,n])=>(P.bag[k]||0)>=n);
+    return `<div class="shop-row">
+      <div><div class="nm">${r.to}${r.cnt>1?" ×"+r.cnt:""}</div><div class="ds">${mats}</div><div class="ds" style="color:#a89c7c">${r.desc}</div></div>
+      <button class="sm" data-syn="${i}" ${can?"":"disabled"}>合成</button>
+    </div>`;
+  }).join("");
+  showModal(`<h3>⚗ 天 工 合 成</h3>
+    <p style="font-size:12px;color:#a89c7c">以低阶道具合成高阶道具，无失败风险。</p>
+    <div class="box left" style="padding:0;border:none;background:none;max-height:55vh;overflow-y:auto">${rows}</div>
+    <div class="btns"><button id="syn-close">离开</button></div>`);
+  document.querySelectorAll(".modal [data-syn]").forEach(b=>{
+    b.onclick = ()=>{ doSynthesis(+b.dataset.syn); };
+  });
+  $("syn-close").onclick = closeModal;
+}
+function doSynthesis(idx){
+  const r = SYNTHESIS[idx]; if(!r) return;
+  for(const [k,n] of Object.entries(r.from)){
+    if((P.bag[k]||0)<n){ log("材料不足。","hint"); return; }
+  }
+  for(const [k,n] of Object.entries(r.from)){
+    for(let i=0;i<n;i++) consume(k);
+  }
+  addItem(P, r.to, r.cnt);
+  log(`⚗ 合成成功！获得【${r.to}】×${r.cnt}`,"good");
+  SFX.hit();
+  refresh(); saveGame(true);
+  openSynthesis();
 }
 
 /* ==========================================================
@@ -6411,6 +6572,7 @@ function resolveDemon(demon, action, isBoss){
       P.wu = (P.wu||0) + wuBonus;
       recalcStats(P);
       log(`✦ ${demon.fight} 道心圆满，悟性 +${wuBonus}！`,"epic");
+      addChronicle(`降伏${demon.nm}${isBoss?"（觉醒态）":""}，悟性 +${wuBonus}。`);
       if(isBoss){
         const cultBonus = (P.realmIdx+1)*500;
         gainCult(P, cultBonus, "心魔觉醒·降伏");
@@ -6646,6 +6808,7 @@ function openSect(){
         P._totalContrib = P._totalContrib || 0;
         P.disciples = P.disciples || [];
         log(`※ 你拜入【${s}】门下，成为外门弟子。`,"epic");
+        addChronicle(`拜入【${s}】，成为外门弟子。`);
         closeModal(); refresh(); saveGame(true);
       };
     });
@@ -7094,6 +7257,7 @@ function dungeonNextFloor(){
     sectTaskAdvance("dungeon");
     P.curDungeon = null;
     log(`✦ 秘境【${dg.def.n}】通关！`,"epic");
+    addChronicle(`通关秘境【${dg.def.n}】${dg.def.floors} 层。`);
     refresh();saveGame(true);
     return;
   }
@@ -7103,6 +7267,16 @@ function dungeonNextFloor(){
     const h=Math.floor(P.maxHp*0.1); P.hp=Math.min(P.maxHp,P.hp+h);
     log(`✦ 祝福之力：恢复 ${h} 气血。`,"good");
   }
+  // v18: 互动层间事件（非首层、非Boss层，且本层未处理过）
+  if(dg.floor > 1 && dg.floor < dg.def.floors && !dg._choiceDone){
+    for(const ev of DUNGEON_CHOICE_EVENTS){
+      if(Math.random() < ev.prob){
+        ev.trigger(P, dg);
+        return;
+      }
+    }
+  }
+  dg._choiceDone = false;
   const isBoss = dg.floor === dg.def.floors && dg.def.boss != null;
   if(isBoss){
     log(`— 秘境第 ${dg.floor}/${dg.def.floors} 层 · ★ BOSS ★ —`,"epic");
@@ -8244,6 +8418,8 @@ function gameOver(){
   // v12: 记录仙榜
   if(P.age >= P.lifespan) recordHall("寿终正寝");
   else recordHall("战殁");
+  if(P.age >= P.lifespan) addChronicle(`寿元已尽，在${REALMS[P.realmIdx][0]}之境坐化。享年 ${P.age} 岁。`);
+  else addChronicle(`战斗殒命，重伤复活，代价沉重。`);
   // v9：寿终正寝 = 永久死亡（删档）；战斗死亡 = 重罚但可继续
   if(P.age >= P.lifespan){
     // —— 寿元耗尽：不可逆 ——
@@ -8539,6 +8715,8 @@ function loadGame(){
     // v17 字段（阵法/符箓）
     if(d.formation===undefined) d.formation = null;
     if(!Array.isArray(d.knownFormations)) d.knownFormations = [];
+    // v18
+    if(!Array.isArray(d.chronicle)) d.chronicle = [];
     // v4 寿元迁移：移除强制拉满逻辑（避免覆盖新机制），仅做异常兜底
     if(d.lifespan===undefined || d.lifespan<=0){
       d.lifespan = 80 + (d.realmIdx||0)*30;
@@ -8769,6 +8947,8 @@ $("btn-market").onclick  = openMarket;
 $("btn-dungeon").onclick = openDungeon;
 if($("btn-bounty")) $("btn-bounty").onclick = openBountyBoard;
 if($("btn-formation")) $("btn-formation").onclick = openFormationPanel;
+if($("btn-synthesis")) $("btn-synthesis").onclick = openSynthesis;
+if($("btn-chronicle")) $("btn-chronicle").onclick = openChronicle;
 $("btn-calendar").onclick= openCalendar;
 // v5：夙愿入口（按钮 + 状态行）
 $("btn-quest").onclick   = openQuestPanel;
