@@ -496,6 +496,7 @@
         <button id="btn-bounty">📋 悬 赏</button>
         <button id="btn-formation">🔮 阵 法</button>
         <button id="btn-synthesis">⚗ 合 成</button>
+        <button id="btn-arena">⚔ 擂 台</button>
       </div>
 
       <!-- 第 3 组：故事 / 工具 -->
@@ -3575,6 +3576,13 @@ const TALISMANS = {
   "遁地符":  {type:"flee",   fleeMul:2.0, desc:"逃跑成功率翻倍",             price:60},
 };
 
+// v19 · 天梯擂台 NPC 名表
+const ARENA_NAMES = [
+  "无名散修","赤焰门徒","寒冰居士","青云剑客","玄阴使者",
+  "天机弟子","大衍道人","御兽真人","紫霄长老","万兽谷主",
+  "血煞魔修","冥河道人","九幽冥君","天狐妖仙","太上仙人",
+];
+
 // v16 · 机缘系统
 const FORTUNE_ENCOUNTERS = [
   {id:"cave",   nm:"洞天福地",   minRealm:3,
@@ -3761,6 +3769,9 @@ function newPlayer(name,rootName,elements){
     knownFormations: [],                       // 已学阵法列表
     // —— v18 · 修行纪要 ——
     chronicle: [],                             // [{day,age,realm,text}]
+    // —— v19 · 装备强化 + 天梯 ——
+    equipEnhance: {},                          // {装备名: 强化等级}
+    arena: {pts:0, wins:0, todayDate:"", todayCnt:0},
   };
   recalcStats(p);
   // 初始化后按当前 maxHp/maxMp 满血满蓝
@@ -3829,10 +3840,16 @@ function equipStatBonus(p){
     // 2) 兼容运行时挂的临时装备对象（如终局诛仙剑 {name,atk,ele}）
     const eqObj = (typeof eq==="object") ? eq : null;
     if(eqObj){
-      // 用 atk 折算到 ling，def 折算到 ti，hp 折算到 ti，保证零侵入
       if(eqObj.atk) sum.ling += Math.floor(eqObj.atk/3);
       if(eqObj.def) sum.ti   += Math.floor(eqObj.def/2);
       if(eqObj.hp)  sum.ti   += Math.floor(eqObj.hp/20);
+    }
+    // v19: 强化加成折算为根骨
+    if(typeof eq === "string" && typeof enhanceBonus === "function"){
+      const eb = enhanceBonus(eq);
+      if(eb.atk) sum.ling += Math.floor(eb.atk/3);
+      if(eb.def) sum.ti   += Math.floor(eb.def/2);
+      if(eb.hp)  sum.ti   += Math.floor(eb.hp/20);
     }
   }
   return sum;
@@ -4994,6 +5011,95 @@ const CULT_EVENTS = [
       p.dao = (p.dao||0) + 10;
       log("道行 +10（永久·前世道果）", "good");
       recalcStats(p);
+    }},
+
+  // ============ v19 · 新增事件 ============
+  {tag:"good", w:3, t:"灵 蝶 引 路",
+    fn:p=>{
+      log("◆ 一只通体金色的灵蝶绕你飞舞，引你至一处灵脉节点。","good");
+      const mpGain = Math.floor(p.maxMp*0.5);
+      p.mp = Math.min(p.maxMp, p.mp+mpGain);
+      gainCult(p, 100+p.realmIdx*30, "灵脉吸纳");
+    }},
+  {tag:"good", w:2, cond:p=>p.realmIdx>=3, t:"旧 识 赠 丹",
+    fn:p=>{
+      const pills = ["聚气丹","凝神丹","筑基丹","回元丹"];
+      const pill = pills[Math.min(pills.length-1, Math.floor(p.realmIdx/4))];
+      const n = rand(1,3);
+      addItem(p, pill, n);
+      log(`◆ 一位故交飞鹤传书，附赠【${pill}】×${n}。`,"good");
+    }},
+  {tag:"good", w:2, cond:p=>p.realmIdx>=5, t:"天 书 残 页",
+    fn:p=>{
+      log("◆ 洞府角落翻出一张泛黄的天书残页，上面记载了一种呼吸吐纳之法。","good");
+      p.shen = (p.shen||0) + 2;
+      p.wu = (p.wu||0) + 2;
+      recalcStats(p);
+      log("神识 +2，悟性 +2（永久）","good");
+    }},
+  {tag:"neutral", w:3, t:"落 叶 知 秋",
+    fn:p=>{
+      log("◇ 洞口一片枯叶飘入，你望着它缓缓落地——心中忽有所悟，又似无所悟。","hint");
+      if(Math.random()<0.3){
+        p.dao = (p.dao||0) + 1;
+        log("道行 +1","good");
+      }
+    }},
+  {tag:"neutral", w:2, cond:p=>p.realmIdx>=2, t:"灵 石 矿 脉",
+    fn:p=>{
+      const stones = 20 + p.realmIdx*15;
+      addItem(p, "灵石", stones);
+      log(`◇ 闭关洞府深处发现一小脉灵石矿，采得 ${stones} 灵石。`,"good");
+    }},
+  {tag:"bad", w:2, cond:p=>p.realmIdx>=3, t:"灵 根 震 荡",
+    fn:p=>{
+      log("✕ 修行中灵根忽然震荡不安，似有暗伤。","bad");
+      const lingLoss = Math.min(p.ling||0, 2);
+      p.ling = Math.max(0, (p.ling||0) - lingLoss);
+      recalcStats(p);
+      log(`灵力 -${lingLoss}`,"bad");
+    }},
+  {tag:"good", w:2, cond:p=>p.garden&&p.garden.length>0, t:"灵 田 丰 收",
+    fn:p=>{
+      log("◆ 闭关间灵气外溢，灵田中作物长势喜人！","good");
+      for(const plot of p.garden){
+        if(plot && plot.seed && !plot.harvested){
+          plot.plantDay = Math.max(0, (plot.plantDay||0) - 15);
+        }
+      }
+      log("所有灵田作物提前 15 天成熟！","good");
+    }},
+  {tag:"good", w:1, cond:p=>p.realmIdx>=6, t:"古 阵 残 识",
+    fn:p=>{
+      if(!p.knownFormations) p.knownFormations=[];
+      const pool = Object.keys(FORMATIONS).filter(f=>!p.knownFormations.includes(f));
+      if(pool.length){
+        const f = pool[Math.floor(Math.random()*pool.length)];
+        p.knownFormations.push(f);
+        log(`✦ 闭关中你忽然领悟了【${f}】的布置之法！`,"epic");
+      } else {
+        gainCult(p, 800+p.realmIdx*100, "阵法精进");
+        log("◆ 阵法感悟化为修行动力。","good");
+      }
+    }},
+  {tag:"neutral", w:3, cond:p=>p.realmIdx>=1, t:"鸟 鸣 惊 梦",
+    fn:p=>{
+      log("◇ 洞外鸟鸣阵阵，将你从入定中唤醒。修行效果减半，但精神尚好。","hint");
+      heal(p, Math.floor(p.maxHp*0.1));
+    }},
+  {tag:"bad", w:2, t:"虫 蚁 入 洞",
+    fn:p=>{
+      log("✕ 一群灵虫闻灵气而入洞，啃噬了你的部分药材。","bad");
+      const herbs = Object.keys(p.bag).filter(k=>HERBS&&HERBS[k]&&(p.bag[k]||0)>0);
+      if(herbs.length){
+        const h = choice(herbs);
+        const loss = Math.min(p.bag[h]||0, rand(1,3));
+        p.bag[h] -= loss;
+        if(p.bag[h]<=0) delete p.bag[h];
+        log(`失去${h} ×${loss}`,"bad");
+      } else {
+        log("好在你包中并无药材。","hint");
+      }
     }},
 ];
 
@@ -6175,6 +6281,73 @@ function unequipSlot(slot){
   refresh();
 }
 
+/* ==========================================================
+ *   v19 · 装备强化系统
+ * ========================================================== */
+const ENHANCE_COST = [50,100,200,400,800,1500,3000,5000,8000,15000];
+const ENHANCE_RATE = [1,1,1,0.85,0.75,0.6,0.45,0.35,0.25,0.2];
+function getEnhanceLv(name){ return (P.equipEnhance && P.equipEnhance[name]) || 0; }
+function enhanceBonus(name){
+  const lv = getEnhanceLv(name);
+  if(lv <= 0) return {};
+  const info = EQUIPS[name]; if(!info) return {};
+  const mul = lv * 0.1;
+  const b = {};
+  if(info.atk)  b.atk  = Math.floor(info.atk * mul);
+  if(info.def)  b.def  = Math.floor(info.def * mul);
+  if(info.hp)   b.hp   = Math.floor(info.hp * mul);
+  if(info.cult) b.cult = +(info.cult * mul).toFixed(2);
+  if(info.flee) b.flee = +(info.flee * mul).toFixed(2);
+  return b;
+}
+function openEnhance(slot){
+  const nm = P.equips[slot]; if(!nm || !EQUIPS[nm]) return;
+  const info = EQUIPS[nm];
+  const lv = getEnhanceLv(nm);
+  if(lv >= 10){ showModal(`<h3>⚒ 强 化</h3><p>【${nm}】已达最高 +10 强化。</p><div class="btns"><button onclick="closeModal()">退</button></div>`); return; }
+  const cost = ENHANCE_COST[lv] * info.tier;
+  const rate = ENHANCE_RATE[lv];
+  const bonus = enhanceBonus(nm);
+  const curParts = [];
+  if(bonus.atk) curParts.push(`+${bonus.atk}攻`);
+  if(bonus.def) curParts.push(`+${bonus.def}防`);
+  if(bonus.hp)  curParts.push(`+${bonus.hp}气血`);
+  if(bonus.cult)curParts.push(`+${Math.floor(bonus.cult*100)}%修炼`);
+  const curDesc = curParts.length ? curParts.join("/") : "无";
+  showModal(`<h3>⚒ 装 备 强 化</h3>
+    <div class="box left" style="padding:8px">
+      <div style="font-size:14px;color:#d4b46a">【${nm}】+${lv}</div>
+      <div style="font-size:12px;color:#a89c7c;margin:4px 0">当前强化加成：${curDesc}</div>
+      <div style="font-size:12px">强化至 +${lv+1}：成功率 <b style="color:${rate>=0.7?"#7fc7a3":"#e85050"}">${Math.floor(rate*100)}%</b></div>
+      <div style="font-size:12px">消耗灵石：<b style="color:#d4b46a">${cost}</b>（持有 ${P.bag["灵石"]||0}）</div>
+      ${lv>=6?`<div style="font-size:11px;color:#e85050;margin-top:4px">⚠ +7 以上失败会降低 1 级</div>`:""}
+    </div>
+    <div class="btns">
+      <button id="enh-go" class="primary" ${(P.bag["灵石"]||0)>=cost?"":"disabled"}>⚒ 强化</button>
+      <button id="enh-close">取消</button>
+    </div>`);
+  $("enh-go").onclick = ()=>{
+    if((P.bag["灵石"]||0)<cost){ log("灵石不足。","hint"); return; }
+    P.bag["灵石"] -= cost;
+    if(!P.equipEnhance) P.equipEnhance = {};
+    closeModal();
+    if(Math.random() < rate){
+      P.equipEnhance[nm] = lv + 1;
+      log(`✦ 强化成功！【${nm}】+${lv+1}！`,"epic");
+      SFX.achieve();
+    } else {
+      if(lv >= 7){
+        P.equipEnhance[nm] = lv - 1;
+        log(`强化失败……【${nm}】降至 +${lv-1}。`,"bad");
+      } else {
+        log(`强化失败，装备未受损。`,"hint");
+      }
+    }
+    recalcStats(P); refresh(); saveGame(true);
+  };
+  $("enh-close").onclick = closeModal;
+}
+
 /* —— 本命法宝：祭炼（消耗 5000 灵石 + 一枚） —— */
 function refineRelic(name){
   if(!RELICS[name]){log("非法宝。","hint");return}
@@ -6315,6 +6488,81 @@ function doSynthesis(idx){
   SFX.hit();
   refresh(); saveGame(true);
   openSynthesis();
+}
+
+/* ==========================================================
+ *   v19 · 天梯擂台系统
+ * ========================================================== */
+function genArenaOpponent(rank){
+  const ri = Math.min(P.realmIdx + Math.floor(rank/3) - 1, REALMS.length-2);
+  const effIdx = Math.max(1, ri);
+  const nm = ARENA_NAMES[Math.min(ARENA_NAMES.length-1, effIdx)];
+  const baseHp = 200 + effIdx*300;
+  const baseAtk = 15 + effIdx*25;
+  const baseDef = 5 + effIdx*15;
+  return {name:nm+"·"+["甲","乙","丙","丁","戊"][rank%5], realm:REALMS[effIdx][0],
+          hp:baseHp, atk:baseAtk, def:baseDef, realmIdx:effIdx};
+}
+function getArenaToday(){
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function openArena(){
+  if(P.inBattle){log("战斗中不可。","hint");return}
+  if(P.realmIdx < 2){log("需练气三层方可入擂台。","hint");return}
+  if(!P.arena) P.arena = {pts:0, wins:0, todayDate:"", todayCnt:0};
+  const today = getArenaToday();
+  if(P.arena.todayDate !== today){ P.arena.todayDate = today; P.arena.todayCnt = 0; }
+  const remain = 3 - P.arena.todayCnt;
+  const opponents = [0,1,2].map(i=>genArenaOpponent(i));
+  const rows = opponents.map((o,i)=>{
+    return `<div class="shop-row">
+      <div><div class="nm">${o.name}</div><div class="ds">${o.realm} · 气血${o.hp} · 攻${o.atk} · 防${o.def}</div></div>
+      <button class="sm" data-arena="${i}" ${remain>0?"":"disabled"}>挑 战</button>
+    </div>`;
+  }).join("");
+  const rank = P.arena.pts >= 500 ? "天榜" : P.arena.pts >= 200 ? "地榜" : P.arena.pts >= 50 ? "人榜" : "无名";
+  showModal(`<h3>⚔ 天 梯 擂 台</h3>
+    <div style="font-size:12px;color:#a89c7c;margin-bottom:6px">
+      积分：<b style="color:#d4b46a">${P.arena.pts}</b> · 排名：<b style="color:#7fc7a3">${rank}</b> · 胜场：${P.arena.wins} · 今日剩余：<b>${remain}</b>/3
+    </div>
+    <div class="box left" style="padding:0;border:none;background:none">${rows}</div>
+    <div class="btns"><button id="arena-close">离开</button></div>`);
+  document.querySelectorAll(".modal [data-arena]").forEach(b=>{
+    b.onclick=()=>{
+      const idx = +b.dataset.arena;
+      closeModal();
+      arenaFight(opponents[idx]);
+    };
+  });
+  $("arena-close").onclick = closeModal;
+}
+function arenaFight(opp){
+  if(!P.arena) P.arena = {pts:0, wins:0, todayDate:"", todayCnt:0};
+  P.arena.todayCnt++;
+  const pAtk = P.atk || 10;
+  const pDef = P.def || 0;
+  const K = 300;
+  const pDmg = Math.max(1, Math.floor(pAtk * (1 - opp.def/(opp.def+K))));
+  const oDmg = Math.max(1, Math.floor(opp.atk * (1 - pDef/(pDef+K))));
+  const pRounds = Math.ceil(opp.hp / pDmg);
+  const oRounds = Math.ceil(P.hp / oDmg);
+  const win = pRounds <= oRounds;
+  if(win){
+    const stoneReward = 30 + P.realmIdx * 20;
+    const cultReward = 50 + P.realmIdx * 30;
+    const ptsGain = 5 + Math.floor(P.realmIdx/3);
+    P.arena.pts += ptsGain;
+    P.arena.wins++;
+    addItem(P, "灵石", stoneReward);
+    gainCult(P, cultReward, "擂台");
+    log(`⚔ 擂台胜！击败${opp.name}！灵石 +${stoneReward}，修为 +${cultReward}，积分 +${ptsGain}`,"epic");
+    SFX.hit();
+    addChronicle(`擂台击败${opp.name}（${opp.realm}），积分 ${P.arena.pts}。`);
+  } else {
+    log(`⚔ 擂台负。${opp.name}实力更胜一筹。`,"bad");
+  }
+  refresh(); saveGame(true);
 }
 
 /* ==========================================================
@@ -8010,18 +8258,20 @@ function refresh(){
     const stEl = sl.querySelector(".stat");
     if(stEl) stEl.remove();
     if(nm){
-      nmEl.textContent = nm + (key==="relic"?` Lv.${P.relicLv||0}`:"");
+      const eLv = (key!=="relic" && getEnhanceLv) ? getEnhanceLv(nm) : 0;
+      nmEl.textContent = nm + (key==="relic"?` Lv.${P.relicLv||0}` : (eLv>0?` +${eLv}`:""));
       nmEl.classList.remove("empty");
       const info = key==="relic"?RELICS[nm]:EQUIPS[nm];
       if(info){
         const stat = document.createElement("div");
         stat.className = "stat";
         const parts = [];
-        if(info.atk) parts.push(`+${info.atk} 攻`);
-        if(info.def) parts.push(`+${info.def} 防`);
-        if(info.hp)  parts.push(`+${info.hp} 气血`);
-        if(info.cult)parts.push(`+${Math.floor(info.cult*100)}% 修炼`);
-        if(info.flee)parts.push(`+${Math.floor(info.flee*100)}% 遁逃`);
+        const eb = (key!=="relic" && typeof enhanceBonus==="function") ? enhanceBonus(nm) : {};
+        if(info.atk) parts.push(`+${info.atk+(eb.atk||0)} 攻`);
+        if(info.def) parts.push(`+${info.def+(eb.def||0)} 防`);
+        if(info.hp)  parts.push(`+${info.hp+(eb.hp||0)} 气血`);
+        if(info.cult)parts.push(`+${Math.floor((info.cult+(eb.cult||0))*100)}% 修炼`);
+        if(info.flee)parts.push(`+${Math.floor((info.flee+(eb.flee||0))*100)}% 遁逃`);
         if(key==="relic"){
           const cur = info.base + (info.grow||0)*(P.relicLv||0);
           parts.push(`+${cur} 攻`);
@@ -8033,7 +8283,11 @@ function refresh(){
         if(key==="relic"){
           log("本命法宝已与你气机相连，不可卸下。","hint");return;
         }
-        unequipSlot(key);
+        showModal(`<h3>🔧 装 备 操 作</h3><p>【${nm}】${eLv>0?" +"+eLv:""}</p>
+          <div class="btns"><button id="eq-off">卸 下</button><button id="eq-enh" class="primary">⚒ 强 化</button><button id="eq-x">取 消</button></div>`);
+        $("eq-off").onclick=()=>{closeModal();unequipSlot(key);};
+        $("eq-enh").onclick=()=>{closeModal();openEnhance(key);};
+        $("eq-x").onclick=closeModal;
       };
     }else{
       nmEl.textContent = "— 空 —";
@@ -8717,6 +8971,9 @@ function loadGame(){
     if(!Array.isArray(d.knownFormations)) d.knownFormations = [];
     // v18
     if(!Array.isArray(d.chronicle)) d.chronicle = [];
+    // v19
+    if(!d.equipEnhance || typeof d.equipEnhance!=="object") d.equipEnhance = {};
+    if(!d.arena) d.arena = {pts:0, wins:0, todayDate:"", todayCnt:0};
     // v4 寿元迁移：移除强制拉满逻辑（避免覆盖新机制），仅做异常兜底
     if(d.lifespan===undefined || d.lifespan<=0){
       d.lifespan = 80 + (d.realmIdx||0)*30;
@@ -8949,6 +9206,7 @@ if($("btn-bounty")) $("btn-bounty").onclick = openBountyBoard;
 if($("btn-formation")) $("btn-formation").onclick = openFormationPanel;
 if($("btn-synthesis")) $("btn-synthesis").onclick = openSynthesis;
 if($("btn-chronicle")) $("btn-chronicle").onclick = openChronicle;
+if($("btn-arena")) $("btn-arena").onclick = openArena;
 $("btn-calendar").onclick= openCalendar;
 // v5：夙愿入口（按钮 + 状态行）
 $("btn-quest").onclick   = openQuestPanel;
