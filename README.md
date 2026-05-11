@@ -73,6 +73,7 @@ xiuxian/
 ├── CLAUDE.md          # AI Agent 开发指南（架构/函数索引/数值体系/规范）
 ├── CHANGELOG.md       # 版本迭代日志（v1-v10，含改动原因）
 ├── whitepaper.html    # 项目白皮书（19 章详细设计文档）
+├── play-xiuxian.js    # Headless 测试工具（Node.js，300 回合自动体验）
 ├── xiuxian.py         # 早期 CLI 原型（已废弃，保留纪念）
 └── .codebuddy/        # 开发过程记录（对话计划 / artifact）
 ```

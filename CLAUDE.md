@@ -126,11 +126,11 @@ ATK × 1.18^gap
 
 ### Headless 测试工具
 
-`/tmp/play-xiuxian.js` — Node.js headless playtest harness
+`play-xiuxian.js` — Node.js headless playtest harness
 
 用法：
 ```bash
-node /tmp/play-xiuxian.js
+node play-xiuxian.js
 ```
 
 功能：
@@ -169,4 +169,4 @@ node /tmp/play-xiuxian.js
 | `CHANGELOG.md` | 版本迭代日志（含改动原因） |
 | `whitepaper.html` | 19 章设计白皮书 |
 | `xiuxian.py` | 早期 CLI 原型（已废弃） |
-| `/tmp/play-xiuxian.js` | Headless 测试工具 |
+| `play-xiuxian.js` | Headless 测试工具 |
