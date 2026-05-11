@@ -3818,6 +3818,12 @@ function calcDamage(atk, def, opt){
   const elBonus = elMatch(atk.attEl, def.defEls);
   // 3) 暴击
   let isCrit = Math.random() < (atk.crit||0.05);
+  // v10.3 · 凶兆：怪物攻击（有 matkSide 标记）6% 概率触发"凶兆"（伤害 ×1.7）
+  //   通过 opt.isMonster 标识，由 computeMonsterDmg 传入
+  let isOmen = false;
+  if(opt.isMonster && !isCrit && Math.random() < 0.06){
+    isOmen = true;
+  }
   // 4) 基础伤害（含神通倍率 + 等级压制 ±2）
   const lvDelta = (atk.lv||0) - (def.lv||0);
   let raw = (atk.atk||1) * mul * elBonus + lvDelta;
@@ -3827,15 +3833,26 @@ function calcDamage(atk, def, opt){
   // 非线性减伤：dmg = raw * (1 - effDef/(effDef+K))
   const K = 300;
   let dmg = raw * (1 - effDef/(effDef + K));
-  if(isCrit) dmg *= (atk.critDmg || 1.5);
+  // v10.3 · 伤害分布方差：±20% 浮动（保留手感但不极端）
+  const variance = 0.8 + Math.random() * 0.2 + Math.random() * 0.2;  // 0.8 ~ 1.2
+  dmg *= variance;
+  // v10.3 · 暴击倍率浮动：原固定 1.5x → 1.7~2.2x
+  if(isCrit){
+    const critDmgBase = atk.critDmg || 1.5;
+    const critVariance = critDmgBase + 0.2 + Math.random() * 0.5;  // +0.2 ~ +0.7
+    dmg *= critVariance;
+  }
+  // v10.3 · 凶兆：怪物 6% 触发，伤害 ×1.7
+  if(isOmen) dmg *= 1.7;
   dmg = Math.max(1, Math.floor(dmg));
   // 染色 log
   const tags = [];
+  if(isOmen) tags.push("凶兆");
   if(isCrit) tags.push("暴击");
   if(elBonus > 1) tags.push(`${atk.attEl}克${(def.defEls||[])[0]||"?"}`);
   else if(elBonus < 1) tags.push("被克");
   if(penRate>0.3) tags.push("破防");
-  return {dmg, isCrit, isDodge:false, elBonus, log:tags.join("·")};
+  return {dmg, isCrit, isOmen, isDodge:false, elBonus, log:tags.join("·")};
 }
 
 /* 包装：从 P 抽取攻方属性快照（含节气 buff） */
@@ -3843,11 +3860,19 @@ function attackerOf(p, override){
   if(!p._d) recalcStats(p);
   const d = p._d;
   const buff = getBuff(p);
+  // v10.3 · 绝境爆发：HP < 25% 时，暴击率 +25%，伤害 +20%（在 mul 上叠加，后面战斗入口读这个值）
+  const hpRatio = (p.hp||0) / Math.max(1, p.maxHp||1);
+  const desperate = hpRatio > 0 && hpRatio < 0.25;
+  const desperateAtkMul = desperate ? 1.20 : 1.0;
+  const desperateCritAdd = desperate ? 0.25 : 0;
+  const desperateCritDmgAdd = desperate ? 0.8 : 0;
   return Object.assign({
-    atk:Math.floor(d.atk*buff.atkMul),
-    crit:Math.min(0.95, d.crit + (buff.critAdd||0)),
-    critDmg:d.critDmg, hit:d.hit, pen:d.pen,
+    atk:Math.floor(d.atk*buff.atkMul*desperateAtkMul),
+    crit:Math.min(0.95, d.crit + (buff.critAdd||0) + desperateCritAdd),
+    critDmg:d.critDmg + desperateCritDmgAdd,
+    hit:d.hit, pen:d.pen,
     attEl:d.attEl, lv:p.realmIdx,
+    _desperate: desperate,  // 暴露给调用方做 log
   }, override||{});
 }
 function defenderOf(p, override){
@@ -3891,8 +3916,24 @@ function applyDamageToP(d, src){
   dmg = Math.max(1, dmg);
   P.hp = Math.max(0, P.hp-dmg);
   const tag = d.log ? `[${d.log}] ` : "";
-  const cls = d.isCrit ? "crit" : "bad";
-  log(`${tag}受到 ${dmg} 点伤害（${P.hp}/${P.maxHp}）`, cls);
+  // v10.3 · 凶兆触发：红光 + 抖屏 + 音效
+  if(d.isOmen){
+    log(`※ 凶兆骤现！${tag}受到 ${dmg} 点重伤！（${P.hp}/${P.maxHp}）`, "crit");
+    if(typeof vfx === "function") vfx("red");
+    if(typeof screenShake === "function") screenShake();
+    if(typeof SFX !== "undefined" && SFX.rumble) SFX.rumble();
+  }else{
+    const cls = d.isCrit ? "crit" : "bad";
+    log(`${tag}受到 ${dmg} 点伤害（${P.hp}/${P.maxHp}）`, cls);
+  }
+  // v10.3 · 绝境爆发提示：HP 首次跌破 25% 时给个警示（buff 已在 attackerOf 里接入）
+  const hpRatio = P.hp / Math.max(1, P.maxHp);
+  if(hpRatio > 0 && hpRatio < 0.25 && !P._desperateFlagged){
+    P._desperateFlagged = true;
+    log("※※【绝境·爆发】气血垂危，你于绝境中激起真火，下次攻击势必惊天！", "epic");
+    if(typeof vfx === "function") vfx("gold");
+  }
+  if(hpRatio >= 0.4) P._desperateFlagged = false;  // 回血后重置提示
 }
 
 /* 应用伤害到怪物 */
@@ -3902,9 +3943,18 @@ function applyDamageToM(m, d, srcName){
     return false;
   }
   m.mhp -= d.dmg;
+  // v10.3 · 绝境暴击 → 用 epic 染色 + 特效
+  const hpRatio = (P.hp||0) / Math.max(1, P.maxHp||1);
+  const isDesperateCrit = d.isCrit && hpRatio < 0.25;
   const tag = d.log ? `【${d.log}】` : "";
-  const cls = d.isCrit ? "crit" : (d.elBonus>1?"el":"good");
-  log(`${tag}${srcName?"【"+srcName+"】":""}打出 ${d.dmg} 点伤害（${Math.max(0,m.mhp)}/${m.maxMhp}）`, cls);
+  if(isDesperateCrit){
+    log(`✦✦ 绝境一击！${tag}${srcName?"【"+srcName+"】":""}打出 ${d.dmg} 点惊天伤害！（${Math.max(0,m.mhp)}/${m.maxMhp}）`, "epic");
+    if(typeof vfx === "function") vfx("gold");
+    if(typeof screenShake === "function") screenShake();
+  }else{
+    const cls = d.isCrit ? "crit" : (d.elBonus>1?"el":"good");
+    log(`${tag}${srcName?"【"+srcName+"】":""}打出 ${d.dmg} 点伤害（${Math.max(0,m.mhp)}/${m.maxMhp}）`, cls);
+  }
   return m.mhp <= 0;
 }
 
@@ -5870,7 +5920,8 @@ function startBattle(m){
 function computeMonsterDmg(){
   const m = P.monster;
   // v3：通过 calcDamage 算（带闪避/暴击/相克/破防），返回结构体
-  const d = calcDamage(monsterAttacker(m), defenderOf(P), {});
+  // v10.3：传入 isMonster 标记，启用"凶兆"机制（10% 概率普攻伤害 ×2）
+  const d = calcDamage(monsterAttacker(m), defenderOf(P), {isMonster:true});
   return d;
 }
 
@@ -6154,10 +6205,18 @@ function battleFlee(){
     afterAction();
   }else{
     log("逃跑失败！","bad");
-    // v10：逃跑失败被追击，受一次怪物攻击
-    const chaseDmg = m.matk;
+    // v10.3 · 逃跑失败被追击：1.3x 基础攻击；10% 概率致命追击 ×2.2
+    const isFatalChase = Math.random() < 0.10;
+    const chaseDmg = Math.floor(m.matk * (isFatalChase ? 2.2 : 1.3));
     takeDmg(P, chaseDmg);
-    log(`被追击！受到 ${chaseDmg} 点伤害。`,"bad");
+    if(isFatalChase){
+      log(`※※ 致命追击！「${m.name}」凶猛扑下，受 ${chaseDmg} 点重伤！`,"crit");
+      if(typeof vfx === "function") vfx("red");
+      if(typeof screenShake === "function") screenShake();
+      if(typeof SFX !== "undefined" && SFX.rumble) SFX.rumble();
+    }else{
+      log(`被追击！受到 ${chaseDmg} 点伤害。`,"bad");
+    }
     if(!alive(P)){endBattle(false); gameOver(); return}
     if(monsterCounterPhase(m)){endBattle(false);return}
     postActionPhase(m);
