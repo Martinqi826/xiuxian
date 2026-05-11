@@ -500,6 +500,7 @@
         <button id="btn-dailies">📋 日 常</button>
         <button id="btn-talent">🌟 天 赋</button>
         <button id="btn-salvage">⚒ 分 解</button>
+        <button id="btn-cave">🏠 洞 府</button>
       </div>
 
       <!-- 第 3 组：故事 / 工具 -->
@@ -3834,6 +3835,67 @@ function worldRuleMul(key){
   return 1 + getWorldRule(key);
 }
 
+// v26 · 洞府系统
+const CAVE_FACILITIES = [
+  {id:"spirit",  nm:"聚灵室", desc:"修炼速度加成",     perLv:0.05, unit:"%修炼", icon:"💫", baseCost:100},
+  {id:"alchemy", nm:"丹房",   desc:"炼丹成功率加成",   perLv:0.02, unit:"%炼丹", icon:"🔥", baseCost:150},
+  {id:"library", nm:"藏经阁", desc:"闭关修为基础加成",  perLv:3,    unit:"修为/次",icon:"📚", baseCost:200},
+];
+function getCaveLv(p, facId){ return (p.cave && p.cave[facId]) || 0; }
+function getCaveMaxLv(p){ return 3 + Math.floor(p.realmIdx / 3); }
+function getCaveCost(facId, lv){
+  const fac = CAVE_FACILITIES.find(f=>f.id===facId);
+  return Math.floor((fac?.baseCost||100) * Math.pow(1.8, lv));
+}
+function caveCultBonus(p){
+  return 1 + getCaveLv(p,"spirit") * 0.05;
+}
+function caveAlchemyBonus(p){
+  return getCaveLv(p,"alchemy") * 0.02;
+}
+function caveLibraryBonus(p){
+  return getCaveLv(p,"library") * 3;
+}
+
+function openCave(){
+  if(P.inBattle){log("战斗中不可。","hint");return}
+  if(!P.cave) P.cave = {};
+  const maxLv = getCaveMaxLv(P);
+  const rows = CAVE_FACILITIES.map(fac=>{
+    const lv = getCaveLv(P, fac.id);
+    const cost = getCaveCost(fac.id, lv);
+    const bonus = fac.id==="spirit" ? `+${(lv*5)}%修炼` : fac.id==="alchemy" ? `+${(lv*2)}%炼丹` : `+${lv*3}修为/次`;
+    const canUp = lv < maxLv && (P.bag["灵石"]||0) >= cost;
+    return `<div class="shop-row">
+      <div><div class="nm">${fac.icon} ${fac.nm} Lv.${lv}/${maxLv}</div>
+      <div class="ds">${fac.desc}（当前：${bonus}）</div></div>
+      <button class="sm" data-cave="${fac.id}" ${canUp?"":"disabled"}>升级 ${cost}石</button>
+    </div>`;
+  }).join("");
+  showModal(`<h3>🏠 洞 府</h3>
+    <p style="color:#a89c7c;font-size:11px">升级设施提升修炼效率（上限随境界提升，当前 Lv.${maxLv}）</p>
+    ${rows}
+    <div class="btns"><button id="cave-close">离开</button></div>`);
+  document.querySelectorAll(".modal [data-cave]").forEach(b=>{
+    b.onclick = ()=>{
+      const facId = b.dataset.cave;
+      const lv = getCaveLv(P, facId);
+      const cost = getCaveCost(facId, lv);
+      if(lv >= maxLv){ log("已达当前境界上限。","hint"); return; }
+      if((P.bag["灵石"]||0)<cost){ log("灵石不足。","hint"); return; }
+      P.bag["灵石"] -= cost;
+      if(!P.cave) P.cave = {};
+      P.cave[facId] = lv + 1;
+      const fac = CAVE_FACILITIES.find(f=>f.id===facId);
+      log(`✦ ${fac.icon} ${fac.nm}升至 Lv.${lv+1}！`,"good");
+      SFX.hit();
+      closeModal(); refresh(); saveGame(true);
+      openCave();
+    };
+  });
+  $("cave-close").onclick = closeModal;
+}
+
 function checkTechMutation(p){
   if(!p.tech) return;
   const mut = TECH_MUTATIONS.find(m => m.from === p.tech);
@@ -3914,6 +3976,65 @@ function triggerEnlightenChoice(p){
     };
   });
   if($("enl-close")) $("enl-close").onclick = closeModal;
+}
+
+// v26 · 战斗连招系统
+const COMBO_CHAINS = [
+  {id:"破甲斩",  seq:["attack","attack","skill"],  desc:"三连攻势，最后一击神通破防",
+   effect:"breakGauge", val:2, msg:"连招【破甲斩】！攻势如潮，破绽暴涨！"},
+  {id:"蓄劲爆发",seq:["heal","attack","attack"],    desc:"养精蓄锐后双连斩",
+   effect:"bonusDmg", val:0.5, msg:"连招【蓄劲爆发】！气血充盈，威力暴增！"},
+  {id:"虚实连环",seq:["flee","attack","skill"],      desc:"佯退诱敌后全力出击",
+   effect:"bonusDmg", val:0.8, msg:"连招【虚实连环】！虚实莫辨，凌厉一击！"},
+  {id:"金蝉脱壳",seq:["attack","heal","flee"],       desc:"战中调息伺机脱身",
+   effect:"freeFlee", val:1.0, msg:"连招【金蝉脱壳】！金蝉脱壳，全身而退！"},
+  {id:"乘胜追击",seq:["skill","attack","attack"],    desc:"神通开路双连击",
+   effect:"extraHit", val:0.6, msg:"连招【乘胜追击】！势如破竹，追斩一击！"},
+];
+
+function recordBattleAction(m, action){
+  if(!m) return;
+  if(!m._actionHistory) m._actionHistory = [];
+  m._actionHistory.push(action);
+  if(m._actionHistory.length > 3) m._actionHistory.shift();
+}
+
+function checkComboChain(m){
+  if(!m || !m._actionHistory || m._actionHistory.length < 3) return null;
+  const h = m._actionHistory;
+  for(const chain of COMBO_CHAINS){
+    if(h[0]===chain.seq[0] && h[1]===chain.seq[1] && h[2]===chain.seq[2]){
+      m._actionHistory = [];
+      return chain;
+    }
+  }
+  return null;
+}
+
+function applyComboChain(chain, m){
+  log(`✦✦ ${chain.msg}`, "epic");
+  SFX.chime();
+  if(chain.effect === "breakGauge"){
+    addBreakGauge(m, chain.val);
+  } else if(chain.effect === "bonusDmg"){
+    const d = calcDamage(attackerOf(P), monsterDefender(m), {mul:chain.val});
+    log(`连招追加伤害 ${d.dmg}！`, "good");
+    const killed = applyDamageToM(m, d, null);
+    if(killed) return "killed";
+  } else if(chain.effect === "freeFlee"){
+    log("遁法自成，必定脱身！","good");
+    P.inBattle = false; P.monster = null;
+    setScene("凡 人 修 仙 路","— 一 缕 神 识 自 虚 空 降 临 —","");
+    bindMainButtons();
+    afterAction();
+    return "fled";
+  } else if(chain.effect === "extraHit"){
+    const d = calcDamage(attackerOf(P), monsterDefender(m), {mul:chain.val});
+    log(`追击伤害 ${d.dmg}！`, "good");
+    const killed = applyDamageToM(m, d, null);
+    if(killed) return "killed";
+  }
+  return null;
 }
 
 // v17 · 阵法系统
@@ -4138,6 +4259,8 @@ function newPlayer(name,rootName,elements){
     worldRules: [],
     // —— v25 · 悟道 ——
     enlighten: {},
+    // —— v26 · 洞府 ——
+    cave: {},
   };
   recalcStats(p);
   // 初始化后按当前 maxHp/maxMp 满血满蓝
@@ -4526,7 +4649,8 @@ function gainCult(p,base,reason){
   const tCultMul = 1 + (typeof talentStat==="function" ? talentStat(p,"cultMul") : 0);
   const dScholar = typeof disciplePassive==="function" ? disciplePassive("scholar")*0.05 : 0;
   const wrCultMul = typeof worldRuleMul==="function" ? worldRuleMul("cultMul") : 1;
-  const amt=Math.floor(base*rootMul(p)*TECHS[p.tech][0]*gearCultBonus(p)*buff.cultMul*bkMul*altMul*sectMul*weCultMul*tCultMul*(1+dScholar)*wrCultMul);
+  const caveMul = typeof caveCultBonus==="function" ? caveCultBonus(p) : 1;
+  const amt=Math.floor(base*rootMul(p)*TECHS[p.tech][0]*gearCultBonus(p)*buff.cultMul*bkMul*altMul*sectMul*weCultMul*tCultMul*(1+dScholar)*wrCultMul*caveMul);
   const prevCult = p.cult;
   p.cult+=amt;
   const tags = [];
@@ -5129,7 +5253,8 @@ function actCultivate(){
   // 饰品加成已在 gearCultBonus 里
 
   // —— 基础修为 ——
-  const base = 10 + P.realmIdx*5;
+  const caveLib = typeof caveLibraryBonus==="function" ? caveLibraryBonus(P) : 0;
+  const base = 10 + P.realmIdx*5 + caveLib;
   let total = 0;
   for(let i=0;i<days;i++) total += base + rand(-2,4);
   total = Math.floor(total * stateMul);
@@ -6810,6 +6935,7 @@ function castSkill(name){
   }
   P.cult -= sk.cult;
   if(mpCost > 0) P.mp = Math.max(0, P.mp - mpCost);
+  recordBattleAction(m, "skill");
   if(lifeCost > 0){
     P.lifespan -= lifeCost;
     log(`※ 【${name}】代价沉重，折损寿元 ${lifeCost} 年（阳寿 ${P.age}/${P.lifespan}）`,"bad");
@@ -6857,6 +6983,9 @@ function castSkill(name){
   // 灵宠协攻
   const petResult = petAssistAttack();
   if(petResult === "killed"){ endBattle(true); return; }
+  // v26 连招检测
+  const chainR = checkComboChain(m);
+  if(chainR){ const cr = applyComboChain(chainR, m); if(cr==="killed"){endBattle(true);return} if(cr==="fled") return; }
   // 怪物反击（统一三分支）
   if(monsterCounterPhase(m)){ endBattle(false); return; }
   postActionPhase(m);
@@ -7054,6 +7183,7 @@ function alchemyMake(name){
   if(hasTechPassive("alchemyBoost")) rate += 0.10;
   if(typeof talentStat==="function") rate += talentStat(P,"alchAdd");
   if(typeof disciplePassive==="function") rate += disciplePassive("alchemy") * 0.03;
+  if(typeof caveAlchemyBonus==="function") rate += caveAlchemyBonus(P);
   rate = Math.min(0.95, rate);
   log(`丹炉升起，炼制【${name}】，成功率 ${Math.floor(rate*100)}%……`, "sys");
   setTimeout(()=>{
@@ -8483,6 +8613,16 @@ function postActionPhase(m){
   checkTelegraph(m);
   tickBreak(m);
   regenMp(P, 0.015);
+  // v26 连招提示
+  if(m._actionHistory && m._actionHistory.length >= 2){
+    const h = m._actionHistory;
+    const actionName = {attack:"攻",heal:"药",skill:"术",flee:"遁"};
+    const histStr = h.map(a=>actionName[a]||a).join("→");
+    for(const c of COMBO_CHAINS){
+      const match = h.length >= 2 && h[h.length-2]===c.seq[0] && h[h.length-1]===c.seq[1];
+      if(match) log(`连招预兆：${histStr}→？ 【${c.id}】差一步（${actionName[c.seq[2]]}）`, "hint");
+    }
+  }
   refresh();
 }
 
@@ -8641,6 +8781,7 @@ function endBattle(win){
 }
 function battleAttack(){
   const m=P.monster;
+  recordBattleAction(m, "attack");
   // 连击计数
   m.combo = (m.combo||0) + 1;
   const comboMul = 1 + Math.min(10, m.combo) * 0.08;
@@ -8671,6 +8812,9 @@ function battleAttack(){
   // 灵宠协攻
   const petResult = petAssistAttack();
   if(petResult === "killed"){ endBattle(true); return; }
+  // v26 连招检测
+  const chain = checkComboChain(m);
+  if(chain){ const cr = applyComboChain(chain, m); if(cr==="killed"){endBattle(true);return} if(cr==="fled") return; }
   // 怪物反击（统一三分支）
   if(monsterCounterPhase(m)){endBattle(false);return}
   postActionPhase(m);
@@ -8704,11 +8848,15 @@ function battleHeal(){
   if(!pick){log("气血与真元皆已充盈，无需服丹！","hint");return}
   // 嗑药重置连击 + 计数丹毒
   if(P.monster){ P.monster.combo = 0; P.monster.healCount = (P.monster.healCount||0) + 1; }
+  recordBattleAction(P.monster, "heal");
   SFX.heal(); floatDmg("+回复","heal");
   useItem(pick);
   // 怪物反击（统一三分支）
   const m = P.monster;
   if(m){
+    // v26 连招检测
+    const chain = checkComboChain(m);
+    if(chain){ const cr = applyComboChain(chain, m); if(cr==="killed"){endBattle(true);return} if(cr==="fled") return; }
     if(monsterCounterPhase(m)){endBattle(false);return}
     postActionPhase(m);
   }
@@ -8716,6 +8864,10 @@ function battleHeal(){
 function battleFlee(){
   const m=P.monster;
   if(m) m.combo = 0;
+  recordBattleAction(m, "flee");
+  // v26 连招检测（金蝉脱壳 = 必定脱身）
+  const chain = checkComboChain(m);
+  if(chain){ const cr = applyComboChain(chain, m); if(cr==="fled") return; if(cr==="killed"){endBattle(true);return} }
   const bonus = gearFleeBonus(P);
   const buff = getBuff(P);
   const talisFleeM = P._talismanFleeMul || 1;
@@ -9821,6 +9973,7 @@ function loadGame(){
     if(d._techCultCount === undefined) d._techCultCount = 0;
     if(!d.worldRules) d.worldRules = [];
     if(!d.enlighten) d.enlighten = {};
+    if(!d.cave) d.cave = {};
     // v4 寿元迁移：移除强制拉满逻辑（避免覆盖新机制），仅做异常兜底
     if(d.lifespan===undefined || d.lifespan<=0){
       d.lifespan = 80 + (d.realmIdx||0)*30;
@@ -10058,6 +10211,7 @@ if($("btn-dailies")) $("btn-dailies").onclick = openDailies;
 if($("btn-talent")) $("btn-talent").onclick = openTalentPanel;
 if($("btn-bestiary")) $("btn-bestiary").onclick = openBestiary;
 if($("btn-salvage")) $("btn-salvage").onclick = openSalvagePanel;
+if($("btn-cave")) $("btn-cave").onclick = openCave;
 $("btn-calendar").onclick= openCalendar;
 // v5：夙愿入口（按钮 + 状态行）
 $("btn-quest").onclick   = openQuestPanel;
