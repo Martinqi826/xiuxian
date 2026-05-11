@@ -2172,15 +2172,23 @@ const ITEMS = {
   "鸿蒙古玉":  {type:"奇物",desc:"上古鸿蒙之气所凝，与「无属之体」共鸣方显神威"},
 };
 const MONSTERS = [
-  // 名, 等级要求, HP, 攻, 修为奖, 灵石奖, 属性
-  ["黑风狼",   0,  120,  15,  20,  5,   "木"],
-  ["赤焰狐",   3,  400,  35,  60,  15,  "火"],
-  ["玄铁蟒",   6,  1500, 80,  150, 40,  "金"],
-  ["血煞修士", 9,  5000, 140, 300, 80,  "火"],
-  ["筑基妖修", 12, 15000,220, 600, 200, "水"],
-  ["化形蛟龙", 15, 25000,350, 1500,500, "水"],
-  ["元婴老怪", 18, 50000,600, 4000,1200,"土"],
-  ["散修剑仙", 20,100000,900, 9000,3000,"金"],
+  // v11: 15 种怪物，填补等级空档，五行均衡
+  // idx  名           等级  HP      攻   修为奖  灵石奖 属性
+  /*0*/  ["黑风狼",     0,   120,    15,   20,    5,    "木"],
+  /*1*/  ["毒牙蛛",     1,   160,    18,   30,    7,    "土"],
+  /*2*/  ["赤焰狐",     3,   400,    35,   60,    15,   "火"],
+  /*3*/  ["寒冰蝎",     4,   550,    45,   80,    22,   "水"],
+  /*4*/  ["玄铁蟒",     6,   1500,   80,   150,   40,   "金"],
+  /*5*/  ["厉魂鬼修",   7,   2000,   95,   180,   55,   "土"],
+  /*6*/  ["血煞修士",   9,   5000,   140,  300,   80,   "火"],
+  /*7*/  ["碧落妖鸟",   10,  6500,   160,  400,   110,  "木"],
+  /*8*/  ["筑基妖修",   12,  15000,  220,  600,   200,  "水"],
+  /*9*/  ["金甲傀儡",   13,  18000,  250,  800,   300,  "金"],
+  /*10*/ ["化形蛟龙",   15,  25000,  350,  1500,  500,  "水"],
+  /*11*/ ["九幽冥蝠",   16,  32000,  400,  2000,  700,  "土"],
+  /*12*/ ["元婴老怪",   18,  50000,  600,  4000,  1200, "火"],
+  /*13*/ ["天狐妖王",   19,  62000,  700,  5500,  1800, "木"],
+  /*14*/ ["散修剑仙",   20,  100000, 900,  9000,  3000, "金"],
 ];
 
 /* ============================================================
@@ -2214,33 +2222,54 @@ const PET_LINES = {
 };
 
 const PETS_META = {
-  // —— 8 种妖兽收服灵宠（idx 对应 MONSTERS） ——
-  "黑风狼":   {idx:0, nm:"黑风狼",   ele:"木", rarity:"普通", catchRate:0.30,
+  // v11: idx 对应新 MONSTERS 数组索引
+  "黑风狼":   {idx:0,  nm:"黑风狼",   ele:"木", rarity:"普通", catchRate:0.30,
               baseHp:50,  baseAtk:8,  baseDef:3, hpMul:1.15, atkMul:1.10, defMul:1.05,
               skill:null,                    desc:"幼狼，机敏迅捷"},
-  "赤焰狐":   {idx:1, nm:"赤焰狐",   ele:"火", rarity:"普通", catchRate:0.25,
+  "毒牙蛛":   {idx:1,  nm:"毒牙蛛",   ele:"土", rarity:"普通", catchRate:0.28,
+              baseHp:65,  baseAtk:10, baseDef:5, hpMul:1.16, atkMul:1.10, defMul:1.08,
+              skill:"毒丝缚",                desc:"蛛毒入骨，丝网缠敌"},
+  "赤焰狐":   {idx:2,  nm:"赤焰狐",   ele:"火", rarity:"普通", catchRate:0.25,
               baseHp:80,  baseAtk:14, baseDef:4, hpMul:1.18, atkMul:1.12, defMul:1.05,
               skill:"火尾扫",                 desc:"灵狐通晓火诀，尾扫成炎"},
-  "玄铁蟒":   {idx:2, nm:"玄铁蟒",   ele:"金", rarity:"稀有", catchRate:0.18,
+  "寒冰蝎":   {idx:3,  nm:"寒冰蝎",   ele:"水", rarity:"普通", catchRate:0.22,
+              baseHp:110, baseAtk:18, baseDef:8, hpMul:1.18, atkMul:1.12, defMul:1.08,
+              skill:"冰尾刺",                 desc:"寒蝎尾针，冰封敌脉"},
+  "玄铁蟒":   {idx:4,  nm:"玄铁蟒",   ele:"金", rarity:"稀有", catchRate:0.18,
               baseHp:180, baseAtk:24, baseDef:12,hpMul:1.20, atkMul:1.10, defMul:1.10,
               skill:"金鳞缠",                 desc:"皮坚如铁，缠斗见长"},
-  "血煞修士": {idx:3, nm:"血煞傀儡", ele:"火", rarity:"稀有", catchRate:0.10,
+  "厉魂鬼修": {idx:5,  nm:"鬼仆",     ele:"土", rarity:"稀有", catchRate:0.12,
+              baseHp:250, baseAtk:35, baseDef:10,hpMul:1.18, atkMul:1.18, defMul:1.06,
+              skill:"摄魂咒",                 desc:"鬼修残魂炼为仆从，阴气森然"},
+  "血煞修士": {idx:6,  nm:"血煞傀儡", ele:"火", rarity:"稀有", catchRate:0.10,
               baseHp:300, baseAtk:40, baseDef:8, hpMul:1.18, atkMul:1.20, defMul:1.05,
               skill:"血煞掌",                 desc:"邪修元神被你炼成傀儡，杀气盈天"},
-  "筑基妖修": {idx:4, nm:"筑基妖修", ele:"水", rarity:"稀有", catchRate:0.08,
+  "碧落妖鸟": {idx:7,  nm:"碧落灵禽", ele:"木", rarity:"稀有", catchRate:0.12,
+              baseHp:400, baseAtk:50, baseDef:14,hpMul:1.20, atkMul:1.15, defMul:1.08,
+              skill:"风刃羽",                 desc:"碧落灵禽，风行天下"},
+  "筑基妖修": {idx:8,  nm:"筑基妖修", ele:"水", rarity:"稀有", catchRate:0.08,
               baseHp:600, baseAtk:60, baseDef:18,hpMul:1.20, atkMul:1.15, defMul:1.10,
               skill:"妖息冲",                 desc:"已开灵智，可与你心意相通"},
-  "化形蛟龙": {idx:5, nm:"化形蛟龙", ele:"水", rarity:"史诗", catchRate:0.05,
+  "金甲傀儡": {idx:9,  nm:"铁卫",     ele:"金", rarity:"史诗", catchRate:0.06,
+              baseHp:1000,baseAtk:75, baseDef:35,hpMul:1.22, atkMul:1.12, defMul:1.15,
+              skill:"雷拳震",                 desc:"上古傀儡收为己用，坚不可摧"},
+  "化形蛟龙": {idx:10, nm:"化形蛟龙", ele:"水", rarity:"史诗", catchRate:0.05,
               baseHp:1500,baseAtk:100,baseDef:30,hpMul:1.22, atkMul:1.18, defMul:1.12,
               skill:"水龙吟",                 desc:"已具龙形，腾云驾雾"},
-  "元婴老怪": {idx:6, nm:"元婴傀儡", ele:"土", rarity:"史诗", catchRate:0.03,
+  "九幽冥蝠": {idx:11, nm:"冥蝠",     ele:"土", rarity:"史诗", catchRate:0.04,
+              baseHp:2200,baseAtk:120,baseDef:40,hpMul:1.22, atkMul:1.20, defMul:1.12,
+              skill:"暗蚀波",                 desc:"九幽冥蝠，以暗噬光"},
+  "元婴老怪": {idx:12, nm:"元婴傀儡", ele:"火", rarity:"史诗", catchRate:0.03,
               baseHp:3500,baseAtk:160,baseDef:50,hpMul:1.22, atkMul:1.20, defMul:1.12,
               skill:"地脉吼",                 desc:"老怪元婴被你炼为傀儡，深沉如山"},
-  "散修剑仙": {idx:7, nm:"剑灵",     ele:"金", rarity:"传说", catchRate:0.02,
+  "天狐妖王": {idx:13, nm:"妖狐灵",   ele:"木", rarity:"传说", catchRate:0.025,
+              baseHp:5000,baseAtk:220,baseDef:55,hpMul:1.25, atkMul:1.25, defMul:1.12,
+              skill:"幻灭爪",                 desc:"天狐妖王残魂，千幻万化"},
+  "散修剑仙": {idx:14, nm:"剑灵",     ele:"金", rarity:"传说", catchRate:0.02,
               baseHp:6000,baseAtk:280,baseDef:60,hpMul:1.25, atkMul:1.25, defMul:1.10,
               skill:"剑气回旋",               desc:"剑仙残魂寄于剑中，化为剑灵"},
 
-  // —— 4 个专属蛋孵化的稀有灵宠 ——
+  // —— 4 个专属蛋孵化灵宠 ——
   "青鸾雏":   {idx:-1, nm:"青鸾雏",  ele:"木", rarity:"史诗", catchRate:0,
               baseHp:1200,baseAtk:90, baseDef:25,hpMul:1.25, atkMul:1.22, defMul:1.10,
               skill:"凤鸣",                   desc:"青鸾雏鸟，鸣音助修，回血兼增伤"},
@@ -2265,12 +2294,19 @@ const PET_EGGS = {
 
 /* —— 灵宠神通效果表 —— */
 const PET_SKILLS = {
+  "毒丝缚":   {dmgMul:1.2,  defBuff:0.15, desc:"毒丝缠敌，+15% 防御，造成 120% 伤害"},
   "火尾扫":   {dmgMul:1.3,  desc:"对怪物造成 130% 灵宠攻击，30% 概率灼烧"},
+  "冰尾刺":   {dmgMul:1.3,  desc:"寒冰尾刺，造成 130% 伤害，20% 概率冰冻"},
   "金鳞缠":   {dmgMul:1.2,  defBuff:0.2, desc:"自身防御 +20%，并造成 120% 伤害"},
+  "摄魂咒":   {dmgMul:1.4,  desc:"摄魂咒力，造成 140% 伤害"},
   "血煞掌":   {dmgMul:1.5,  desc:"血煞掌力，造成 150% 伤害"},
+  "风刃羽":   {dmgMul:1.4,  hpRegen:0.03, desc:"风刃齐发造成 140% 伤害，回主人 3% 气血"},
   "妖息冲":   {dmgMul:1.4,  desc:"造成 140% 伤害，无视部分防御"},
+  "雷拳震":   {dmgMul:1.5,  defBuff:0.25, desc:"雷霆铁拳，+25% 防御，造成 150% 伤害"},
   "水龙吟":   {dmgMul:1.6,  hpRegen:0.05, desc:"造成 160% 伤害，同时回复主人 5% 气血"},
+  "暗蚀波":   {dmgMul:1.6,  desc:"暗蚀之力，造成 160% 伤害，侵蚀敌防"},
   "地脉吼":   {dmgMul:1.5,  defBuff:0.3, desc:"震慑全场，自身防御 +30%"},
+  "幻灭爪":   {dmgMul:1.8,  desc:"幻灭一爪，造成 180% 伤害"},
   "剑气回旋": {dmgMul:2.0,  desc:"剑灵剑气回旋，造成 200% 伤害"},
   "凤鸣":     {dmgMul:1.2,  hpRegen:0.10, mpRegen:0.05, desc:"凤鸣助修，回 10% 气血、5% 真元"},
   "玄龟息":   {dmgMul:1.0,  defBuff:0.5,  shield:0.3, desc:"为主人套护盾，下次受击 -30%"},
@@ -2860,25 +2896,45 @@ const SKILLS = {
 
 /* —— 装备（可从坊市/秘境/宗门获取） —— */
 const EQUIPS = {
-  // key: {slot, atk, def, hp, cult, dx, ele, tier, desc}
-  "青铜剑":      {slot:"weapon",   atk:8,  tier:1, desc:"凡铁所铸 · +8 攻"},
-  "玄铁剑":      {slot:"weapon",   atk:25, tier:2, desc:"玄铁百炼 · +25 攻"},
-  "赤炎刀":      {slot:"weapon",   atk:60, ele:"火", tier:3, desc:"带火属 +60 攻"},
-  "青竹蜂云剑":  {slot:"weapon",   atk:150,ele:"木", tier:4, desc:"凡人流神兵 · 木属 +150"},
-  "诛仙古剑":    {slot:"weapon",   atk:500,tier:5, desc:"斩仙之剑 · +500 攻"},
+  // v11: 扩充至 32 件，覆盖 T1-T6 六档（凡/练气/筑基/金丹/元婴/化神+）
+  // ——— 武器（7 件）———
+  "青铜剑":      {slot:"weapon",   atk:8,   tier:1, desc:"凡铁所铸 · +8 攻"},
+  "玄铁剑":      {slot:"weapon",   atk:25,  tier:2, desc:"玄铁百炼 · +25 攻"},
+  "赤炎刀":      {slot:"weapon",   atk:60,  ele:"火", tier:3, desc:"带火属 +60 攻"},
+  "碧水寒枪":    {slot:"weapon",   atk:100, ele:"水", tier:3, desc:"水属 +100 攻"},
+  "青竹蜂云剑":  {slot:"weapon",   atk:150, ele:"木", tier:4, desc:"凡人流神兵 · 木属 +150"},
+  "天魔破军戟":  {slot:"weapon",   atk:300, tier:5, desc:"魔道至宝 · +300 攻"},
+  "诛仙古剑":    {slot:"weapon",   atk:500, tier:6, desc:"斩仙之剑 · +500 攻"},
 
-  "牛皮甲":      {slot:"armor",    def:5,  hp:50,  tier:1, desc:"+5 防 / +50 气血"},
-  "乌金甲":      {slot:"armor",    def:20, hp:200, tier:2, desc:"+20 防 / +200 气血"},
-  "玄龟宝甲":    {slot:"armor",    def:60, hp:600, tier:3, desc:"+60 防 / +600 气血"},
-  "紫金战铠":    {slot:"armor",    def:150,hp:1500,tier:4, desc:"+150 防 / +1500 气血"},
+  // ——— 护甲（7 件）———
+  "牛皮甲":      {slot:"armor",    def:5,   hp:50,   tier:1, desc:"+5 防 / +50 气血"},
+  "乌金甲":      {slot:"armor",    def:20,  hp:200,  tier:2, desc:"+20 防 / +200 气血"},
+  "玄龟宝甲":    {slot:"armor",    def:60,  hp:600,  tier:3, desc:"+60 防 / +600 气血"},
+  "冰蚕丝袍":    {slot:"armor",    def:90,  hp:1000, tier:4, desc:"+90 防 / +1000 气血"},
+  "紫金战铠":    {slot:"armor",    def:150, hp:1500, tier:5, desc:"+150 防 / +1500 气血"},
+  "混元道袍":    {slot:"armor",    def:250, hp:3000, tier:6, desc:"+250 防 / +3000 气血"},
 
-  "聚灵玉佩":    {slot:"accessory",cult:0.1,tier:1, desc:"修炼速度 +10%"},
-  "九转玉珠":    {slot:"accessory",cult:0.3,dx:20,tier:3, desc:"修炼 +30% / 道心 +20"},
-  "太上玉符":    {slot:"accessory",cult:0.8,dx:50,tier:5, desc:"修炼 +80% / 道心 +50"},
+  // ——— 饰品（6 件）———
+  "聚灵玉佩":    {slot:"accessory",cult:0.1, tier:1, desc:"修炼速度 +10%"},
+  "灵犀坠":      {slot:"accessory",cult:0.2, dx:10, tier:2, desc:"修炼 +20% / 道心 +10"},
+  "九转玉珠":    {slot:"accessory",cult:0.3, dx:20, tier:3, desc:"修炼 +30% / 道心 +20"},
+  "天心玉":      {slot:"accessory",cult:0.5, dx:35, tier:4, desc:"修炼 +50% / 道心 +35"},
+  "太上玉符":    {slot:"accessory",cult:0.8, dx:50, tier:5, desc:"修炼 +80% / 道心 +50"},
+  "鸿蒙灵珠":    {slot:"accessory",cult:1.2, dx:80, tier:6, desc:"修炼 +120% / 道心 +80"},
 
-  "黄风舟":      {slot:"mount",    flee:0.15,tier:1, desc:"遁逃 +15%"},
-  "御剑飞行":    {slot:"mount",    flee:0.3,atk:20,tier:3, desc:"遁逃 +30% / +20 攻"},
-  "九霄凤羽":    {slot:"mount",    flee:0.5,atk:100,tier:5, desc:"遁逃 +50% / +100 攻"},
+  // ——— 坐骑/遁光（6 件）———
+  "黄风舟":      {slot:"mount",    flee:0.15, tier:1, desc:"遁逃 +15%"},
+  "踏云靴":      {slot:"mount",    flee:0.2, atk:10, tier:2, desc:"遁逃 +20% / +10 攻"},
+  "御剑飞行":    {slot:"mount",    flee:0.3, atk:20, tier:3, desc:"遁逃 +30% / +20 攻"},
+  "金翅大鹏":    {slot:"mount",    flee:0.4, atk:50, tier:4, desc:"遁逃 +40% / +50 攻"},
+  "九霄凤羽":    {slot:"mount",    flee:0.5, atk:100,tier:5, desc:"遁逃 +50% / +100 攻"},
+  "虚空挪移符":  {slot:"mount",    flee:0.7, atk:180,tier:6, desc:"遁逃 +70% / +180 攻"},
+
+  // ——— 特殊装备（战斗掉落/秘境限定）———
+  "噬魂幡":      {slot:"weapon",   atk:200, ele:"土", tier:4, desc:"土属 +200 攻 · 秘境限定"},
+  "星辰锁子甲":  {slot:"armor",    def:120, hp:1200, tier:4, desc:"+120 防 · 秘境限定"},
+  "夺魄铃":      {slot:"accessory",cult:0.4, atk:30, tier:3, desc:"修炼 +40% / +30 攻 · 稀有"},
+  "血玉扳指":    {slot:"accessory",cult:0.6, hp:800, tier:4, desc:"修炼 +60% / +800 气血 · 稀有"},
 };
 
 /* —— 本命法宝（独立槽，需祭炼）—— v6 数值翻倍 */
@@ -2924,23 +2980,34 @@ const RECIPES = {
 
 /* —— 宗门 —— */
 const SECTS = {
-  "青云门": {minRoot:3, joinCult:200,  style:"正道剑修", desc:"正道大宗，剑修圣地，重名望"},
-  "万兽谷": {minRoot:0, joinCult:100,  style:"兽修",    desc:"兽修一脉，不拘灵根"},
-  "玄阴宗": {minRoot:2, joinCult:300,  style:"阴柔杀伐",desc:"阴诡一脉，擅毒擅计"},
-  "天机阁": {minRoot:4, joinCult:800,  style:"炼丹炼器",desc:"炼丹圣地，贡献换丹方"},
-  "大衍宗": {minRoot:5, joinCult:2000, style:"传说宗门",desc:"只收天灵根以上，仙道正宗"},
+  // v11: 宗门差异化 — 每宗门有专属被动 buff
+  "青云门": {minRoot:3, joinCult:200,  style:"正道剑修", desc:"剑修圣地 · 攻击 +12%",
+             buff:{atk:0.12}, tasks:[0,1,2,5,8]},
+  "万兽谷": {minRoot:0, joinCult:100,  style:"兽修",    desc:"兽修一脉 · 灵宠攻 +20%",
+             buff:{petAtk:0.20}, tasks:[0,3,6,7]},
+  "玄阴宗": {minRoot:2, joinCult:300,  style:"阴柔杀伐",desc:"阴诡一脉 · 暴击 +8%",
+             buff:{crit:0.08}, tasks:[0,1,4,5,8]},
+  "天机阁": {minRoot:4, joinCult:800,  style:"炼丹炼器",desc:"炼丹圣地 · 炼丹成功率 +15%",
+             buff:{alchemy:0.15}, tasks:[1,2,4,7,9]},
+  "大衍宗": {minRoot:5, joinCult:2000, style:"传说宗门",desc:"仙道正宗 · 修炼 +15% / 道心 +10",
+             buff:{cult:0.15, dx:10}, tasks:[2,5,8,9]},
 };
 
-/* —— 宗门任务 —— v6：每个任务额外给道行（化神突破必需） */
+/* —— 宗门任务池 —— v11: 扩充至 10 种，宗门按 tasks 数组挑选 */
 const SECT_TASKS = [
-  {n:"伐妖任务",   desc:"斩杀妖兽 3 只", type:"monster", cnt:3, contrib:30, cult:100, dao:1},
-  {n:"采药任务",   desc:"献上聚灵草 ×5", type:"item", item:"聚灵草", cnt:5, contrib:50, cult:150, dao:1},
-  {n:"护山任务",   desc:"闭关 30 天护山", type:"cult", days:30, contrib:60, cult:300, dao:2},
-  {n:"秘境探索",   desc:"通关一次秘境",  type:"dungeon", cnt:1, contrib:120, cult:800, dao:3},
-  {n:"参悟道经",   desc:"专心研读宗门道经",type:"cult", days:60, contrib:80, cult:400, dao:5},
+  /*0*/ {n:"伐妖任务",   desc:"斩杀妖兽 3 只",       type:"monster", cnt:3,  contrib:30,  cult:100,  dao:1},
+  /*1*/ {n:"采药任务",   desc:"献上聚灵草 ×5",        type:"item", item:"聚灵草", cnt:5, contrib:50, cult:150, dao:1},
+  /*2*/ {n:"护山任务",   desc:"闭关 30 天护山",       type:"cult", days:30,  contrib:60,  cult:300,  dao:2},
+  /*3*/ {n:"驯兽任务",   desc:"收服 1 只灵宠",        type:"pet",  cnt:1,    contrib:80,  cult:200,  dao:2},
+  /*4*/ {n:"炼丹供奉",   desc:"炼制丹药 3 炉",        type:"alchemy", cnt:3, contrib:70,  cult:250,  dao:2},
+  /*5*/ {n:"秘境探索",   desc:"通关一次秘境",         type:"dungeon", cnt:1, contrib:120, cult:800,  dao:3},
+  /*6*/ {n:"万兽驱邪",   desc:"斩杀妖兽 8 只",        type:"monster", cnt:8,  contrib:100, cult:500,  dao:3},
+  /*7*/ {n:"采集珍药",   desc:"献上千年灵芝 ×2",      type:"item", item:"千年灵芝", cnt:2, contrib:150, cult:600, dao:3},
+  /*8*/ {n:"参悟道经",   desc:"专心研读宗门道经",     type:"cult", days:60,  contrib:80,  cult:400,  dao:5},
+  /*9*/ {n:"宗门大比",   desc:"斩杀妖兽 5 只且不死",  type:"monster", cnt:5,  contrib:200, cult:1200, dao:5},
 ];
 
-/* —— 坊市商品表（基础物价，按境界递增） —— */
+/* —— v11 坊市：常驻 + 稀有轮换 + 售卖 —— */
 const MARKET = {
   buy: [
     {nm:"聚气丹",   pr:20},
@@ -2951,14 +3018,11 @@ const MARKET = {
     {nm:"破障丹",   pr:800},
     {nm:"五行淬体丹",pr:3000},
     {nm:"洗髓丹",   pr:5000},
-    // —— 真元丹（v4：战斗中可服用回蓝） ——
     {nm:"聚灵丹",   pr:200},
     {nm:"玄元丹",   pr:1500},
     {nm:"紫府丹",   pr:8000},
-    // —— 延寿丹（昂贵稀缺；九转还魂丹仅秘境/炼制可得，坊市不售） ——
     {nm:"蟠桃",      pr:8000},
     {nm:"万年灵芝精",pr:50000},
-    // —— v6 · 突破必需品（高价兜底，主要靠自炼/任务获取）——
     {nm:"悟道茶",    pr:1500},
     {nm:"法宝祭炼丹",pr:3000},
     {nm:"金丹",      pr:12000},
@@ -2969,7 +3033,6 @@ const MARKET = {
     {nm:"千年灵芝", pr:250},
     {nm:"万年玄参", pr:1000},
     {nm:"九叶玄参", pr:4000},
-    // 装备
     {nm:"青铜剑",   pr:100, eq:true},
     {nm:"玄铁剑",   pr:800, eq:true},
     {nm:"赤炎刀",   pr:4000,eq:true},
@@ -2977,17 +3040,36 @@ const MARKET = {
     {nm:"乌金甲",   pr:1200,eq:true},
     {nm:"聚灵玉佩", pr:500, eq:true},
     {nm:"黄风舟",   pr:600, eq:true},
+    {nm:"踏云靴",   pr:1000,eq:true},
+    {nm:"灵犀坠",   pr:1500,eq:true},
+    {nm:"碧水寒枪", pr:6000,eq:true},
   ],
+  rare: [
+    {nm:"冰蚕丝袍",   pr:15000,eq:true, weight:3},
+    {nm:"天心玉",      pr:20000,eq:true, weight:2},
+    {nm:"金翅大鹏",    pr:25000,eq:true, weight:2},
+    {nm:"夺魄铃",      pr:8000, eq:true, weight:4},
+    {nm:"血玉扳指",    pr:12000,eq:true, weight:3},
+    {nm:"九转还魂丹",  pr:100000,weight:1},
+    {nm:"天劫真血",    pr:30000, weight:2},
+  ],
+  sellRatio: 0.4,
 };
 
-/* —— 秘境（按境界开放） —— */
+/* —— v11 秘境：属性匹配 + Boss 层 + 层间事件 —— */
 const DUNGEONS = [
-  {n:"青木秘境",  need:2,  floors:3, reward:{cult:300, stone:100, item:"聚气丹"},    monster:[0,1]},
-  {n:"玄冰谷",    need:5,  floors:4, reward:{cult:1200,stone:500, item:"破障丹"},    monster:[1,2,3]},
-  {n:"炎魔窟",    need:9,  floors:5, reward:{cult:5000,stone:2000,item:"筑基丹"},    monster:[3,4]},
-  {n:"上古遗迹",  need:12, floors:6, reward:{cult:15000,stone:8000,item:"金丹玉露"}, monster:[4,5]},
-  {n:"太古战场",  need:15, floors:7, reward:{cult:50000,stone:30000,item:"化神丹"},  monster:[5,6]},
-  {n:"仙古墓",    need:18, floors:9, reward:{cult:200000,stone:100000,item:"化神丹"},monster:[6,7]},
+  {n:"青木秘境",  need:2,  floors:3, ele:"木", reward:{cult:300,   stone:100,   item:"聚气丹"},      monster:[0,1,2],   boss:2,  bossItem:"踏云靴"},
+  {n:"玄冰谷",    need:5,  floors:4, ele:"水", reward:{cult:1200,  stone:500,   item:"破障丹"},      monster:[1,3,4],   boss:4,  bossItem:"碧水寒枪"},
+  {n:"炎魔窟",    need:9,  floors:5, ele:"火", reward:{cult:5000,  stone:2000,  item:"筑基丹"},      monster:[2,5,6],   boss:6,  bossItem:"噬魂幡"},
+  {n:"上古遗迹",  need:12, floors:6, ele:"金", reward:{cult:15000, stone:8000,  item:"金丹玉露"},    monster:[7,8,9],   boss:9,  bossItem:"星辰锁子甲"},
+  {n:"太古战场",  need:15, floors:7, ele:"土", reward:{cult:50000, stone:30000, item:"化神丹"},      monster:[9,10,11],  boss:11, bossItem:"天心玉"},
+  {n:"仙古墓",    need:18, floors:9, ele:"金", reward:{cult:200000,stone:100000,item:"化神丹"},      monster:[12,13,14], boss:14, bossItem:"虚空挪移符"},
+];
+const DUNGEON_EVENTS = [
+  {name:"灵泉",   prob:0.20, fn:p=>{const h=Math.floor(p.maxHp*0.3);p.hp=Math.min(p.maxHp,p.hp+h);return `发现灵泉，恢复 ${h} 气血！`;}},
+  {name:"宝箱",   prob:0.15, fn:p=>{const s=50+p.realmIdx*30;p.bag["灵石"]=(p.bag["灵石"]||0)+s;return `打开宝箱，获得 ${s} 灵石！`;}},
+  {name:"陷阱",   prob:0.12, fn:p=>{const d=Math.floor(p.maxHp*0.15);p.hp=Math.max(1,p.hp-d);return `触发阵法陷阱，受到 ${d} 伤害！`;}},
+  {name:"悟道石", prob:0.08, fn:p=>{const c=30+p.realmIdx*15;p.cult+=c;return `悟道石前静坐片刻，修为 +${c}！`;}},
 ];
 
 /* ============================================================
@@ -3100,14 +3182,21 @@ const SKILL_META = {
 
 /* —— 怪物扩展元数据：spd / crit / karma 落差（按怪物 idx） —— */
 const MONSTER_META = [
-  {spd:8,  crit:0.05, karma:-1, special:{name:"狼嚎",   dmgMul:2.5, interval:[4,6], interruptThreshold:0.15, desc:"仰天长嗥——下一击将是凶猛撕咬！"}},
-  {spd:14, crit:0.08, karma:-1, special:{name:"焰尾",   dmgMul:3.0, interval:[3,5], interruptThreshold:0.18, desc:"九尾扬起——烈焰即将席卷！"}},
-  {spd:18, crit:0.10, karma:-2, special:{name:"缠绞",   dmgMul:3.0, interval:[3,5], interruptThreshold:0.20, desc:"蟒身蜷缩——将以全力缠绞！"}},
-  {spd:25, crit:0.15, karma:-5, special:{name:"血煞掌", dmgMul:3.5, interval:[3,5], interruptThreshold:0.22, desc:"双掌血光大盛——血煞大法即将爆发！"}},
-  {spd:35, crit:0.18, karma:-2, special:{name:"妖术",   dmgMul:3.5, interval:[3,4], interruptThreshold:0.25, desc:"掐诀念咒——妖力汇聚，大术将成！"}},
-  {spd:45, crit:0.22, karma:-2, special:{name:"龙息",   dmgMul:4.0, interval:[3,5], interruptThreshold:0.28, desc:"深吸一口——蛟龙之息即将喷薄！"}},
-  {spd:55, crit:0.25, karma:-3, special:{name:"元婴爆", dmgMul:4.0, interval:[3,4], interruptThreshold:0.30, desc:"元婴虚影浮现——自爆之势！"}},
-  {spd:80, crit:0.30, karma:-5, special:{name:"剑域",   dmgMul:5.0, interval:[3,4], interruptThreshold:0.35, desc:"万剑归宗——剑域即将展开！"}},
+  /*0  黑风狼*/   {spd:8,  crit:0.05, karma:-1, special:{name:"狼嚎",   dmgMul:2.5, interval:[4,6], interruptThreshold:0.15, desc:"仰天长嗥——下一击将是凶猛撕咬！"}},
+  /*1  毒牙蛛*/   {spd:10, crit:0.06, karma:-1, special:{name:"毒雾",   dmgMul:2.5, interval:[4,6], interruptThreshold:0.15, desc:"腹部喷出毒雾——剧毒弥漫！"}},
+  /*2  赤焰狐*/   {spd:14, crit:0.08, karma:-1, special:{name:"焰尾",   dmgMul:3.0, interval:[3,5], interruptThreshold:0.18, desc:"九尾扬起——烈焰即将席卷！"}},
+  /*3  寒冰蝎*/   {spd:16, crit:0.09, karma:-1, special:{name:"冰刺",   dmgMul:2.8, interval:[3,5], interruptThreshold:0.18, desc:"尾针凝冰——寒光一闪！"}},
+  /*4  玄铁蟒*/   {spd:18, crit:0.10, karma:-2, special:{name:"缠绞",   dmgMul:3.0, interval:[3,5], interruptThreshold:0.20, desc:"蟒身蜷缩——将以全力缠绞！"}},
+  /*5  厉魂鬼修*/ {spd:22, crit:0.12, karma:-3, special:{name:"摄魂",   dmgMul:3.2, interval:[3,5], interruptThreshold:0.20, desc:"鬼眼大张——摄魂大法即将笼罩！"}},
+  /*6  血煞修士*/ {spd:25, crit:0.15, karma:-5, special:{name:"血煞掌", dmgMul:3.5, interval:[3,5], interruptThreshold:0.22, desc:"双掌血光大盛——血煞大法即将爆发！"}},
+  /*7  碧落妖鸟*/ {spd:30, crit:0.16, karma:-1, special:{name:"风刃",   dmgMul:3.2, interval:[3,5], interruptThreshold:0.22, desc:"双翼掀起狂风——漫天风刃！"}},
+  /*8  筑基妖修*/ {spd:35, crit:0.18, karma:-2, special:{name:"妖术",   dmgMul:3.5, interval:[3,4], interruptThreshold:0.25, desc:"掐诀念咒——妖力汇聚，大术将成！"}},
+  /*9  金甲傀儡*/ {spd:38, crit:0.20, karma: 0, special:{name:"雷拳",   dmgMul:3.5, interval:[3,4], interruptThreshold:0.25, desc:"机关轰鸣——雷霆一拳蓄势待发！"}},
+  /*10 化形蛟龙*/ {spd:45, crit:0.22, karma:-2, special:{name:"龙息",   dmgMul:4.0, interval:[3,5], interruptThreshold:0.28, desc:"深吸一口——蛟龙之息即将喷薄！"}},
+  /*11 九幽冥蝠*/ {spd:50, crit:0.24, karma:-3, special:{name:"暗蚀",   dmgMul:3.8, interval:[3,4], interruptThreshold:0.28, desc:"黑雾翻涌——九幽之力侵蚀一切！"}},
+  /*12 元婴老怪*/ {spd:55, crit:0.25, karma:-3, special:{name:"元婴爆", dmgMul:4.0, interval:[3,4], interruptThreshold:0.30, desc:"元婴虚影浮现——自爆之势！"}},
+  /*13 天狐妖王*/ {spd:70, crit:0.28, karma:-2, special:{name:"幻杀",   dmgMul:4.5, interval:[3,4], interruptThreshold:0.32, desc:"千幻迷瞳——万象皆虚！"}},
+  /*14 散修剑仙*/ {spd:80, crit:0.30, karma:-5, special:{name:"剑域",   dmgMul:5.0, interval:[3,4], interruptThreshold:0.35, desc:"万剑归宗——剑域即将展开！"}},
 ];
 // 注：karma 为负数表示「击杀此怪可获得正业力」（杀邪得善），
 //     妖兽类绝对值小，邪修类大；详见 onKarma 入口
@@ -3309,10 +3398,11 @@ function recalcStats(p){
   const cBuff = (typeof getBuff==="function") ? getBuff(p) : {hpMul:1, mpMul:1};
   d.maxHp   = Math.floor((100 + eff.ti*8  + p.realmIdx*60 + eff.dao*2) * (cBuff.hpMul||1));
   d.maxMp   = Math.floor(( 50 + eff.ling*3 + p.realmIdx*15) * (cBuff.mpMul||1));
-  d.atk     =  eff.ling*2 + Math.floor((TECHS[p.tech]?TECHS[p.tech][1]:0)) + p.realmIdx*5;
+  const sBuff = (p.sect && SECTS[p.sect] && SECTS[p.sect].buff) || {};
+  d.atk     =  Math.floor((eff.ling*2 + Math.floor((TECHS[p.tech]?TECHS[p.tech][1]:0)) + p.realmIdx*5) * (1+(sBuff.atk||0)));
   d.def     =  Math.floor(eff.ti*1.5) + Math.floor(eff.dao*0.5);
   d.spd     =  10 + Math.floor(eff.shen*0.3) + p.realmIdx*2;
-  d.crit    =  0.05 + eff.shen*0.0015 + eff.yun*0.003;     // 命中暴击概率
+  d.crit    =  0.05 + eff.shen*0.0015 + eff.yun*0.003 + (sBuff.crit||0);
   d.critDmg =  1.50 + eff.yun*0.01;                         // 暴击倍率
   d.pen     =  Math.floor(eff.shen*0.2 + eff.dao*0.5);      // 破防（百分比形式：值/100）
   d.dodge   =  0.03 + eff.shen*0.0008 + eff.yun*0.0015;     // 闪避基础
@@ -3382,8 +3472,10 @@ function gearCultBonus(p){
   for(const k in p.equips){
     const eq = p.equips[k]; if(!eq) continue;
     const info = EQUIPS[eq]; if(!info) continue;
-    if(info.cult) b += info.cult;  // 累加百分比
+    if(info.cult) b += info.cult;
   }
+  const sBuff = (p.sect && SECTS[p.sect] && SECTS[p.sect].buff) || {};
+  if(sBuff.cult) b += sBuff.cult;
   return b;
 }
 function gearFleeBonus(p){
@@ -5613,11 +5705,13 @@ function renderSectPanel(){
     taskHtml = `<p class="sys" style="color:#d4b46a">当前任务：${t.n} · 进度 ${t.progress}/${t.cnt||t.days||1}</p>
       <div class="btns" style="margin:6px 0"><button class="sm" id="sect-abandon">放弃</button></div>`;
   }else{
-    const pool = SECT_TASKS.map((t,i)=>`<div class="shop-row">
+    const sectDef = SECTS[s];
+    const taskIdxs = (sectDef && sectDef.tasks) || [0,1,2,4,8];
+    const pool = taskIdxs.map(i=>{const t=SECT_TASKS[i];return `<div class="shop-row">
       <div><div class="nm">${t.n}</div><div class="ds">${t.desc}</div></div>
       <div class="pr">贡献+${t.contrib} / 修为+${t.cult}</div>
       <button class="sm" data-task="${i}">领取</button>
-    </div>`).join("");
+    </div>`;}).join("");
     taskHtml = `<p style="color:#a89c7c;font-size:12px">请选择任务：</p>${pool}`;
   }
   // 贡献商店 — v6：加入突破必需品（金丹/悟道茶/法宝祭炼丹）
@@ -5642,8 +5736,10 @@ function renderSectPanel(){
     <div class="pr">${it.cost} 贡献</div>
     <button class="sm" data-buy="${i}" ${P.contrib>=it.cost?"":"disabled"}>兑换</button>
   </div>`).join("");
+  const sectInfo = SECTS[s];
+  const buffDesc = sectInfo ? sectInfo.desc.split("·").pop().trim() : "";
   showModal(`<h3>🏯 ${s}</h3>
-    <p style="font-size:12px;color:#a89c7c">贡献点：<b style="color:#d4b46a">${P.contrib}</b></p>
+    <p style="font-size:12px;color:#a89c7c">贡献点：<b style="color:#d4b46a">${P.contrib}</b>${buffDesc?` · <span style="color:#7fc7a3">门派加成：${buffDesc}</span>`:""}</p>
     <h2 style="color:#d4b46a;font-size:13px;letter-spacing:3px;margin-top:4px">宗 门 任 务</h2>
     ${taskHtml}
     <h2 style="color:#d4b46a;font-size:13px;letter-spacing:3px;margin-top:10px">贡 献 商 店</h2>
@@ -5713,23 +5809,50 @@ function openMarket(){
   if(P.inBattle){log("战斗中不可去。","hint");return}
   renderMarketPanel("buy");
 }
+function marketRareStock(){
+  if(!P._mktRare || (P.days - (P._mktRareDay||0)) >= 30){
+    const pool = MARKET.rare || [];
+    const totalW = pool.reduce((s,r)=>s+r.weight,0);
+    const picks = [];
+    const used = new Set();
+    while(picks.length < 3 && picks.length < pool.length){
+      let r = Math.random()*totalW, j=0;
+      for(;j<pool.length;j++){if(!used.has(j)){r-=pool[j].weight;if(r<=0)break;}}
+      if(j<pool.length&&!used.has(j)){used.add(j);picks.push(pool[j]);}
+    }
+    P._mktRare = picks;
+    P._mktRareDay = P.days;
+  }
+  return P._mktRare || [];
+}
 function renderMarketPanel(mode){
   const stone = P.bag["灵石"]||0;
+  const priceMul = 1 + P.realmIdx*0.05;
   const buyRows = MARKET.buy.map((it,i)=>{
-    const price = Math.floor(it.pr * (1 + P.realmIdx*0.05));
+    const price = Math.floor(it.pr * priceMul);
     return `<div class="shop-row">
       <div><div class="nm">${it.nm}</div><div class="ds">${(ITEMS[it.nm]&&ITEMS[it.nm].desc)||(EQUIPS[it.nm]&&EQUIPS[it.nm].desc)||""}</div></div>
       <div class="pr">${price} 灵石</div>
       <button class="sm" data-buy="${i}" data-pr="${price}" ${stone>=price?"":"disabled"}>购买</button>
     </div>`;
   }).join("");
+  const rares = marketRareStock();
+  const rareRows = rares.length ? rares.map((it,i)=>{
+    const price = Math.floor(it.pr * priceMul);
+    return `<div class="shop-row" style="border-left:2px solid #ffe6b4">
+      <div><div class="nm" style="color:#ffe6b4">✦ ${it.nm}</div><div class="ds">${(ITEMS[it.nm]&&ITEMS[it.nm].desc)||(EQUIPS[it.nm]&&EQUIPS[it.nm].desc)||"稀有商品"}</div></div>
+      <div class="pr">${price} 灵石</div>
+      <button class="sm" data-rare="${i}" data-pr="${price}" ${stone>=price?"":"disabled"}>购买</button>
+    </div>`;
+  }).join("") : "";
+  const nextRefresh = Math.max(0, 30 - (P.days - (P._mktRareDay||0)));
 
-  // 出售：列出玩家背包中可卖的
   const sellable = Object.keys(P.bag).filter(k=>k!=="灵石"&&P.bag[k]>0);
+  const ratio = MARKET.sellRatio || 0.4;
   const sellRows = sellable.map(k=>{
-    const info = MARKET.buy.find(it=>it.nm===k);
-    const base = info?info.pr:5;
-    const price = Math.max(1, Math.floor(base*0.5));
+    const info = MARKET.buy.find(it=>it.nm===k) || (MARKET.rare||[]).find(it=>it.nm===k);
+    const base = info ? info.pr : (EQUIPS[k] ? (EQUIPS[k].tier||1)*200 : (ITEMS[k]&&ITEMS[k].price?ITEMS[k].price:5));
+    const price = Math.max(1, Math.floor(base*ratio));
     return `<div class="shop-row">
       <div><div class="nm">${k} ×${P.bag[k]}</div></div>
       <div class="pr">${price} 灵石</div>
@@ -5741,11 +5864,12 @@ function renderMarketPanel(mode){
     <button id="mk-tab-buy" class="${mode==='buy'?'active':''}">购 买</button>
     <button id="mk-tab-sell" class="${mode==='sell'?'active':''}">出 售</button>
   </div>`;
+  const rareSection = (mode==='buy' && rareRows) ? `<h2 style="color:#ffe6b4;font-size:13px;margin:10px 0 4px">✦ 珍 稀 商 品 <span style="font-size:11px;color:#a89c7c">（${nextRefresh} 日后刷新）</span></h2>${rareRows}` : "";
   showModal(`<h3>🏪 坊 市</h3>
     <p style="font-size:12px;color:#a89c7c">灵石：<b style="color:#d4b46a">${stone}</b> · 物价随境界上浮</p>
     ${tabBtns}
     <div class="box left" style="padding:0;border:none;background:none;max-height:50vh;overflow:auto">
-      ${mode==='buy'?buyRows:sellRows}
+      ${mode==='buy'?buyRows+rareSection:sellRows}
     </div>
     <div class="btns"><button id="mk-close">离开</button></div>`);
   document.querySelectorAll(".modal [data-buy]").forEach(b=>{
@@ -5754,6 +5878,19 @@ function renderMarketPanel(mode){
       if((P.bag["灵石"]||0)<pr) return;
       P.bag["灵石"] -= pr;
       addItem(P, MARKET.buy[i].nm, 1);
+      refresh();saveGame(true);
+      renderMarketPanel("buy");
+    };
+  });
+  document.querySelectorAll(".modal [data-rare]").forEach(b=>{
+    b.onclick = ()=>{
+      const i = +b.dataset.rare, pr = +b.dataset.pr;
+      const rs = marketRareStock();
+      if(!rs[i]||(P.bag["灵石"]||0)<pr) return;
+      P.bag["灵石"] -= pr;
+      addItem(P, rs[i].nm, 1);
+      rs.splice(i,1);
+      P._mktRare = rs;
       refresh();saveGame(true);
       renderMarketPanel("buy");
     };
@@ -5871,8 +6008,9 @@ function openDungeon(){
   const rows = DUNGEONS.map((d,i)=>{
     const unlock = P.realmIdx >= d.need;
     const rec = P.dungeonRec[d.n]||0;
+    const eleTag = d.ele ? `<span class="ele" style="font-size:10px;vertical-align:middle">${d.ele}</span>` : "";
     return `<div class="shop-row">
-      <div><div class="nm">${d.n}</div><div class="ds">${d.floors} 层 · 境界≥${d.need} · 通关${rec}次</div></div>
+      <div><div class="nm">${eleTag}${d.n}</div><div class="ds">${d.floors} 层 · 境界≥${d.need} · ★Boss · 通关${rec}次</div></div>
       <div class="pr">修为+${d.reward.cult.toLocaleString()}</div>
       <button class="sm" data-dg="${i}" ${unlock?"":"disabled"}>入 境</button>
     </div>`;
@@ -5934,12 +6072,32 @@ function dungeonNextFloor(){
     refresh();saveGame(true);
     return;
   }
-  log(`— 秘境第 ${dg.floor}/${dg.def.floors} 层 —`,"sys");
-  const pool = dg.def.monster.map(i=>MONSTERS[i]);
-  const m = choice(pool);
-  startBattle(m);
-  // 标记战斗来源
-  P.monster.fromDungeon = true;
+  const isBoss = dg.floor === dg.def.floors && dg.def.boss != null;
+  if(isBoss){
+    log(`— 秘境第 ${dg.floor}/${dg.def.floors} 层 · ★ BOSS ★ —`,"epic");
+    const bm = MONSTERS[dg.def.boss];
+    startBattle(bm);
+    P.monster.fromDungeon = true;
+    P.monster.isBoss = true;
+    P.monster.mhp  = Math.floor(P.monster.mhp * 1.8);
+    P.monster.hp   = P.monster.mhp;
+    P.monster.matk = Math.floor(P.monster.matk * 1.4);
+  }else{
+    if(dg.floor > 1 && typeof DUNGEON_EVENTS !== "undefined"){
+      for(const ev of DUNGEON_EVENTS){
+        if(Math.random() < ev.prob){
+          const msg = ev.fn(P);
+          log(`✦ 层间奇遇 · ${ev.name}：${msg}`,"good");
+          break;
+        }
+      }
+    }
+    log(`— 秘境第 ${dg.floor}/${dg.def.floors} 层 —`,"sys");
+    const pool = dg.def.monster.map(i=>MONSTERS[i]);
+    const m = choice(pool);
+    startBattle(m);
+    P.monster.fromDungeon = true;
+  }
 }
 
 /* ==========================================================
@@ -6157,6 +6315,13 @@ function endBattle(win){
       else if(fromDg && P.realmIdx >= 18 && Math.random() < 0.001){
         addItem(P, "九转还魂丹", 1);
         log("✦ 九转还魂丹现世！活死人肉白骨，逆天之物！","epic");
+      }
+    }
+    if(m.isBoss && fromDg && P.curDungeon){
+      const bossItem = P.curDungeon.def.bossItem;
+      if(bossItem){
+        addItem(P, bossItem, 1);
+        log(`★ Boss 掉落：【${bossItem}】！`,"epic");
       }
     }
     P.stats.kill++;
