@@ -497,6 +497,7 @@
         <button id="btn-formation">🔮 阵 法</button>
         <button id="btn-synthesis">⚗ 合 成</button>
         <button id="btn-arena">⚔ 擂 台</button>
+        <button id="btn-dailies">📋 日 常</button>
       </div>
 
       <!-- 第 3 组：故事 / 工具 -->
@@ -3870,6 +3871,8 @@ function newPlayer(name,rootName,elements){
     // —— v19 · 装备强化 + 天梯 ——
     equipEnhance: {},                          // {装备名: 强化等级}
     arena: {pts:0, wins:0, todayDate:"", todayCnt:0},
+    // —— v21 · 每日挑战 ——
+    dailies: null,
   };
   recalcStats(p);
   // 初始化后按当前 maxHp/maxMp 满血满蓝
@@ -3910,6 +3913,29 @@ function applyLineage(p){
   }
   if(L.immortalTimes >= 3){
     p.bag["天劫真血"] = (p.bag["天劫真血"]||0) + 1;
+  }
+  // v21: 5) 阵法知识传承
+  if(L.inheritFormations && L.inheritFormations.length){
+    p.knownFormations = [...L.inheritFormations];
+    p.lineage.formations = L.inheritFormations.length;
+  }
+  // v21: 6) 擂台积分传承
+  if(L.inheritArenaPts > 0){
+    p.arena = p.arena || {pts:0, wins:0, todayDate:"", todayCnt:0};
+    p.arena.pts = L.inheritArenaPts;
+    p.lineage.arenaPts = L.inheritArenaPts;
+  }
+  // v21: 7) 根骨回响
+  if(L.statEcho){
+    for(const k of ["ti","ling","shen","wu","yun"]){
+      if(L.statEcho[k] > 0) p[k] = (p[k]||0) + L.statEcho[k];
+    }
+    p.lineage.statEcho = {...L.statEcho};
+  }
+  // v21: 8) 前世记忆
+  if(L.prevChronicle && L.prevChronicle.length){
+    p.chronicle = [...L.prevChronicle];
+    p.lineage.prevMemory = L.prevChronicle.length;
   }
   recalcStats(p);
   p.hp = p.maxHp;
@@ -4860,6 +4886,7 @@ function actCultivate(){
   if(hasTechPassive("demonic")){ P.karma = Math.max(-100, (P.karma||0) - 1); }
   // v16 · 悬赏令进度
   if(typeof bountyAdvance === "function") bountyAdvance("cult");
+  if(typeof dailyAdvance === "function") dailyAdvance("cult");
   passDays(P, days);
   sectTaskAdvance("cult", days);
 
@@ -5668,6 +5695,7 @@ function actAdventure(){
   if(P.inBattle){log("战斗中无法外出。","hint");return}
   // P0-1 · 交替奖励：连续闭关 >=3 次后历练 → 双倍收益
   P.advRun = (P.advRun||0) + 1;
+  if(typeof dailyAdvance === "function") dailyAdvance("adv");
   let advAltMul = 1;
   if((P.cultRun||0) >= 3){
     advAltMul = 2;
@@ -6000,11 +6028,13 @@ function loadLineage(){
     const s = localStorage.getItem(LINEAGE_KEY);
     if(!s) return {runs:0, totalDays:0, bestRealm:0, immortalTimes:0,
                    inheritRelic:null, inheritRelicLv:0,
-                   karmaSum:0, daoSum:0, deeds:[], rerolls:0};
+                   karmaSum:0, daoSum:0, deeds:[], rerolls:0,
+                   inheritFormations:[], inheritArenaPts:0, statEcho:null, prevChronicle:null};
     return JSON.parse(s);
   }catch{ return {runs:0, totalDays:0, bestRealm:0, immortalTimes:0,
                   inheritRelic:null, inheritRelicLv:0,
-                  karmaSum:0, daoSum:0, deeds:[], rerolls:0}; }
+                  karmaSum:0, daoSum:0, deeds:[], rerolls:0,
+                  inheritFormations:[], inheritArenaPts:0, statEcho:null, prevChronicle:null}; }
 }
 function saveLineage(L){ try{ localStorage.setItem(LINEAGE_KEY, JSON.stringify(L)); }catch{} }
 
@@ -6029,6 +6059,32 @@ function actAscension(){
   }
   // 继承"灵根重抽次数"（每次飞升 +2 次）
   L.rerolls = (L.rerolls||0) + 2;
+  // v21: 继承阵法知识
+  if(P.knownFormations && P.knownFormations.length){
+    L.inheritFormations = (L.inheritFormations||[]);
+    for(const f of P.knownFormations){
+      if(!L.inheritFormations.includes(f)) L.inheritFormations.push(f);
+    }
+  }
+  // v21: 继承擂台积分（30%）
+  if(P.arena && P.arena.pts > 0){
+    L.inheritArenaPts = Math.max(L.inheritArenaPts||0, Math.floor(P.arena.pts * 0.3));
+  }
+  // v21: 根骨回响（前世巅峰属性的5%，上限各10）
+  const peakStats = {ti:P.ti||0, ling:P.ling||0, shen:P.shen||0, wu:P.wu||0, yun:P.yun||0};
+  const oldEcho = L.statEcho || {ti:0,ling:0,shen:0,wu:0,yun:0};
+  for(const k of ["ti","ling","shen","wu","yun"]){
+    oldEcho[k] = Math.min(10, Math.max(oldEcho[k], Math.floor(peakStats[k]*0.05)));
+  }
+  L.statEcho = oldEcho;
+  // v21: 前世记忆（纪要精华，最多保留5条）
+  if(P.chronicle && P.chronicle.length){
+    const highlights = P.chronicle.filter(c =>
+      c.text.includes("飞升") || c.text.includes("突破") || c.text.includes("天劫") ||
+      c.text.includes("道侣") || c.text.includes("夙愿")
+    ).slice(-5);
+    if(highlights.length) L.prevChronicle = highlights.map(c=>({...c, text:"【前世】"+c.text}));
+  }
   // 仙缘事迹
   const deed = `${P.name} · ${P.rootName}${P.elements.join("、")} · 修行 ${P.days} 天 · 飞升`;
   L.deeds = (L.deeds||[]).slice(-9).concat(deed);
@@ -6055,6 +6111,9 @@ function actAscension(){
       <p>· 灵根重抽：+2 次（累计 ${L.rerolls} 次）</p>
       ${L.inheritRelic?`<p>· 本命法宝传承：${L.inheritRelic} Lv.${L.inheritRelicLv}</p>`:""}
       <p style="color:#7fc7a3">· 道 行 累 积：<b>${L.daoSum}</b>（影响新周目起点）</p>
+      ${L.inheritFormations&&L.inheritFormations.length?`<p>· 阵法传承：${L.inheritFormations.join("、")}</p>`:""}
+      ${L.inheritArenaPts?`<p>· 擂台积分：${L.inheritArenaPts}</p>`:""}
+      ${L.statEcho?`<p>· 根骨回响：前世修为化作先天底蕴</p>`:""}
     </div>
     <div class="btns"><button id="asc-rebirth" class="primary">入 轮 回 · 再 修 一 世</button></div>
   `);
@@ -6505,6 +6564,7 @@ function alchemyMake(name){
       addItem(P, name, 1+extra);
       if(extra) log(`※ 炼出【极品${name}】！获得 ×2`,"epic");
       P.stats.alchemy++;
+      if(typeof dailyAdvance === "function") dailyAdvance("alchemy");
       // 每 10 次升一级
       if(P.stats.alchemy % 10 === 0 && P.alchemyLv < 5){
         P.alchemyLv++;
@@ -6584,6 +6644,7 @@ function doSynthesis(idx){
   }
   addItem(P, r.to, r.cnt);
   log(`⚗ 合成成功！获得【${r.to}】×${r.cnt}`,"good");
+  if(typeof dailyAdvance === "function") dailyAdvance("synth");
   SFX.hit();
   refresh(); saveGame(true);
   openSynthesis();
@@ -6662,6 +6723,68 @@ function arenaFight(opp){
     log(`⚔ 擂台负。${opp.name}实力更胜一筹。`,"bad");
   }
   refresh(); saveGame(true);
+}
+
+/* ==========================================================
+ *   v21 · 每日挑战系统
+ * ========================================================== */
+const DAILY_TYPES = [
+  {type:"kill",   desc:"击杀妖兽",    gen:p=>({target:2+Math.floor(p.realmIdx/3), unit:"只"})},
+  {type:"cult",   desc:"闭关修炼",    gen:p=>({target:2+Math.floor(p.realmIdx/4), unit:"次"})},
+  {type:"alchemy",desc:"炼制丹药",    gen:p=>({target:1+Math.floor(p.realmIdx/5), unit:"炉"})},
+  {type:"adv",    desc:"外出历练",    gen:p=>({target:3+Math.floor(p.realmIdx/3), unit:"次"})},
+  {type:"synth",  desc:"合成道具",    gen:p=>({target:1+Math.floor(p.realmIdx/6), unit:"次"})},
+];
+function initDailyChallenges(){
+  if(!P.dailies) P.dailies = {date:"", tasks:[]};
+  const today = getArenaToday();
+  if(P.dailies.date === today) return;
+  P.dailies.date = today;
+  const pool = DAILY_TYPES.slice();
+  const picked = [];
+  for(let i=0;i<3&&pool.length;i++){
+    const idx = Math.floor(Math.random()*pool.length);
+    const t = pool.splice(idx,1)[0];
+    const g = t.gen(P);
+    picked.push({type:t.type, desc:t.desc, target:g.target, unit:g.unit, progress:0, done:false,
+      reward:{stone:30+P.realmIdx*15, cult:50+P.realmIdx*20}});
+  }
+  P.dailies.tasks = picked;
+}
+function dailyAdvance(type, n){
+  if(!P.dailies || !P.dailies.tasks) return;
+  for(const t of P.dailies.tasks){
+    if(t.type === type && !t.done){
+      t.progress = Math.min(t.target, t.progress + (n||1));
+      if(t.progress >= t.target){
+        t.done = true;
+        addItem(P, "灵石", t.reward.stone);
+        gainCult(P, t.reward.cult, "每日挑战");
+        P.dx = Math.min(P.maxDx, (P.dx||100) + 5);
+        log(`✦ 每日挑战【${t.desc}】完成！灵石 +${t.reward.stone}，修为 +${t.reward.cult}，道心 +5`,"epic");
+      }
+    }
+  }
+}
+function openDailies(){
+  initDailyChallenges();
+  const allDone = P.dailies.tasks.every(t=>t.done);
+  const rows = P.dailies.tasks.map(t=>{
+    const bar = Math.floor(t.progress/t.target*100);
+    return `<div class="shop-row">
+      <div>
+        <div class="nm">${t.done?"✅":"📋"} ${t.desc} ${t.progress}/${t.target}${t.unit}</div>
+        <div style="height:4px;background:#1a1f2a;border-radius:2px;margin-top:3px;width:120px">
+          <i style="display:block;height:100%;width:${bar}%;background:${t.done?"#7fc7a3":"#d4b46a"};border-radius:2px"></i></div>
+      </div>
+      <div class="pr" style="font-size:11px">${t.done?"已完成":`${t.reward.stone}石+${t.reward.cult}修`}</div>
+    </div>`;
+  }).join("");
+  showModal(`<h3>📋 每 日 挑 战</h3>
+    <p style="font-size:12px;color:#a89c7c">每日刷新 3 个挑战，完成获灵石+修为+道心。${allDone?"<b style='color:#7fc7a3'> 今日已全部完成！</b>":""}</p>
+    <div class="box left" style="padding:0;border:none;background:none">${rows}</div>
+    <div class="btns"><button id="daily-close">关闭</button></div>`);
+  $("daily-close").onclick = closeModal;
 }
 
 /* ==========================================================
@@ -7899,6 +8022,7 @@ function endBattle(win){
     P.stats.kill++;
     // v16: 悬赏令进度
     if(typeof bountyAdvance === "function") bountyAdvance("kill");
+    if(typeof dailyAdvance === "function") dailyAdvance("kill");
     // v12: 成就标记
     if(!P.equips.weapon && !P.equips.armor && !P.equips.accessory && !P.equips.mount){
       if(!P.flags) P.flags={}; P.flags._ach_bareWin = true;
@@ -8783,6 +8907,29 @@ function gameOver(){
   else addChronicle(`战斗殒命，重伤复活，代价沉重。`);
   // v9：寿终正寝 = 永久死亡（删档）；战斗死亡 = 重罚但可继续
   if(P.age >= P.lifespan){
+    // v21: 寿终也保存部分传承（弱于飞升）
+    const L = loadLineage();
+    L.runs = (L.runs||0) + 1;
+    L.totalDays = (L.totalDays||0) + (P.days||0);
+    L.bestRealm = Math.max(L.bestRealm||0, P.realmIdx);
+    L.karmaSum  = (L.karmaSum||0) + Math.floor((P.karma||0)*0.5);
+    L.daoSum    = (L.daoSum||0) + Math.floor((P.dao||0)*0.5);
+    L.rerolls   = (L.rerolls||0) + 1;
+    if(P.knownFormations && P.knownFormations.length){
+      L.inheritFormations = (L.inheritFormations||[]);
+      for(const f of P.knownFormations){
+        if(!L.inheritFormations.includes(f)) L.inheritFormations.push(f);
+      }
+    }
+    const peakStats = {ti:P.ti||0, ling:P.ling||0, shen:P.shen||0, wu:P.wu||0, yun:P.yun||0};
+    const oldEcho = L.statEcho || {ti:0,ling:0,shen:0,wu:0,yun:0};
+    for(const k of ["ti","ling","shen","wu","yun"]){
+      oldEcho[k] = Math.min(10, Math.max(oldEcho[k], Math.floor(peakStats[k]*0.03)));
+    }
+    L.statEcho = oldEcho;
+    const deed = `${P.name} · ${P.rootName} · 修行 ${P.days} 天 · 寿终 · ${REALMS[P.realmIdx][0]}`;
+    L.deeds = (L.deeds||[]).slice(-9).concat(deed);
+    saveLineage(L);
     // —— 寿元耗尽：不可逆 ——
     showModal(`
       <h3>🕯 道 途 终 焉</h3>
@@ -9081,6 +9228,7 @@ function loadGame(){
     // v19
     if(!d.equipEnhance || typeof d.equipEnhance!=="object") d.equipEnhance = {};
     if(!d.arena) d.arena = {pts:0, wins:0, todayDate:"", todayCnt:0};
+    if(!d.dailies) d.dailies = null;
     // v4 寿元迁移：移除强制拉满逻辑（避免覆盖新机制），仅做异常兜底
     if(d.lifespan===undefined || d.lifespan<=0){
       d.lifespan = 80 + (d.realmIdx||0)*30;
@@ -9314,6 +9462,7 @@ if($("btn-formation")) $("btn-formation").onclick = openFormationPanel;
 if($("btn-synthesis")) $("btn-synthesis").onclick = openSynthesis;
 if($("btn-chronicle")) $("btn-chronicle").onclick = openChronicle;
 if($("btn-arena")) $("btn-arena").onclick = openArena;
+if($("btn-dailies")) $("btn-dailies").onclick = openDailies;
 $("btn-calendar").onclick= openCalendar;
 // v5：夙愿入口（按钮 + 状态行）
 $("btn-quest").onclick   = openQuestPanel;
