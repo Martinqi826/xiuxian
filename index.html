@@ -493,6 +493,7 @@
         <button id="btn-sect">🏯 宗 门</button>
         <button id="btn-market">🏪 坊 市</button>
         <button id="btn-dungeon">🏔 秘 境</button>
+        <button id="btn-bounty">📋 悬 赏</button>
       </div>
 
       <!-- 第 3 组：故事 / 工具 -->
@@ -2302,6 +2303,12 @@ const TECHS = {
   "烈阳剑诀": [1.2,12,"至阳剑意，攻伐犀利"],
   "九转玄功": [1.6,8, "古老传承，威力无穷"],
   "太上忘情": [2.0,15,"传说仙诀，斩断七情"],
+  // v16 · 新增功法
+  "混元归一诀":[1.4,3, "调和五行，炼丹成功率 +10%"],
+  "长生诀":   [1.1,0, "以寿为道，每次闭关 +2 寿元"],
+  "杀生剑意": [1.0,20,"嗜血剑修，攻击极高但道心衰减"],
+  "造化神功": [1.5,5, "造化万物，灵田加速 50%"],
+  "天魔功":   [1.8,15,"魔道至高功法，修为极快但业力加深"],
 };
 const ITEMS = {
   "聚气丹":{type:"丹药",cult:50, desc:"+50 修为"},
@@ -3437,7 +3444,65 @@ const TECH_META = {
   "烈阳剑诀": {el:"火", mp:5},
   "九转玄功": {el:null, mp:10},
   "太上忘情": {el:null, mp:20},
+  // v16
+  "混元归一诀":{el:null, mp:5,  passive:"alchemyBoost"},
+  "长生诀":   {el:null, mp:0,  passive:"longevity"},
+  "杀生剑意": {el:"金", mp:8,  passive:"bloodthirst"},
+  "造化神功": {el:"木", mp:5,  passive:"gardenBoost"},
+  "天魔功":   {el:null, mp:15, passive:"demonic"},
 };
+
+function hasTechPassive(id){ return (TECH_META[P?.tech]||{}).passive === id; }
+
+// v16 · 机缘系统
+const FORTUNE_ENCOUNTERS = [
+  {id:"cave",   nm:"洞天福地",   minRealm:3,
+   desc:"你误入一处洞天福地，灵气浓郁得近乎凝为液态！",
+   fn:p=>{ const bonus=(p.realmIdx+1)*400; gainCult(p,bonus,"洞天福地"); p.dx=p.maxDx; }},
+  {id:"elder",  nm:"隐世高人",   minRealm:5,
+   desc:"溪边垂钓的老者回身一笑，你顿觉灵台开阔。",
+   fn:p=>{ p.wu=(p.wu||0)+3; p.dao=(p.dao||0)+2; recalcStats(p); log("悟性 +3，道行 +2（永久）","epic"); }},
+  {id:"relic",  nm:"前辈遗物",   minRealm:0,
+   desc:"枯骨旁的储物袋中，你翻出了一些宝贝。",
+   fn:p=>{
+     const pool=["聚气丹","凝神丹","破障丹","金创药","回元丹","蟠桃"].slice(0,Math.min(6,2+Math.floor(p.realmIdx/3)));
+     for(let i=0;i<3;i++) addItem(p,choice(pool),rand(1,2));
+   }},
+  {id:"spring", nm:"灵泉涌现",   minRealm:2,
+   desc:"山岩中涌出一股灵泉，你掬水而饮，周身经脉为之一畅。",
+   fn:p=>{ p.hp=p.maxHp; p.mp=p.maxMp; p.lifespan+=5; log("气血全满，真元全满，寿元 +5","good"); }},
+  {id:"fruit",  nm:"天材地宝",   minRealm:6,
+   desc:"崖壁上长着一株散发金光的奇草，似有灵性。",
+   fn:p=>{
+     const tierPool = [["聚灵草",5],["凝血花",3],["破障花",2],["千年灵芝",1],["万年玄参",1]];
+     const pick = tierPool[Math.min(tierPool.length-1, Math.floor(p.realmIdx/4))];
+     addItem(p, pick[0], pick[1]);
+   }},
+  {id:"insight",nm:"顿悟",       minRealm:8,
+   desc:"天地之间似有大道低语，你进入了一种奇妙的悟道状态……",
+   fn:p=>{ const bonus=(p.realmIdx+1)*800; gainCult(p,bonus,"天道顿悟"); p.shen=(p.shen||0)+3; recalcStats(p); log("神识 +3（永久）","epic"); }},
+  {id:"legacy", nm:"古修传承",   minRealm:10,
+   desc:"你踏入一处上古阵法，识海中涌入海量信息——这是一位陨落大能的毕生修行感悟！",
+   fn:p=>{
+     const stats=["ti","ling","wu","shen","yun","dao"];
+     for(const s of stats) p[s]=(p[s]||0)+1;
+     recalcStats(p); log("六根骨全部 +1（永久·古修传承）","epic");
+   }},
+];
+
+// v16 · 悬赏令模板
+const BOUNTY_TEMPLATES = [
+  {type:"kill",  desc:p=>`击杀 ${3+p.realmIdx} 只妖兽`,  target:p=>3+p.realmIdx,
+   reward:p=>({stone:50+p.realmIdx*30, cult:30+p.realmIdx*20})},
+  {type:"herb",  desc:p=>`收集 聚灵草 ×${2+Math.floor(p.realmIdx/2)}`,  item:"聚灵草", target:p=>2+Math.floor(p.realmIdx/2),
+   reward:p=>({stone:30+p.realmIdx*20, cult:20+p.realmIdx*10})},
+  {type:"herb",  desc:p=>`收集 凝血花 ×${2+Math.floor(p.realmIdx/3)}`,  item:"凝血花", target:p=>2+Math.floor(p.realmIdx/3),
+   reward:p=>({stone:40+p.realmIdx*25, cult:25+p.realmIdx*15})},
+  {type:"cult",  desc:p=>`闭关修炼 ${3+Math.floor(p.realmIdx/2)} 次`, target:p=>3+Math.floor(p.realmIdx/2),
+   reward:p=>({stone:60+p.realmIdx*40, item:choice(["聚气丹","凝神丹","回元丹"])})},
+  {type:"dungeon",desc:()=>"通关任意一个秘境", target:()=>1,
+   reward:p=>({stone:100+p.realmIdx*50, cult:80+p.realmIdx*30})},
+];
 
 /* —— 战斗神通扩展：mp 消耗 & 寿元代价（v4 梯度拉大：高阶神通真正稀缺） —— */
 const SKILL_META = {
@@ -3568,6 +3633,8 @@ function newPlayer(name,rootName,elements){
     _totalContrib: 0,                          // 宗门累计贡献(声望)
     disciples: [],                             // [{name,level,joinDay}]
     worldEvent: null,                          // {id,endDay} 当前天象
+    bounties: [],                              // [{tplIdx,progress,target,desc,reward,refreshDay}]
+    _bountyRefresh: 0,                         // 下次刷新日
   };
   recalcStats(p);
   // 初始化后按当前 maxHp/maxMp 满血满蓝
@@ -3987,6 +4054,8 @@ function heal(p,a){
 function addItem(p,name,n=1){
   p.bag[name]=(p.bag[name]||0)+n;
   log(`获得 ${name} ×${n}`,"good");
+  // v16: herb bounty tracking
+  if(HERBS[name] && typeof bountyAdvance === "function") bountyAdvance("herb", name);
 }
 function passDays(p,n){
   const d0 = p.days|0;
@@ -4041,12 +4110,14 @@ function passDays(p,n){
     }
     if(totalIncome > 0) addItem(p, "灵石", totalIncome);
   }
-  // v14 · 灵田成熟检测
+  // v14 · 灵田成熟检测 (v16: 造化神功加速50%)
   if(p.garden && p.garden.length){
+    const gardenAccel = (typeof hasTechPassive==="function" && hasTechPassive("gardenBoost")) ? 1.5 : 1;
     for(const plot of p.garden){
       if(plot.mature) continue;
       const sd = HERB_SEEDS[plot.seed];
-      if(sd && p.days - plot.plantDay >= sd.days){
+      const effectiveDays = (p.days - plot.plantDay) * gardenAccel;
+      if(sd && effectiveDays >= sd.days){
         plot.mature = true;
         log(`🌱 灵田中的【${sd.herb}】已成熟，可前往收获！`,"good");
       }
@@ -4536,6 +4607,12 @@ function actCultivate(){
   }
 
   gainCult(P, total, `闭关${days}日`);
+  // v16 · 功法被动效果
+  if(hasTechPassive("longevity")){ P.lifespan += 2; }
+  if(hasTechPassive("bloodthirst")){ P.dx = Math.max(0, (P.dx||100) - 3); }
+  if(hasTechPassive("demonic")){ P.karma = Math.max(-100, (P.karma||0) - 1); }
+  // v16 · 悬赏令进度
+  if(typeof bountyAdvance === "function") bountyAdvance("cult");
   passDays(P, days);
   sectTaskAdvance("cult", days);
 
@@ -5271,6 +5348,8 @@ function actAdventure(){
     const altBonus = Math.floor((10 + P.realmIdx * 5) * 3 * advAltMul);
     gainCult(P, altBonus, "交替奖励");
   }
+  // v16：机缘触发（独立于其他事件）
+  if(typeof tryFortuneEncounter === "function") tryFortuneEncounter();
   if(Math.random()<0.55){
     // 过滤可触发的奇遇（满足 cond）
     const pool = ADVS.filter(e=>!e.cond || e.cond(P));
@@ -6009,6 +6088,7 @@ function alchemyMake(name){
   // 成功率（含节气加成）
   const buff = getBuff(P);
   let rate = r.rate + P.realmIdx*0.01 + P.alchemyLv*0.02 + (buff.alchemyAdd||0);
+  if(hasTechPassive("alchemyBoost")) rate += 0.10;
   rate = Math.min(0.95, rate);
   log(`丹炉升起，炼制【${name}】，成功率 ${Math.floor(rate*100)}%……`, "sys");
   setTimeout(()=>{
@@ -6037,6 +6117,83 @@ function alchemyMake(name){
     if(P.hp<=0) setTimeout(gameOver,400);
     else openAlchemy();
   }, 600);
+}
+
+/* ==========================================================
+ *   v16 · 机缘系统
+ * ========================================================== */
+function tryFortuneEncounter(){
+  if(!P) return false;
+  const rate = 0.06 + (P.yun||0)*0.002;
+  if(Math.random() >= rate) return false;
+  const pool = FORTUNE_ENCOUNTERS.filter(e=>P.realmIdx >= e.minRealm);
+  if(!pool.length) return false;
+  const enc = choice(pool);
+  log(`🌟 机缘！【${enc.nm}】`,"epic");
+  log(enc.desc,"epic");
+  SFX.chime(); vfx("gold");
+  enc.fn(P);
+  return true;
+}
+
+/* ==========================================================
+ *   v16 · 悬赏令系统
+ * ========================================================== */
+function refreshBounties(){
+  if(!P) return;
+  if(P.days < (P._bountyRefresh||0)) return;
+  P.bounties = [];
+  const indices = shuffle([0,1,2,3,4]).slice(0,3);
+  for(const i of indices){
+    const tpl = BOUNTY_TEMPLATES[i];
+    const target = tpl.target(P);
+    P.bounties.push({
+      tplIdx: i,
+      type: tpl.type,
+      desc: tpl.desc(P),
+      item: tpl.item||null,
+      target,
+      progress: 0,
+      reward: tpl.reward(P),
+    });
+  }
+  P._bountyRefresh = P.days + 60;
+}
+function bountyAdvance(type, extra){
+  if(!P || !P.bounties) return;
+  for(const b of P.bounties){
+    if(b.progress >= b.target) continue;
+    if(b.type === type){
+      if(type === "herb" && extra !== b.item) continue;
+      b.progress++;
+      if(b.progress >= b.target){
+        log(`✦ 悬赏令【${b.desc}】完成！`,"epic");
+        if(b.reward.stone) addItem(P, "灵石", b.reward.stone);
+        if(b.reward.cult) gainCult(P, b.reward.cult, "悬赏令");
+        if(b.reward.item) addItem(P, b.reward.item, 1);
+      }
+    }
+  }
+}
+function openBountyBoard(){
+  if(!P) return;
+  refreshBounties();
+  const rows = (P.bounties||[]).map((b,i)=>{
+    const done = b.progress >= b.target;
+    const rText = [];
+    if(b.reward.stone) rText.push(`灵石×${b.reward.stone}`);
+    if(b.reward.cult) rText.push(`修为+${b.reward.cult}`);
+    if(b.reward.item) rText.push(b.reward.item);
+    return `<div class="shop-row" style="${done?'opacity:.5':''}">
+      <div><div class="nm">${done?"✅ ":""}${b.desc}</div>
+        <div class="ds">进度 ${b.progress}/${b.target} · 奖励：${rText.join("、")}</div></div>
+    </div>`;
+  }).join("");
+  const refresh = P._bountyRefresh - P.days;
+  showModal(`<h3>📋 悬 赏 令</h3>
+    <p style="font-size:11px;color:#a89c7c">每 60 天刷新一批悬赏。下次刷新：${refresh > 0 ? refresh+"天后" : "已刷新"}</p>
+    ${rows || "<p style='color:#a89c7c'>暂无悬赏。</p>"}
+    <div class="btns"><button onclick="closeModal()">关闭</button></div>`);
 }
 
 /* ==========================================================
@@ -6100,6 +6257,10 @@ function resolveDemon(demon, action, isBoss){
         const cultBonus = (P.realmIdx+1)*500;
         gainCult(P, cultBonus, "心魔觉醒·降伏");
         log(`击溃心魔，修为暴涨 +${cultBonus}！`,"epic");
+        if(Math.random()<0.3 && P.tech!=="天魔功"){
+          P.tech = "天魔功";
+          log(`★ 心魔遗赠：你领悟了【天魔功】！修为极快但业力加深。`,"epic");
+        }
       }
       SFX.achieve();
     } else {
@@ -6367,8 +6528,17 @@ function renderSectPanel(){
     {nm:"金丹×1（金丹境突破必需）",  cost:2000,fn:()=>addItem(P,"金丹",1)},
     {nm:"太上玉符",   cost:3000,fn:()=>addItem(P,"太上玉符",1)},
     {nm:"功法·九转玄功", cost:1500,fn:()=>{
-      if(P.tech==="九转玄功"||P.tech==="太上忘情"){log("你已有更强功法。","hint");return false;}
+      if(TECHS[P.tech]&&TECHS[P.tech][0]>=1.6){log("你已有更强功法。","hint");return false;}
       P.tech="九转玄功";log("改修【九转玄功】！","good");
+    }},
+    {nm:"功法·混元归一诀（炼丹+10%）", cost:1200,fn:()=>{
+      P.tech="混元归一诀";log("改修【混元归一诀】！炼丹成功率 +10%","good");
+    }},
+    {nm:"功法·长生诀（闭关+2寿元）", cost:2500,fn:()=>{
+      P.tech="长生诀";log("改修【长生诀】！每次闭关延寿 2 年","good");
+    }},
+    {nm:"功法·造化神功（灵田+50%）", cost:2000,fn:()=>{
+      P.tech="造化神功";log("改修【造化神功】！灵田成熟速度 +50%","good");
     }},
   ];
   const shopRows = shop.map((it,i)=>`<div class="shop-row">
@@ -6762,6 +6932,7 @@ function dungeonNextFloor(){
     }
     P.dungeonRec[dg.def.n] = (P.dungeonRec[dg.def.n]||0)+1;
     P.stats.dungeon++;
+    if(typeof bountyAdvance === "function") bountyAdvance("dungeon");
     sectTaskAdvance("dungeon");
     P.curDungeon = null;
     log(`✦ 秘境【${dg.def.n}】通关！`,"epic");
@@ -7040,8 +7211,15 @@ function endBattle(win){
         addItem(P, bossItem, 1);
         log(`★ Boss 掉落：【${bossItem}】！`,"epic");
       }
+      // v16：高阶秘境有概率掉落杀生剑意
+      if(P.curDungeon.def.need >= 12 && Math.random()<0.15 && P.tech!=="杀生剑意"){
+        P.tech = "杀生剑意";
+        log(`★★ 秘境深处，你拾得一卷血色剑诀——【杀生剑意】！攻击极高但道心衰减。`,"epic");
+      }
     }
     P.stats.kill++;
+    // v16: 悬赏令进度
+    if(typeof bountyAdvance === "function") bountyAdvance("kill");
     // v12: 成就标记
     if(!P.equips.weapon && !P.equips.armor && !P.equips.accessory && !P.equips.mount){
       if(!P.flags) P.flags={}; P.flags._ach_bareWin = true;
@@ -8181,6 +8359,8 @@ function loadGame(){
     if(d._totalContrib===undefined) d._totalContrib = d.contrib||0;
     if(!Array.isArray(d.disciples)) d.disciples = [];
     if(d.worldEvent===undefined) d.worldEvent = null;
+    if(!Array.isArray(d.bounties)) d.bounties = [];
+    if(d._bountyRefresh===undefined) d._bountyRefresh = 0;
     // v4 寿元迁移：移除强制拉满逻辑（避免覆盖新机制），仅做异常兜底
     if(d.lifespan===undefined || d.lifespan<=0){
       d.lifespan = 80 + (d.realmIdx||0)*30;
@@ -8409,6 +8589,7 @@ if($("btn-plant")) $("btn-plant").onclick = openPlantModal;
 $("btn-sect").onclick    = openSect;
 $("btn-market").onclick  = openMarket;
 $("btn-dungeon").onclick = openDungeon;
+if($("btn-bounty")) $("btn-bounty").onclick = openBountyBoard;
 $("btn-calendar").onclick= openCalendar;
 // v5：夙愿入口（按钮 + 状态行）
 $("btn-quest").onclick   = openQuestPanel;
