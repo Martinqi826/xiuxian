@@ -3,42 +3,47 @@
 ## 项目概述
 
 单文件浏览器修仙挂机游戏。**零依赖**（纯 HTML+CSS+JS），双击 `index.html` 即玩。
-当前 ~8000 行，所有逻辑在一个 `<script>` 块内。存档用 localStorage。
+当前 ~9900 行，所有逻辑在一个 `<script>` 块内。存档用 localStorage。
 
 ## 技术架构
 
 ### 单文件结构（index.html）
 
 ```
-L1-500       CSS 样式（水墨主题、毛玻璃面板）
-L500-680     工具函数 + 音效/特效
-L680-700     REALMS 数组（21 阶境界 + 修为门槛）
-L700-2050    数据表：夙愿(QUESTS)、道侣(PARTNERS)、灵草(HERBS)、丹方(RECIPES)、物品(ITEMS)
-L2050-2070   MONSTERS 数组（8 种怪物：名/等级/HP/ATK/修为奖/灵石奖/属性）
-L2070-2700   灵宠系统（PETS_META、PET_PERSONALITIES）
-L2700-2800   装备(EQUIPS)、本命法宝(RELICS)
-L2800-2990   灵草(HERBS)、丹方(RECIPES)、市场(MARKET)
-L2990-3010   MONSTER_META（怪物AI：spd/crit/special/karma）
-L3010-3500   核心工具：log/newPlayer/recalcStats/gainCult/takeDmg/addItem/passDays
-L3500-3740   夙愿/节庆触发器
-L3740-3870   战斗计算：alive/calcDamage/attackerOf/defenderOf
-L3870-4660   闭关(actCultivate) + 历练(actAdventure) + 闭关事件链
-L4660-4740   历练战斗入口 + 遇怪权重
-L4740-4910   突破系统：actBreakthrough/checkBreakthroughGate
-L4910-5040   doBreakthroughSuccess/飞升(actAscension)
-L5040-5200   天劫系统（startTribulation/processBolt）
-L5200-5550   神通/装备/炼丹/宗门
-L5550-5700   坊市/道历/秘境
-L5700-5790   秘境战斗(dungeonNextFloor)
-L5790-5940   startBattle + 战斗机制（蓄力/破绽/连击）
-L5940-6100   endBattle（胜利奖励/掉率） + battleAttack + battleHeal
-L6100-6170   battleFlee + useItem
-L6170-6560   物品使用/装备/refresh/renderStatsPanel/afterAction
-L6560-6670   gameOver（战斗死亡=复活/寿终=删档）
-L6670-6860   模态框/角色创建/存档读档
-L6860-7000   自动模式（autoTick/autoBattleStep/autoStart）
-L7000-7150   bindMainButtons/离线结算/bootstrap
-L7150-8087   DEV面板 + 帮助弹窗
+L1-500       CSS 样式（水墨主题、毛玻璃面板、浮动伤害动画）
+L500-700     HTML 结构（侧栏状态+Tab面板+操作区+弹窗）
+L700-960     工具函数 + 音效/特效（SFX IIFE）
+L960-2300    REALMS + 夙愿(QUESTS) + 道侣(PARTNERS) + TECHS(10种功法) + ITEMS
+L2300-2700   MONSTERS(15种) + MONSTER_META + 灵宠(PETS_META)
+L2700-3100   装备(EQUIPS/32件) + 本命法宝(RELICS) + 节气(TERM_BUFFS)
+L3100-3200   灵草(HERBS) + 种子(HERB_SEEDS) + 天象(WORLD_EVENTS) + 心魔(DEMON_TYPES)
+L3200-3320   炼丹配方(RECIPES) + 宗门(SECTS) + 坊市(MARKET) + 秘境(DUNGEONS)
+L3320-3500   成就(ACHIEVEMENTS) + 阵法(FORMATIONS) + 符箓(TALISMANS) + 机缘 + 悬赏令
+L3500-3600   叙事文本(NARRATIVE) + 闭关选择事件(CHOICE_EVENTS)
+L3600-3800   newPlayer + applyLineage + recalcStats（含阵法加成）
+L3800-4100   核心工具：gainCult(含宗门/天象/阵法乘数) + passDays(含天象/弟子/灵田)
+L4100-4400   战斗计算：calcDamage/attackerOf/defenderOf + battleAttack
+L4400-4600   闭关(actCultivate) + 功法被动 + 闭关事件链
+L4600-5000   闭关随机事件(CULT_EVENTS) + 选择事件(EVENT_CHAINS)
+L5000-5100   天劫系统（分阶选择）
+L5100-5400   突破(actBreakthrough) + 历练(actAdventure) + 机缘触发
+L5400-5600   doBreakthroughSuccess + 飞升(actAscension) + Roguelike 传承
+L5600-5700   天劫流程(startTribulation/processBolt)
+L5700-6100   神通/装备/炼丹(openAlchemy)
+L6100-6200   拍卖行(AUCTION_ITEMS/triggerAuction)
+L6200-6400   v15: 心魔(triggerInnerDemon) + 天象 + 签到 + 灵田
+L6400-6600   悬赏令(refreshBounties/bountyAdvance) + 阵法面板 + 符箓
+L6600-6800   宗门(SECT_RANKS/声望/弟子) + openSect + renderSectPanel
+L6800-7000   坊市(renderMarketPanel) + 道历(openCalendar)
+L7000-7200   秘境(openDungeon/dungeonNextFloor)
+L7200-7500   startBattle + 战斗机制(蓄力/破绽/连击/符箓加成)
+L7500-7700   endBattle(掉率/种子/成就) + battleFlee(符箓逃跑)
+L7700-7900   物品使用(useItem/符箓) + refresh(天象显示/灵田面板)
+L7900-8100   renderStatsPanel + afterAction(拍卖触发) + 成就/仙榜
+L8100-8400   gameOver + 模态框/角色创建/存档读档(含v15迁移)
+L8400-8600   自动模式(autoTick/autoBattleStep)
+L8600-8950   bindMainButtons + 离线结算 + bootstrap(签到触发)
+L8950-9900   DEV面板 + 帮助弹窗
 ```
 
 ### 核心全局变量
@@ -47,10 +52,20 @@ L7150-8087   DEV面板 + 帮助弹窗
 |------|------|
 | `P` | 玩家状态对象（整个游戏状态的核心） |
 | `REALMS` | 21 阶境界名 + 修为门槛数组 |
-| `MONSTERS` | 8 种怪物 [名,等级,HP,ATK,修为奖,灵石奖,属性] |
+| `MONSTERS` | 15 种怪物 [名,等级,HP,ATK,修为奖,灵石奖,属性] |
 | `MONSTER_META` | 怪物AI参数（index-parallel with MONSTERS） |
-| `EQUIPS` | 装备字典（slot/atk/def/hp/tier） |
-| `ITEMS` | 物品字典（丹药/灵草/奇物） |
+| `EQUIPS` | 装备字典（32件，slot/atk/def/hp/tier） |
+| `ITEMS` | 物品字典（丹药/灵草/奇物/种子/符箓） |
+| `TECHS` | 10 种功法 [cultMul, atkBonus, desc] |
+| `FORMATIONS` | 6 种阵法（被动 buff） |
+| `TALISMANS` | 5 种符箓（战斗消耗品） |
+| `HERB_SEEDS` | 6 种灵草种子 |
+| `WORLD_EVENTS` | 6 种天象事件 |
+| `DEMON_TYPES` | 5 种心魔类型 |
+| `BOUNTY_TEMPLATES` | 5 种悬赏令模板 |
+| `FORTUNE_ENCOUNTERS` | 7 种机缘遭遇 |
+| `SECT_RANKS` | 6 阶宗门声望等级 |
+| `ACHIEVEMENTS` | 24 个成就 |
 | `PETS_META` | 灵宠元数据 |
 | `RELICS` | 本命法宝 |
 
@@ -71,6 +86,19 @@ L7150-8087   DEV面板 + 帮助弹窗
   stats: {kill, alchemy, dungeon}, // 统计
   inBattle, monster,             // 战斗状态
   _bkCooldown,                   // 突破冷却
+  // v14+ 新增
+  garden: [{seed,plantDay,mature}], // 灵田
+  checkin: {lastDate,streak},    // 每日签到
+  // v15+ 新增
+  _demonPower,                   // 心魔蓄积(>=80触发Boss)
+  _totalContrib,                 // 宗门累计贡献(声望等级)
+  disciples: [{name,level,joinDay}], // 门下弟子
+  worldEvent: {id,endDay},       // 当前天象
+  // v16+ 新增
+  bounties: [{type,desc,progress,target,reward}], // 悬赏令
+  // v17+ 新增
+  formation,                     // 当前启用阵法名
+  knownFormations: [],           // 已学阵法列表
 }
 ```
 
@@ -147,19 +175,19 @@ node play-xiuxian.js
 
 ## 已知问题
 
-1. **Headless 测试 0 死亡** — AI 善于逃跑，真人可能更激进会死。可考虑加强追击惩罚或降低逃跑成功率
-2. **高境界怪物种类少** — 只有 8 种怪物，化神期以上只有 2-3 种可战。可扩充 MONSTERS 数组（注意同步 MONSTER_META 和 PETS_META）
-3. **寿元压力仍偏轻** — 延寿丹（蟠桃/万年灵芝精）掉率可能需要下调
-4. **天劫系统无法 headless 测试** — modal 交互无法自动化
+1. **Headless 测试偶尔 0 死亡** — AI 善于逃跑。偶有寿终正寝死亡（RNG 依赖）
+2. **寿元压力仍偏轻** — 延寿丹（蟠桃/万年灵芝精）掉率 + 长生诀功法可能需要下调
+3. **天劫/拍卖系统无法 headless 测试** — modal 交互无法自动化
+4. **功法平衡** — 天魔功/杀生剑意高收益需要更多测试验证
 
 ## 扩展方向
 
-- 更多怪物种类填补等级空档
-- PvP 或排行系统
-- 更丰富的秘境机制
-- 成就系统
-- 音效/BGM 增强
-- 移动端适配优化
+- PvP 或排行系统（在线排行榜）
+- 更多秘境词缀和层间事件
+- 门派战争/攻城系统
+- 转世传承增强（更多可继承属性）
+- 移动端进一步适配
+- 多语言支持
 
 ## 相关文件
 

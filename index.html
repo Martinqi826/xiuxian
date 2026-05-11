@@ -494,6 +494,7 @@
         <button id="btn-market">🏪 坊 市</button>
         <button id="btn-dungeon">🏔 秘 境</button>
         <button id="btn-bounty">📋 悬 赏</button>
+        <button id="btn-formation">🔮 阵 法</button>
       </div>
 
       <!-- 第 3 组：故事 / 工具 -->
@@ -2342,6 +2343,12 @@ const ITEMS = {
   "洗髓丹":    {type:"奇物",desc:"洗去一种灵根属性，重新选择五行"},
   "逆天改命丹":{type:"奇物",desc:"传说中的神物——若你是废灵根，或可改写命数"},
   "鸿蒙古玉":  {type:"奇物",desc:"上古鸿蒙之气所凝，与「无属之体」共鸣方显神威"},
+  // v17 · 符箓
+  "火符":    {type:"符箓",desc:"战斗中使用，本回合伤害 ×1.5"},
+  "盾符":    {type:"符箓",desc:"获得最大气血 30% 的护盾"},
+  "雷符":    {type:"符箓",desc:"战斗中使用，本回合伤害 ×2"},
+  "疗伤符":  {type:"符箓",desc:"恢复 40% 最大气血"},
+  "遁地符":  {type:"符箓",desc:"逃跑成功率翻倍"},
   // v14 · 灵草种子
   "聚灵草种":  {type:"种子",desc:"播种于灵田，15 天后收获聚灵草"},
   "凝血花种":  {type:"种子",desc:"播种于灵田，20 天后收获凝血花"},
@@ -3260,6 +3267,12 @@ const MARKET = {
     {nm:"千年灵芝孢",pr:120},
     {nm:"万年玄参苗",pr:500},
     {nm:"九叶玄参苗",pr:2000},
+    // v17 · 符箓
+    {nm:"火符",     pr:50},
+    {nm:"盾符",     pr:80},
+    {nm:"雷符",     pr:200},
+    {nm:"疗伤符",   pr:100},
+    {nm:"遁地符",   pr:60},
     {nm:"青铜剑",   pr:100, eq:true},
     {nm:"玄铁剑",   pr:800, eq:true},
     {nm:"赤炎刀",   pr:4000,eq:true},
@@ -3454,6 +3467,24 @@ const TECH_META = {
 
 function hasTechPassive(id){ return (TECH_META[P?.tech]||{}).passive === id; }
 
+// v17 · 阵法系统
+const FORMATIONS = {
+  "聚灵阵":  {tier:1, cultBonus:0.10, desc:"修炼效率 +10%",         price:300},
+  "金刚阵":  {tier:2, defBonus:0.15,  desc:"战斗防御 +15%",         price:800},
+  "天罡阵":  {tier:2, atkBonus:0.12,  desc:"战斗攻击 +12%",         price:800},
+  "五行阵":  {tier:3, cultBonus:0.15, atkBonus:0.08, desc:"修炼 +15%，攻击 +8%", price:2000},
+  "九宫八卦阵":{tier:4, defBonus:0.20, cultBonus:0.10, desc:"防御 +20%，修炼 +10%", price:5000},
+  "太极两仪阵":{tier:5, cultBonus:0.20, atkBonus:0.15, defBonus:0.10, desc:"全属性加成", price:12000},
+};
+// v17 · 符箓数据
+const TALISMANS = {
+  "火符":    {type:"attack", dmgMul:1.5,  desc:"战斗中使用，本回合伤害 ×1.5", price:50},
+  "盾符":    {type:"shield", shield:0.3,  desc:"获得最大气血 30% 的护盾",   price:80},
+  "雷符":    {type:"attack", dmgMul:2.0,  desc:"战斗中使用，本回合伤害 ×2",  price:200},
+  "疗伤符":  {type:"heal",   healPct:0.4, desc:"恢复 40% 最大气血",          price:100},
+  "遁地符":  {type:"flee",   fleeMul:2.0, desc:"逃跑成功率翻倍",             price:60},
+};
+
 // v16 · 机缘系统
 const FORTUNE_ENCOUNTERS = [
   {id:"cave",   nm:"洞天福地",   minRealm:3,
@@ -3635,6 +3666,9 @@ function newPlayer(name,rootName,elements){
     worldEvent: null,                          // {id,endDay} 当前天象
     bounties: [],                              // [{tplIdx,progress,target,desc,reward,refreshDay}]
     _bountyRefresh: 0,                         // 下次刷新日
+    // —— v17 · 阵法/符箓 ——
+    formation: null,                           // 当前启用的阵法名
+    knownFormations: [],                       // 已学阵法列表
   };
   recalcStats(p);
   // 初始化后按当前 maxHp/maxMp 满血满蓝
@@ -3747,8 +3781,10 @@ function recalcStats(p){
   d.maxHp   = Math.floor((100 + eff.ti*8  + p.realmIdx*60 + eff.dao*2) * (cBuff.hpMul||1));
   d.maxMp   = Math.floor(( 50 + eff.ling*3 + p.realmIdx*15) * (cBuff.mpMul||1));
   const sBuff = (p.sect && SECTS[p.sect] && SECTS[p.sect].buff) || {};
-  d.atk     =  Math.floor((eff.ling*2 + Math.floor((TECHS[p.tech]?TECHS[p.tech][1]:0)) + p.realmIdx*5) * (1+(sBuff.atk||0)));
-  d.def     =  Math.floor(eff.ti*1.5) + Math.floor(eff.dao*0.5);
+  // v17：阵法加成
+  const fmn = p.formation && FORMATIONS[p.formation] || {};
+  d.atk     =  Math.floor((eff.ling*2 + Math.floor((TECHS[p.tech]?TECHS[p.tech][1]:0)) + p.realmIdx*5) * (1+(sBuff.atk||0)) * (1+(fmn.atkBonus||0)));
+  d.def     =  Math.floor((eff.ti*1.5 + eff.dao*0.5) * (1+(fmn.defBonus||0)));
   d.spd     =  10 + Math.floor(eff.shen*0.3) + p.realmIdx*2;
   d.crit    =  0.05 + eff.shen*0.0015 + eff.yun*0.003 + (sBuff.crit||0);
   d.critDmg =  1.50 + eff.yun*0.01;                         // 暴击倍率
@@ -3960,10 +3996,11 @@ function gainCult(p,base,reason){
   }
   // P0-1 · 交替奖励临时倍率
   const altMul = p._advAltMul || 1;
-  // v15 · 宗门声望加成 + 天象加成
+  // v15 · 宗门声望加成 + 天象加成 + v17 阵法加成
   const sectMul = 1 + (typeof getSectCultBonus==="function" ? getSectCultBonus() : 0);
+  const fmnCult = (p.formation && FORMATIONS[p.formation]) ? (FORMATIONS[p.formation].cultBonus||0) : 0;
   const weEffect = typeof getWorldEventEffect==="function" ? getWorldEventEffect() : {};
-  const weCultMul = weEffect.cultMul || 1;
+  const weCultMul = (weEffect.cultMul || 1) * (1 + fmnCult);
   const amt=Math.floor(base*rootMul(p)*TECHS[p.tech][0]*gearCultBonus(p)*buff.cultMul*bkMul*altMul*sectMul*weCultMul);
   const prevCult = p.cult;
   p.cult+=amt;
@@ -6120,6 +6157,127 @@ function alchemyMake(name){
 }
 
 /* ==========================================================
+ *   v17 · 拍卖行事件
+ * ========================================================== */
+const AUCTION_ITEMS = [
+  {nm:"太上忘情（仙级功法）", give:()=>{ P.tech="太上忘情"; log("改修【太上忘情】！传说仙诀。","epic"); }, base:5000},
+  {nm:"天心玉（T4饰品）", give:()=>addItem(P,"天心玉",1), base:3000},
+  {nm:"九转还魂丹（延寿500年）", give:()=>addItem(P,"九转还魂丹",1), base:8000},
+  {nm:"金翅大鹏（T5坐骑）", give:()=>addItem(P,"金翅大鹏",1), base:6000},
+  {nm:"天劫真血 ×3", give:()=>addItem(P,"天劫真血",3), base:4000},
+  {nm:"蟠桃 ×5（延寿150年）", give:()=>addItem(P,"蟠桃",5), base:5000},
+  {nm:"太极两仪阵（全属性阵法）", give:()=>{ if(!P.knownFormations) P.knownFormations=[]; if(!P.knownFormations.includes("太极两仪阵")) P.knownFormations.push("太极两仪阵"); P.formation="太极两仪阵"; recalcStats(P); log("习得【太极两仪阵】！","epic"); }, base:10000},
+  {nm:"万年玄参 ×5", give:()=>addItem(P,"万年玄参",5), base:3000},
+];
+
+function triggerAuction(){
+  if(!P || P.inBattle) return;
+  const item = AUCTION_ITEMS[Math.floor(Math.random()*AUCTION_ITEMS.length)];
+  const npcBid = Math.floor(item.base * (0.8 + Math.random()*0.6));
+  const bids = [
+    Math.floor(npcBid * 0.6),
+    Math.floor(npcBid * 0.8),
+    npcBid,
+    Math.floor(npcBid * 1.3),
+  ];
+  showModal(`<h3>🏛 天 阶 拍 卖 会</h3>
+    <p>${item.nm}</p>
+    <p style="font-size:11px;color:#a89c7c">当前最高出价：${npcBid} 灵石（NPC竞拍）。你有 ${P.bag["灵石"]||0} 灵石。</p>
+    <div class="btns">
+      ${bids.map(b=>`<button data-bid="${b}" ${(P.bag["灵石"]||0)>=b?"":"disabled"}>${b} 石</button>`).join("")}
+      <button data-bid="0">放弃</button>
+    </div>`);
+  document.querySelectorAll(".modal [data-bid]").forEach(b=>{
+    b.onclick = ()=>{
+      const bid = parseInt(b.dataset.bid);
+      closeModal();
+      if(bid === 0){
+        log("你放弃了这次竞拍。","hint");
+        return;
+      }
+      if(bid >= npcBid){
+        addItem(P, "灵石", -bid);
+        item.give();
+        log(`✦ 以 ${bid} 灵石拍下【${item.nm}】！`,"epic");
+      } else {
+        log(`出价 ${bid} 不及 NPC 的 ${npcBid}，竞拍失败。`,"bad");
+      }
+      refresh(); saveGame(true);
+    };
+  });
+}
+
+/* ==========================================================
+ *   v17 · 阵法/符箓系统
+ * ========================================================== */
+function openFormationPanel(){
+  if(!P) return;
+  const known = P.knownFormations || [];
+  const current = P.formation;
+  let rows = "";
+  for(const [name, f] of Object.entries(FORMATIONS)){
+    const learned = known.includes(name);
+    const active = current === name;
+    rows += `<div class="shop-row">
+      <div><div class="nm">${active?"✅ ":""}${name}</div><div class="ds">${f.desc}${!learned?" · 需灵石 "+f.price:""}</div></div>
+      ${learned
+        ? `<button class="sm" data-fm="${name}" ${active?"disabled":""}>${active?"使用中":"启用"}</button>`
+        : `<button class="sm" data-buy-fm="${name}" ${(P.bag["灵石"]||0)>=f.price?"":"disabled"}>学习 (${f.price}石)</button>`}
+    </div>`;
+  }
+  showModal(`<h3>🔮 阵 法</h3>
+    <p style="font-size:11px;color:#a89c7c">学习阵法后可启用，同时只能启用一个。影响修炼/战斗属性。</p>
+    ${rows}
+    <div class="btns"><button onclick="closeModal()">关闭</button></div>`);
+  document.querySelectorAll(".modal [data-fm]").forEach(b=>{
+    b.onclick = ()=>{
+      P.formation = b.dataset.fm;
+      recalcStats(P);
+      log(`启用阵法【${P.formation}】`,"good");
+      closeModal(); openFormationPanel(); refresh(); saveGame(true);
+    };
+  });
+  document.querySelectorAll(".modal [data-buy-fm]").forEach(b=>{
+    b.onclick = ()=>{
+      const nm = b.dataset.buyFm;
+      const f = FORMATIONS[nm];
+      if((P.bag["灵石"]||0) < f.price){ log("灵石不足","hint"); return; }
+      addItem(P, "灵石", -f.price);
+      if(!P.knownFormations) P.knownFormations = [];
+      P.knownFormations.push(nm);
+      P.formation = nm;
+      recalcStats(P);
+      log(`★ 习得阵法【${nm}】并启用！`,"epic");
+      closeModal(); openFormationPanel(); refresh(); saveGame(true);
+    };
+  });
+}
+
+function useTalismanInBattle(name){
+  if(!P || !P.inBattle || !P.monster) return;
+  const t = TALISMANS[name];
+  if(!t) return;
+  if((P.bag[name]||0) < 1){ log("符箓不足。","hint"); return; }
+  consume(name);
+  if(t.type === "attack"){
+    P._talismanDmgMul = t.dmgMul;
+    log(`祭出【${name}】！本回合伤害 ×${t.dmgMul}`,"good");
+  } else if(t.type === "shield"){
+    const shield = Math.floor(P.maxHp * t.shield);
+    P.shield = (P.shield||0) + shield;
+    log(`祭出【${name}】！获得 ${shield} 点护盾`,"good");
+  } else if(t.type === "heal"){
+    const heal = Math.floor(P.maxHp * t.healPct);
+    P.hp = Math.min(P.maxHp, P.hp + heal);
+    log(`祭出【${name}】！恢复 ${heal} 气血`,"good");
+  } else if(t.type === "flee"){
+    P._talismanFleeMul = t.fleeMul;
+    log(`祭出【${name}】！逃跑加成 ×${t.fleeMul}`,"good");
+  }
+  refresh(); saveGame(true);
+}
+
+/* ==========================================================
  *   v16 · 机缘系统
  * ========================================================== */
 function tryFortuneEncounter(){
@@ -7278,9 +7436,11 @@ function battleAttack(){
   m.combo = (m.combo||0) + 1;
   const comboMul = 1 + Math.min(10, m.combo) * 0.08;
   if(m.combo > 1) log(`连击 \u00D7${m.combo} (+${Math.min(80, m.combo*8)}%)`, "hint");
-  // 破防翻倍
+  // 破防翻倍 + v17 符箓加成
   const breakMul = m.breakRounds > 0 ? 2 : 1;
-  const d = calcDamage(attackerOf(P), monsterDefender(m), {mul:comboMul * breakMul});
+  const talisMul = P._talismanDmgMul || 1;
+  if(P._talismanDmgMul) delete P._talismanDmgMul;
+  const d = calcDamage(attackerOf(P), monsterDefender(m), {mul:comboMul * breakMul * talisMul});
   // 克制元素 → 破绽条
   const myEle = pickAttackElement(P);
   if(myEle && m.ele && OVERCOME[myEle] === m.ele) addBreakGauge(m, 1);
@@ -7349,8 +7509,10 @@ function battleFlee(){
   if(m) m.combo = 0;
   const bonus = gearFleeBonus(P);
   const buff = getBuff(P);
+  const talisFleeM = P._talismanFleeMul || 1;
+  if(P._talismanFleeMul) delete P._talismanFleeMul;
   const baseRate = 0.5+0.05*(P.realmIdx-m.lvl)+bonus;
-  if(Math.random()<baseRate*buff.fleeMul){
+  if(Math.random()<baseRate*buff.fleeMul*talisFleeM){
     log("你脚踏遁光，成功逃离。","sys"); SFX.dodge();
     P.inBattle=false;P.monster=null;
     setScene("凡 人 修 仙 路","— 一 缕 神 识 自 虚 空 降 临 —","");
@@ -7384,6 +7546,12 @@ function useItem(name){
   // —— 奇物特殊使用 ——
   if(it.type==="奇物"){
     handleRelic(name);
+    return;
+  }
+  // v17：符箓使用
+  if(it.type==="符箓"){
+    if(!P.inBattle){ log("符箓只能在战斗中使用。","hint"); return; }
+    useTalismanInBattle(name);
     return;
   }
   if(it.type!=="丹药"){log("此物不能直接使用。","hint");return}
@@ -7630,6 +7798,7 @@ function refresh(){
       else if(RELICS[k]) icon="🔮";
       else if(HERBS[k]) icon="🌿";
       else if(ITEMS[k]&&ITEMS[k].type==="种子") icon="🌱";
+      else if(ITEMS[k]&&ITEMS[k].type==="符箓") icon="📜";
       div.innerHTML=`<span>${icon} ${k}<div class="desc">${desc}</div></span><span class="qty">×${qty}</span>`;
       if(ITEMS[k]&&ITEMS[k].type==="丹药"){
         div.title="点击服用";
@@ -7862,6 +8031,12 @@ function afterAction(){
   // v4：弹出节庆事件（队列模式，依次弹）
   if(P._festQueue && P._festQueue.length){
     schedulePump(()=>triggerNextFestival());
+    return;
+  }
+  // v17：拍卖行（约每120天触发一次）
+  if(P.realmIdx >= 3 && !P.inBattle && P.days >= (P._nextAuction||120)){
+    P._nextAuction = P.days + 100 + rand(0,40);
+    schedulePump(()=>triggerAuction());
   }
 }
 
@@ -8361,6 +8536,9 @@ function loadGame(){
     if(d.worldEvent===undefined) d.worldEvent = null;
     if(!Array.isArray(d.bounties)) d.bounties = [];
     if(d._bountyRefresh===undefined) d._bountyRefresh = 0;
+    // v17 字段（阵法/符箓）
+    if(d.formation===undefined) d.formation = null;
+    if(!Array.isArray(d.knownFormations)) d.knownFormations = [];
     // v4 寿元迁移：移除强制拉满逻辑（避免覆盖新机制），仅做异常兜底
     if(d.lifespan===undefined || d.lifespan<=0){
       d.lifespan = 80 + (d.realmIdx||0)*30;
@@ -8590,6 +8768,7 @@ $("btn-sect").onclick    = openSect;
 $("btn-market").onclick  = openMarket;
 $("btn-dungeon").onclick = openDungeon;
 if($("btn-bounty")) $("btn-bounty").onclick = openBountyBoard;
+if($("btn-formation")) $("btn-formation").onclick = openFormationPanel;
 $("btn-calendar").onclick= openCalendar;
 // v5：夙愿入口（按钮 + 状态行）
 $("btn-quest").onclick   = openQuestPanel;
