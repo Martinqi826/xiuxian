@@ -240,6 +240,39 @@
     .term-row{grid-template-columns:repeat(4,1fr)}
   }
 
+  /* v13 · 音量按钮 */
+  #sfx-toggle{
+    position:fixed;top:10px;right:52px;z-index:9998;
+    width:32px;height:32px;border-radius:50%;
+    background:#161a22;border:1px solid var(--line);color:var(--ink);
+    font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;
+    transition:border-color .2s;
+  }
+  #sfx-toggle:hover{border-color:var(--gold)}
+  #sfx-toggle.muted{color:#5c5a4f;border-color:#5c5a4f}
+
+  /* v13 · 自动保存提示 */
+  #save-flash{
+    position:fixed;bottom:30px;right:14px;z-index:200;
+    font-size:10px;color:var(--jade);opacity:0;
+    transition:opacity .3s;pointer-events:none;letter-spacing:1px;
+  }
+  #save-flash.show{opacity:1}
+
+  /* v13 · 修为进度条 */
+  .cult-bar{
+    height:6px;background:rgba(212,180,106,.15);border-radius:3px;margin:4px 0 8px;overflow:hidden;
+  }
+  .cult-bar i{display:block;height:100%;background:linear-gradient(90deg,var(--gold),#e8c97a);border-radius:3px;transition:width .5s ease-out}
+
+  /* v13 · 快捷键提示 */
+  .hotkey-hint{color:#5c5a4f;font-size:10px;text-align:center;margin-top:4px;letter-spacing:1px}
+
+  @media(max-width:900px){
+    #sfx-toggle{top:auto;bottom:66px;right:46px}
+    .hotkey-hint{display:none}
+  }
+
   /* v12 · 浮动伤害数字 */
   .dmg-float{
     position:fixed;pointer-events:none;z-index:200;
@@ -450,6 +483,7 @@
           <button id="btn-auto-adv" class="auto auto-chip" title="自动历练">♺</button>
         </div>
         <button id="btn-bk" class="primary span-2">⚡ 尝试突破</button>
+        <div class="hotkey-hint">快捷键：1闭关 2历练 3突破 空格自动</div>
       </div>
 
       <!-- 第 2 组：玩法系统（4 个副系统） -->
@@ -565,6 +599,10 @@
   <button data-mob="2"><span class="ico">🎒</span>储物</button>
 </nav>
 
+<!-- v13: 音量开关 + 保存提示 -->
+<button id="sfx-toggle" title="音效开关">🔊</button>
+<div id="save-flash">已存</div>
+
 <div class="footer">— 凡 人 修 仙 路 · 纯 文 字 单 机 ·  保 存 在 本 机 浏 览 器 —</div>
 
 <script>
@@ -577,11 +615,13 @@ const SAVE_VERSION = 8;
  * ========================================================== */
 const SFX = (function(){
   let ctx = null;
+  let _muted = localStorage.getItem("xiuxian_mute")==="1";
   function getCtx(){
     if(!ctx) try{ ctx = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){}
     return ctx;
   }
   function play(fn){
+    if(_muted) return;
     const c = getCtx();
     if(!c) return;
     if(c.state==="suspended") c.resume();
@@ -727,6 +767,13 @@ const SFX = (function(){
           o.connect(g); g.connect(c.destination); o.start(t); o.stop(t+0.6);
         });
       });
+    },
+    /* v13: 音量控制 */
+    get muted(){ return _muted; },
+    toggle(){
+      _muted = !_muted;
+      localStorage.setItem("xiuxian_mute", _muted?"1":"0");
+      return _muted;
     }
   };
 })();
@@ -7117,8 +7164,28 @@ function renderStatsPanel(){
   </div>`;
   // 4) 五行 tag
   let elTag = `<div style="margin-top:8px;font-size:11px">攻击属：<b>${d.attEl||"无"}</b> · 防御属：${(d.defEls||[]).join("/")||"无"}</div>`;
+  // 5) v13: 战绩统计
+  const s = P.stats||{};
+  const achCount = Object.keys(P.achievements||{}).length;
+  const petCount = (P.pets||[]).length;
+  const partnerCount = (P.partners||[]).filter(x=>x.fondness>=15).length;
+  const dgCount = Object.keys(P.dungeonRec||{}).length;
+  const playDays = Math.floor(P.days/360);
+  const playYears = playDays > 0 ? `${playDays} 年 ${P.days%360} 天` : `${P.days} 天`;
+  const statsHtml = `<div style="margin-top:10px;border-top:1px dashed rgba(212,180,106,.2);padding-top:8px">
+    <div style="color:#d4b46a;font-size:12px;letter-spacing:2px;margin-bottom:4px">📊 修仙统计</div>
+    <div style="font-size:11px;line-height:1.8;color:#a89c7c">
+      <div>修行时日：<b style="color:#e8e3d3">${playYears}</b>（道龄 ${P.age} 岁）</div>
+      <div>击杀妖兽：<b style="color:#d96a6a">${s.kill||0}</b></div>
+      <div>炼丹次数：<b style="color:#e8c97a">${s.alchemy||0}</b></div>
+      <div>秘境通关：<b style="color:#7fc7a3">${s.dungeon||0}</b>（${dgCount}/6 种）</div>
+      <div>灵宠签约：<b style="color:#7ab0d4">${petCount}</b> · 道侣结识：<b style="color:#c0a8d4">${partnerCount}</b></div>
+      <div>成就解锁：<b style="color:#d4b46a">${achCount}/${ACHIEVEMENTS.length}</b></div>
+      <div>宗门：<b style="color:#e8e3d3">${P.sect?SECTS[P.sect]?.nm||P.sect:"无"}</b> · 贡献 <b>${P.contrib||0}</b></div>
+    </div>
+  </div>`;
   return `<div style="background:rgba(0,0,0,.2);padding:6px;border:1px solid rgba(255,230,180,.15);border-radius:4px">
-    ${rows}${der}${karmaBar}${elTag}</div>`;
+    ${rows}${der}${karmaBar}${elTag}${statsHtml}</div>`;
 }
 
 function afterAction(){
@@ -7917,6 +7984,39 @@ $("btn-help").onclick = ()=>{
   </p>
   <div class="btns"><button id="hp-ok" class="primary">了 然</button></div>`);
   $("hp-ok").onclick = closeModal;
+};
+
+/* v13 · 音量开关 */
+(function initSfxToggle(){
+  const btn = document.getElementById("sfx-toggle");
+  if(!btn) return;
+  function upd(){ btn.textContent = SFX.muted?"🔇":"🔊"; btn.classList.toggle("muted", SFX.muted); }
+  upd();
+  btn.onclick = ()=>{ SFX.toggle(); upd(); };
+})();
+
+/* v13 · 键盘快捷键 */
+if(window.addEventListener) window.addEventListener("keydown", function(e){
+  if(e.target.tagName==="INPUT" || e.target.tagName==="TEXTAREA") return;
+  if(typeof isModalShowing==="function" && isModalShowing()) return;
+  switch(e.key){
+    case "1": if(!P?.inBattle) $("btn-cult")?.click(); break;
+    case "2": if(!P?.inBattle) $("btn-adv")?.click(); break;
+    case "3": if(!P?.inBattle) $("btn-bk")?.click(); break;
+    case " ": e.preventDefault();
+      if(AUTO.mode) autoStop("手动停止");
+      else autoStart(P?.inBattle?"adv":"cult");
+      break;
+    case "s": case "S": if(e.ctrlKey||e.metaKey){e.preventDefault();saveGame(false);} break;
+  }
+});
+
+/* v13 · 自动保存闪烁 */
+const _origSaveGame = saveGame;
+saveGame = function(silent){
+  _origSaveGame(silent);
+  const fl = document.getElementById("save-flash");
+  if(fl){ fl.classList.add("show"); setTimeout(()=>fl.classList.remove("show"), 1200); }
 };
 
 /* P0-3 · 离线修炼结算 */
