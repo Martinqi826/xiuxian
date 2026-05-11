@@ -90,7 +90,30 @@
   .log::-webkit-scrollbar-thumb{background:rgba(212,180,106,.25);border-radius:3px}
 
   /* 按钮 */
-  .actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+  .actions{display:flex;flex-direction:column;gap:10px;margin-top:10px}
+  /* —— v10.1 · 分组容器 —— */
+  .action-group{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .action-group.action-grid-4{grid-template-columns:repeat(4,1fr);gap:6px}
+  .action-group.action-grid-4 button{padding:8px 6px;font-size:13px;letter-spacing:1px}
+  /* 第 1 组里 突破按钮独占两列 */
+  .action-group .span-2{grid-column:1 / -1}
+  /* 主按钮 + 自动按钮 配对：主按钮占绝大部分，自动按钮只是右侧小贴片 */
+  .group-pair{display:grid;grid-template-columns:1fr auto;gap:4px}
+  .group-pair > button:first-child{min-width:0}
+  /* 战斗中按钮可能被劫持显示长文本（如"✨ 施展神通"），第二格需要兜底宽度 */
+  .group-pair > button:last-child{max-width:140px;white-space:nowrap}
+  .auto-chip{
+    padding:10px 10px;font-size:14px;letter-spacing:0;
+    min-width:38px;color:var(--jade);
+    border-color:rgba(127,199,163,.35);
+    background:linear-gradient(180deg,rgba(127,199,163,.12),rgba(127,199,163,.04));
+  }
+  .auto-chip:hover{
+    background:linear-gradient(180deg,rgba(127,199,163,.28),rgba(127,199,163,.08));
+    color:#d8f1e3;
+  }
+  /* 突破按钮不可用时整体隐藏（不占位） */
+  #btn-bk.bk-hidden{display:none}
   button{
     appearance:none;background:linear-gradient(180deg,rgba(212,180,106,.18),rgba(212,180,106,.06));
     border:1px solid var(--line);color:var(--ink);
@@ -109,6 +132,13 @@
   }
   button.auto.active::before{content:"● ";color:var(--jade);animation:blink 1.2s infinite}
   @keyframes blink{50%{opacity:.3}}
+  /* 重启角落小按钮 */
+  .reset-corner{
+    margin-left:auto;
+    padding:4px 8px;font-size:12px;letter-spacing:0;
+    opacity:.55;transition:opacity .2s;
+  }
+  .reset-corner:hover{opacity:1}
 
   .auto-bar{
     display:flex;align-items:center;gap:6px;margin-top:8px;
@@ -300,20 +330,34 @@
     <div class="log" id="log"></div>
 
     <div class="actions">
-      <button id="btn-cult">🧘 闭关修炼</button>
-      <button id="btn-adv">🗡 外出历练</button>
-      <button id="btn-bk" class="primary">⚡ 尝试突破</button>
-      <button id="btn-auto-cult" class="auto">♺ 自动闭关</button>
-      <button id="btn-auto-adv" class="auto">♺ 自动历练</button>
-      <button id="btn-alchemy">🔥 炼 丹</button>
-      <button id="btn-sect">🏯 宗 门</button>
-      <button id="btn-market">🏪 坊 市</button>
-      <button id="btn-dungeon">🏔 秘 境</button>
-      <button id="btn-calendar">📅 道 历</button>
-      <button id="btn-quest">🌙 夙 愿</button>
-      <button id="btn-save">📜 存档玉简</button>
-      <button id="btn-help">📖 道法指引</button>
-      <button id="btn-reset" class="danger">☠ 重启轮回</button>
+      <!-- 第 1 组：修行（核心循环） -->
+      <div class="action-group" data-group="cult">
+        <div class="group-pair">
+          <button id="btn-cult">🧘 闭关修炼</button>
+          <button id="btn-auto-cult" class="auto auto-chip" title="自动闭关">♺</button>
+        </div>
+        <div class="group-pair">
+          <button id="btn-adv">🗡 外出历练</button>
+          <button id="btn-auto-adv" class="auto auto-chip" title="自动历练">♺</button>
+        </div>
+        <button id="btn-bk" class="primary span-2">⚡ 尝试突破</button>
+      </div>
+
+      <!-- 第 2 组：玩法系统（4 个副系统） -->
+      <div class="action-group action-grid-4" data-group="systems">
+        <button id="btn-alchemy">🔥 炼 丹</button>
+        <button id="btn-sect">🏯 宗 门</button>
+        <button id="btn-market">🏪 坊 市</button>
+        <button id="btn-dungeon">🏔 秘 境</button>
+      </div>
+
+      <!-- 第 3 组：故事 / 工具 -->
+      <div class="action-group action-grid-4" data-group="tools">
+        <button id="btn-quest">🌙 夙 愿</button>
+        <button id="btn-calendar">📅 道 历</button>
+        <button id="btn-save">📜 存 档</button>
+        <button id="btn-help">📖 指 引</button>
+      </div>
     </div>
     <div class="auto-bar">
       <span class="lbl">速度</span>
@@ -323,6 +367,8 @@
       <button class="spd" data-spd="233">3x</button>
       <button class="spd" data-spd="140">5x</button>
       <span class="auto-status" id="auto-status">自动：未启动</span>
+      <!-- 重启按钮独立到角落，小字 -->
+      <button id="btn-reset" class="danger reset-corner" title="重启轮回（清档）">☠</button>
     </div>
   </main>
 
@@ -5938,7 +5984,7 @@ function refreshBattleButtons(){
   $("btn-bk").onclick   = battleFlee;
   // 用"自动闭关"按钮临时充当"神通"键
   $("btn-auto-cult").textContent = "✨ 施展神通";
-  $("btn-auto-cult").classList.remove("auto","active");
+  $("btn-auto-cult").classList.remove("auto","active","auto-chip");
   $("btn-auto-cult").onclick = battleSkill;
 }
 function endBattle(win){
@@ -6467,15 +6513,21 @@ function refresh(){
 
   // 突破按钮
   if(!P.inBattle){
-    $("btn-bk").disabled = !(t!=null && P.cult>=t);
+    const canBk = (t!=null && P.cult>=t);
+    $("btn-bk").disabled = !canBk;
+    // v10.1 · 不可突破时整体隐藏（战斗中此按钮复用为"祭出法宝"故不隐藏）
+    $("btn-bk").classList.toggle("bk-hidden", !canBk);
     const trib = TRIBULATION_AT[P.realmIdx+1];
-    if(trib && t!=null && P.cult>=t){
+    if(trib && canBk){
       $("btn-bk").textContent = `⛈ 渡 · ${trib.name}`;
       $("btn-bk").classList.add("epic");
     }else{
       $("btn-bk").textContent = "⚡ 尝试突破";
       $("btn-bk").classList.remove("epic");
     }
+  }else{
+    // 战斗中：移除 hidden 标记，让按钮正常显示
+    $("btn-bk").classList.remove("bk-hidden");
   }
   // v3：玄机详情面板（若打开则刷新内容）
   const psEl = $("panel-stats");
@@ -7011,9 +7063,9 @@ function bindMainButtons(){
   $("btn-cult").onclick = actCultivate;
   $("btn-adv").onclick  = actAdventure;
   $("btn-bk").onclick   = actBreakthrough;
-  // 恢复自动按钮
-  $("btn-auto-cult").textContent = "♺ 自动闭关";
-  $("btn-auto-cult").classList.add("auto");
+  // 恢复自动按钮（v10.1：单字符 chip 风格）
+  $("btn-auto-cult").textContent = "♺";
+  $("btn-auto-cult").classList.add("auto","auto-chip");
   $("btn-auto-cult").onclick = ()=>autoStart("cult");
 }
 $("btn-save").onclick = ()=>saveGame(false);
