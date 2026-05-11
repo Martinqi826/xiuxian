@@ -498,6 +498,7 @@
         <button id="btn-synthesis">⚗ 合 成</button>
         <button id="btn-arena">⚔ 擂 台</button>
         <button id="btn-dailies">📋 日 常</button>
+        <button id="btn-talent">🌟 天 赋</button>
       </div>
 
       <!-- 第 3 组：故事 / 工具 -->
@@ -3532,6 +3533,72 @@ const ACHIEVEMENTS = [
   {id:"lifespan_500",nm:"长生久视", desc:"寿元超过 500 年",           reward:"蟠桃×1",    check:p=>(p.lifespan||0)>=500},
 ];
 
+/* v22 · 天赋系统 — 累计里程碑解锁永久被动 */
+const TALENTS = [
+  {id:"t_kill_30",   nm:"嗜血本能",  desc:"攻击+5%",       stat:{atkMul:0.05},  check:p=>(p.stats?.kill||0)>=30},
+  {id:"t_kill_100",  nm:"战意如潮",  desc:"攻击+10%",      stat:{atkMul:0.10},  check:p=>(p.stats?.kill||0)>=100},
+  {id:"t_kill_300",  nm:"杀神之姿",  desc:"暴击率+3%",     stat:{critAdd:0.03}, check:p=>(p.stats?.kill||0)>=300},
+  {id:"t_cult_20",   nm:"定心入禅",  desc:"修炼速度+10%",  stat:{cultMul:0.10}, check:p=>(p.streak||0)>=20},
+  {id:"t_cult_50",   nm:"道心如铁",  desc:"道心上限+20",   stat:{dxMax:20},     check:p=>(p.streak||0)>=50},
+  {id:"t_alch_20",   nm:"丹心通明",  desc:"炼丹成功+5%",   stat:{alchAdd:0.05}, check:p=>(p.stats?.alchemy||0)>=20},
+  {id:"t_alch_80",   nm:"丹道化神",  desc:"炼丹成功+10%",  stat:{alchAdd:0.10}, check:p=>(p.stats?.alchemy||0)>=80},
+  {id:"t_dg_3",      nm:"秘境寻宝",  desc:"掉率+10%",      stat:{dropAdd:0.10}, check:p=>(p.stats?.dungeon||0)>=3},
+  {id:"t_dg_10",     nm:"秘境宗师",  desc:"秘境怪物-10%血", stat:{dgHpMul:-0.10},check:p=>(p.stats?.dungeon||0)>=10},
+  {id:"t_realm_9",   nm:"金丹蕴体",  desc:"防御+8%",       stat:{defMul:0.08},  check:p=>p.realmIdx>=9},
+  {id:"t_realm_15",  nm:"化神真意",  desc:"攻击+15%",      stat:{atkMul:0.15},  check:p=>p.realmIdx>=15},
+  {id:"t_dao_30",    nm:"悟道通玄",  desc:"修炼速度+15%",  stat:{cultMul:0.15}, check:p=>(p.dao||0)>=30},
+  {id:"t_pet_5",     nm:"通灵心法",  desc:"灵宠伤害+20%",  stat:{petDmg:0.20},  check:p=>(p.pets||[]).length>=5},
+  {id:"t_arena_50",  nm:"擂台霸主",  desc:"攻击+8% 防御+5%",stat:{atkMul:0.08,defMul:0.05}, check:p=>(p.arena?.pts||0)>=50},
+  {id:"t_rich",      nm:"财运亨通",  desc:"战斗灵石+20%",  stat:{stoneMul:0.20},check:p=>(p.bag?.["灵石"]||0)>=20000},
+  {id:"t_life_800",  nm:"长生秘诀",  desc:"寿元+50",       stat:{lifeAdd:50},   check:p=>(p.lifespan||0)>=800},
+];
+
+function getUnlockedTalents(p){
+  if(!p._talentCache){
+    p._talentCache = TALENTS.filter(t => t.check(p)).map(t => t.id);
+  }
+  return p._talentCache;
+}
+function talentStat(p, key){
+  const ids = getUnlockedTalents(p);
+  let sum = 0;
+  for(const t of TALENTS){
+    if(ids.includes(t.id) && t.stat[key]) sum += t.stat[key];
+  }
+  return sum;
+}
+function refreshTalentCache(p){ delete p._talentCache; }
+
+function checkTalentUnlocks(){
+  if(!P.flags) P.flags={};
+  refreshTalentCache(P);
+  for(const t of TALENTS){
+    if(!P.flags["_tl_"+t.id] && t.check(P)){
+      P.flags["_tl_"+t.id] = true;
+      log(`✦ 天赋觉醒【${t.nm}】— ${t.desc}`,"epic");
+      SFX.milestone();
+      recalcStats(P);
+    }
+  }
+}
+
+function openTalentPanel(){
+  refreshTalentCache(P);
+  const unlocked = getUnlockedTalents(P);
+  const rows = TALENTS.map(t=>{
+    const ok = unlocked.includes(t.id);
+    return `<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid rgba(255,255,255,.06);opacity:${ok?1:0.45}">
+      <span>${ok?"✦":"○"} <b>${t.nm}</b> <span style="color:#a89c7c;font-size:11px">${t.desc}</span></span>
+      <span style="font-size:11px;color:${ok?"#7fc7a3":"#666"}">${ok?"已觉醒":"未达成"}</span>
+    </div>`;
+  }).join("");
+  showModal(`<h3>🌟 天 赋</h3>
+    <p style="color:#a89c7c;font-size:11px">累计里程碑自动觉醒，永久生效</p>
+    <div style="max-height:55vh;overflow-y:auto;font-size:12px">${rows}</div>
+    <p style="text-align:center;color:#7fc7a3;margin-top:8px">已觉醒 ${unlocked.length} / ${TALENTS.length}</p>
+    <div class="btns"><button onclick="closeModal()">关 闭</button></div>`);
+}
+
 /* v12 · 秘境词缀 */
 const DUNGEON_MODS = [
   {nm:"炼狱",  desc:"怪物攻击 +40%",          apply:(m)=>{m.matk=Math.floor(m.matk*1.4)}},
@@ -4026,6 +4093,24 @@ function recalcStats(p){
   d.dodge   =  0.03 + eff.shen*0.0008 + eff.yun*0.0015;     // 闪避基础
   d.hit     =  0.95 + eff.shen*0.0010;                      // 命中基础
 
+  // v22：天赋加成
+  if(typeof talentStat === "function"){
+    refreshTalentCache(p);
+    d.atk  = Math.floor(d.atk * (1 + talentStat(p,"atkMul")));
+    d.def  = Math.floor(d.def * (1 + talentStat(p,"defMul")));
+    d.crit += talentStat(p,"critAdd");
+    const dxBonus = talentStat(p,"dxMax");
+    if(dxBonus) p.maxDx = (p.maxDx||100) + dxBonus;
+    const lifeBonus = talentStat(p,"lifeAdd");
+    if(lifeBonus){
+      if(!p._appliedTalents) p._appliedTalents = {};
+      if(!p._appliedTalents.lifeAdd){
+        p.lifespan += lifeBonus;
+        p._appliedTalents.lifeAdd = lifeBonus;
+      }
+    }
+  }
+
   // 上下限保护
   d.crit  = Math.max(0.02, Math.min(0.85, d.crit));
   d.dodge = Math.max(0,    Math.min(0.60, d.dodge));
@@ -4235,7 +4320,9 @@ function gainCult(p,base,reason){
   const fmnCult = (p.formation && FORMATIONS[p.formation]) ? (FORMATIONS[p.formation].cultBonus||0) : 0;
   const weEffect = typeof getWorldEventEffect==="function" ? getWorldEventEffect() : {};
   const weCultMul = (weEffect.cultMul || 1) * (1 + fmnCult);
-  const amt=Math.floor(base*rootMul(p)*TECHS[p.tech][0]*gearCultBonus(p)*buff.cultMul*bkMul*altMul*sectMul*weCultMul);
+  const tCultMul = 1 + (typeof talentStat==="function" ? talentStat(p,"cultMul") : 0);
+  const dScholar = typeof disciplePassive==="function" ? disciplePassive("scholar")*0.05 : 0;
+  const amt=Math.floor(base*rootMul(p)*TECHS[p.tech][0]*gearCultBonus(p)*buff.cultMul*bkMul*altMul*sectMul*weCultMul*tCultMul*(1+dScholar));
   const prevCult = p.cult;
   p.cult+=amt;
   const tags = [];
@@ -4376,7 +4463,8 @@ function passDays(p,n){
   if(p.disciples && p.disciples.length && n > 0){
     let totalIncome = 0;
     for(const d of p.disciples){
-      totalIncome += (5 + d.level * 3) * n;
+      const incomeMul = d.apt==="diligent" ? 1.5 : 1;
+      totalIncome += Math.floor((5 + d.level * 3) * incomeMul) * n;
       if(Math.random() < 0.005 * n) d.level = Math.min(20, d.level + 1);
     }
     if(totalIncome > 0) addItem(p, "灵石", totalIncome);
@@ -4703,7 +4791,7 @@ function attackerOf(p, override){
   const desperateCritAdd = desperate ? 0.25 : 0;
   const desperateCritDmgAdd = desperate ? 0.8 : 0;
   return Object.assign({
-    atk:Math.floor(d.atk*buff.atkMul*desperateAtkMul),
+    atk:Math.floor(d.atk*buff.atkMul*desperateAtkMul*(1+(typeof disciplePassive==="function"?disciplePassive("fighter")*0.03:0))),
     crit:Math.min(0.95, d.crit + (buff.critAdd||0) + desperateCritAdd),
     critDmg:d.critDmg + desperateCritDmgAdd,
     hit:d.hit, pen:d.pen,
@@ -6554,6 +6642,8 @@ function alchemyMake(name){
   const buff = getBuff(P);
   let rate = r.rate + P.realmIdx*0.01 + P.alchemyLv*0.02 + (buff.alchemyAdd||0);
   if(hasTechPassive("alchemyBoost")) rate += 0.10;
+  if(typeof talentStat==="function") rate += talentStat(P,"alchAdd");
+  if(typeof disciplePassive==="function") rate += disciplePassive("alchemy") * 0.03;
   rate = Math.min(0.95, rate);
   log(`丹炉升起，炼制【${name}】，成功率 ${Math.floor(rate*100)}%……`, "sys");
   setTimeout(()=>{
@@ -7243,6 +7333,35 @@ function getSectCultBonus(){
   const idx = SECT_RANKS.indexOf(getSectRank());
   return [0, 0.05, 0.10, 0.15, 0.20, 0.25][idx] || 0;
 }
+// v22 · 弟子资质
+const DISCIPLE_APTITUDES = [
+  {id:"diligent", nm:"勤修",  desc:"产出+50%",   color:"#7fc7a3"},
+  {id:"alchemy",  nm:"丹才",  desc:"炼丹+3%成功",color:"#c0a8d4"},
+  {id:"fighter",  nm:"战意",  desc:"战斗攻+3%",   color:"#d96a6a"},
+  {id:"lucky",    nm:"福运",  desc:"掉率+5%",     color:"#d4b46a"},
+  {id:"scholar",  nm:"博学",  desc:"修炼+5%",     color:"#7ab0d4"},
+];
+function discipleAptitude(){
+  return DISCIPLE_APTITUDES[Math.floor(Math.random()*DISCIPLE_APTITUDES.length)];
+}
+function disciplePassive(key){
+  if(!P.disciples) return 0;
+  return P.disciples.filter(d=>d.apt===key).length;
+}
+function graduateDisciple(idx){
+  const d = (P.disciples||[])[idx]; if(!d || d.level < 15) return;
+  const reward = 200 + d.level * 50;
+  const item = ["破障丹","悟道茶","蟠桃"][Math.floor(Math.random()*3)];
+  addItem(P, "灵石", reward);
+  addItem(P, item, 1);
+  P.contrib += 100;
+  log(`★ 弟子【${d.name}】学成出师！赠灵石 ${reward}、${item} ×1、贡献 +100`,"epic");
+  addChronicle(`弟子【${d.name}】出师（Lv.${d.level}）。`);
+  P.disciples.splice(idx, 1);
+  refresh(); saveGame(true);
+  renderSectPanel();
+}
+
 function maxDisciples(){
   const rank = getSectRank();
   const idx = SECT_RANKS.indexOf(rank);
@@ -7350,9 +7469,13 @@ function renderSectPanel(){
   let discHtml = "";
   if(mxDisc > 0){
     const discRows = disciples.map((d,i)=>{
-      const income = 5 + d.level * 3;
-      return `<div class="shop-row"><div><div class="nm">${d.name}</div><div class="ds">Lv.${d.level} · 每日产出灵石 ×${income}</div></div>
-        <button class="sm" data-dismiss="${i}">逐出</button></div>`;
+      const incomeMul = d.apt==="diligent" ? 1.5 : 1;
+      const income = Math.floor((5 + d.level * 3) * incomeMul);
+      const aptInfo = DISCIPLE_APTITUDES.find(a=>a.id===d.apt);
+      const aptTag = aptInfo ? `<span style="color:${aptInfo.color};font-size:10px">【${aptInfo.nm}】</span>` : "";
+      const gradBtn = d.level >= 15 ? `<button class="sm" data-grad="${i}" style="color:#d4b46a">出师</button>` : "";
+      return `<div class="shop-row"><div><div class="nm">${d.name} ${aptTag}</div><div class="ds">Lv.${d.level} · 灵石/日 ×${income}</div></div>
+        <div>${gradBtn}<button class="sm" data-dismiss="${i}">逐出</button></div></div>`;
     }).join("") || `<div style="color:#a89c7c;font-size:11px">暂无弟子。</div>`;
     discHtml = `<h2 style="color:#7fc7a3;font-size:13px;letter-spacing:3px;margin-top:10px">门 下 弟 子 (${disciples.length}/${mxDisc})</h2>
       ${discRows}
@@ -7401,6 +7524,12 @@ function renderSectPanel(){
       closeModal(); renderSectPanel(); saveGame(true);
     };
   });
+  document.querySelectorAll(".modal [data-grad]").forEach(b=>{
+    b.onclick = ()=>{
+      closeModal();
+      graduateDisciple(+b.dataset.grad);
+    };
+  });
   if($("btn-recruit")) $("btn-recruit").onclick = ()=>{
     if(P.contrib < 200){ log("贡献不足。","hint"); return; }
     if((P.disciples||[]).length >= maxDisciples()){ log("弟子已满。","hint"); return; }
@@ -7409,8 +7538,9 @@ function renderSectPanel(){
     const nm = names[Math.floor(Math.random()*names.length)] + ["子","儿","生","道人"][Math.floor(Math.random()*4)];
     const lv = Math.max(1, Math.floor(P.realmIdx/3));
     if(!P.disciples) P.disciples = [];
-    P.disciples.push({name:nm, level:lv, joinDay:P.days});
-    log(`★ 收【${nm}】为门下弟子（Lv.${lv}）！弟子每日产出灵石。`,"epic");
+    const apt = discipleAptitude();
+    P.disciples.push({name:nm, level:lv, joinDay:P.days, apt:apt.id});
+    log(`★ 收【${nm}】为门下弟子（Lv.${lv}·${apt.nm}）！弟子每日产出灵石。`,"epic");
     closeModal(); renderSectPanel(); saveGame(true);
   };
   $("sect-close").onclick = closeModal;
@@ -7962,11 +8092,14 @@ function endBattle(win){
     log(`※ 你击败了「${m.name}」！`,"good");
     gainCult(P,m.cr,"斩妖");
     const dgRichMul = (m.fromDungeon && P.curDungeon?.mod?.flag==="richLoot") ? 2 : 1;
-    addItem(P,"灵石",m.sr * dgRichMul);
+    const tStoneMul = 1 + (typeof talentStat==="function" ? talentStat(P,"stoneMul") : 0);
+    addItem(P,"灵石",Math.floor(m.sr * dgRichMul * tStoneMul));
     // v4：节气 lootMul 加成掉落概率（小满+10%）
     const buff = getBuff(P);
     const weEff = typeof getWorldEventEffect==="function" ? getWorldEventEffect() : {};
-    const lootMul = (buff.lootMul || 1) * (weEff.lootMul || 1);
+    const tDropAdd = typeof talentStat==="function" ? talentStat(P,"dropAdd") : 0;
+    const dLucky = typeof disciplePassive==="function" ? disciplePassive("lucky")*0.05 : 0;
+    const lootMul = (buff.lootMul || 1) * (weEff.lootMul || 1) * (1 + tDropAdd + dLucky);
     // 25% 丹药 / 5% 灵草 / 2% 装备
     if(Math.random()<0.25*lootMul){
       addItem(P,choice(["金创药","聚气丹","凝神丹","回元丹"]),1);
@@ -8675,6 +8808,7 @@ function afterAction(){
   refresh();
   saveGame(true);
   checkAchievements();
+  checkTalentUnlocks();
   if(!alive(P)){
     setTimeout(gameOver,400);
     return;
@@ -9463,6 +9597,7 @@ if($("btn-synthesis")) $("btn-synthesis").onclick = openSynthesis;
 if($("btn-chronicle")) $("btn-chronicle").onclick = openChronicle;
 if($("btn-arena")) $("btn-arena").onclick = openArena;
 if($("btn-dailies")) $("btn-dailies").onclick = openDailies;
+if($("btn-talent")) $("btn-talent").onclick = openTalentPanel;
 $("btn-calendar").onclick= openCalendar;
 // v5：夙愿入口（按钮 + 状态行）
 $("btn-quest").onclick   = openQuestPanel;
