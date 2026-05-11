@@ -501,6 +501,7 @@
         <button id="btn-talent">🌟 天 赋</button>
         <button id="btn-salvage">⚒ 分 解</button>
         <button id="btn-cave">🏠 洞 府</button>
+        <button id="btn-treasure">🗺 探 宝</button>
       </div>
 
       <!-- 第 3 组：故事 / 工具 -->
@@ -2368,6 +2369,10 @@ const ITEMS = {
   "九叶玄参苗":{type:"种子",desc:"播种于灵田，240 天后收获九叶玄参"},
   // v25 · 装备分解
   "强化石":  {type:"材料",desc:"装备分解产物。强化时消耗可提升成功率 +10%"},
+  "铜质藏宝图":{type:"奇物",desc:"标记着一处低阶遗迹的藏宝图"},
+  "银质藏宝图":{type:"奇物",desc:"通往一处中阶秘藏的藏宝图"},
+  "金质藏宝图":{type:"奇物",desc:"指向上古修士洞府的藏宝图"},
+  "玉质藏宝图":{type:"奇物",desc:"记录着仙人遗宝之所的藏宝图"},
 };
 const MONSTERS = [
   // v11: 15 种怪物，填补等级空档，五行均衡
@@ -3542,6 +3547,56 @@ const DUNGEON_CHOICE_EVENTS = [
       dg._choiceDone=true; dungeonNextFloor();
     };});
   }},
+  // v27 · 新增秘境互动事件
+  {name:"炼器残炉", prob:0.08, trigger:(p,dg)=>{
+    const shardGain = 2 + Math.floor(p.realmIdx/4);
+    showModal(`<h3>🔨 炼 器 残 炉</h3>
+      <p>一座古老的炼器炉仍有余温，似乎还能使用。</p>
+      <div class="btns">
+        <button data-dgc="smelt">⚒ 投入多余装备分解（获${shardGain}强化石）</button>
+        <button data-dgc="warm">🔥 借炉温调息（回复25%真元）</button>
+        <button data-dgc="skip">离开</button>
+      </div>`);
+    document.querySelectorAll(".modal [data-dgc]").forEach(b=>{b.onclick=()=>{
+      const a=b.dataset.dgc; closeModal();
+      if(a==="smelt"){addItem(p,"强化石",shardGain);log(`残炉炼化，获得强化石 ×${shardGain}！`,"good");}
+      else if(a==="warm"){const m=Math.floor(p.maxMp*0.25);p.mp=Math.min(p.maxMp,p.mp+m);log(`炉温暖体，真元恢复 ${m}。`,"good");}
+      dg._choiceDone=true; dungeonNextFloor();
+    };});
+  }},
+  {name:"困兽之阵", prob:0.07, trigger:(p,dg)=>{
+    const atkBuff = 5 + p.realmIdx;
+    showModal(`<h3>🐉 困 兽 之 阵</h3>
+      <p>一头被困在阵法中的灵兽向你求助。</p>
+      <div class="btns">
+        <button data-dgc="free">🔓 破阵释放（获灵兽感恩，本秘境攻击+${atkBuff}）</button>
+        <button data-dgc="absorb">💀 吸收灵兽精元（+500修为，道心-5）</button>
+        <button data-dgc="skip">无视</button>
+      </div>`);
+    document.querySelectorAll(".modal [data-dgc]").forEach(b=>{b.onclick=()=>{
+      const a=b.dataset.dgc; closeModal();
+      if(a==="free"){p._dgAtkBuff=(p._dgAtkBuff||0)+atkBuff;log(`灵兽感恩，攻击临时+${atkBuff}！`,"good");}
+      else if(a==="absorb"){p.cult+=500;p.dx=Math.max(0,(p.dx||0)-5);log("精元入体，修为+500，但道心蒙尘……","bad");}
+      dg._choiceDone=true; dungeonNextFloor();
+    };});
+  }},
+  {name:"藏宝图残片", prob:0.05, trigger:(p,dg)=>{
+    const mapPool = TREASURE_MAPS.filter(tm => p.realmIdx >= tm.minRealm);
+    const tm = mapPool.length ? mapPool[Math.min(mapPool.length-1, Math.floor(Math.random()*mapPool.length))] : mapPool[0];
+    if(!tm){ dg._choiceDone=true; dungeonNextFloor(); return; }
+    showModal(`<h3>🗺 藏 宝 图 残 片</h3>
+      <p>墙壁上嵌着半张藏宝图，旁边还有一个灵石堆。</p>
+      <div class="btns">
+        <button data-dgc="map">🗺 取藏宝图（${tm.nm}）</button>
+        <button data-dgc="stone">💰 取灵石（${200+p.realmIdx*30}枚）</button>
+      </div>`);
+    document.querySelectorAll(".modal [data-dgc]").forEach(b=>{b.onclick=()=>{
+      const a=b.dataset.dgc; closeModal();
+      if(a==="map"){addItem(p,tm.nm,1);log(`拼得【${tm.nm}】！`,"epic");}
+      else if(a==="stone"){const s=200+p.realmIdx*30;addItem(p,"灵石",s);log(`收获灵石 ×${s}。`,"good");}
+      dg._choiceDone=true; dungeonNextFloor();
+    };});
+  }},
 ];
 
 /* ==========================================================
@@ -3648,6 +3703,10 @@ const DUNGEON_MODS = [
   {nm:"迷雾",  desc:"每层额外触发一个随机事件", apply:null, flag:"extraEvent"},
   {nm:"祝福",  desc:"每层恢复 10% 气血",       apply:null, flag:"blessing"},
   {nm:"诅咒",  desc:"怪物血量 +50%",           apply:(m)=>{m.mhp=Math.floor(m.mhp*1.5);m.hp=m.mhp}},
+  {nm:"狂暴",  desc:"怪物攻防 +20%，修为奖励 +60%", apply:(m)=>{m.matk=Math.floor(m.matk*1.2);m.mdef=Math.floor((m.mdef||0)*1.2)}, flag:"frenzy"},
+  {nm:"荒芜",  desc:"无随机事件，但每层灵石 +50", apply:null, flag:"barren"},
+  {nm:"轮回",  desc:"击杀怪物恢复 15% 气血",   apply:null, flag:"lifesteal"},
+  {nm:"藏宝",  desc:"掉率 +80%，但怪物双倍血量", apply:(m)=>{m.mhp=Math.floor(m.mhp*2);m.hp=m.mhp}, flag:"treasure"},
 ];
 
 /* v12 · 仙榜 */
@@ -4035,6 +4094,142 @@ function applyComboChain(chain, m){
     if(killed) return "killed";
   }
   return null;
+}
+
+// v27 · 藏宝图系统
+const TREASURE_MAPS = [
+  {id:"copper",  nm:"铜质藏宝图", tier:1, desc:"标记着一处低阶遗迹", minRealm:0,
+   steps:[
+     {text:"古树下发现一个石碑，上面刻着两条路。", choices:[
+       {label:"左路·密林", result:{items:{"聚气丹":3,"灵石":80}, text:"密林深处找到一个储物袋。"}},
+       {label:"右路·溪涧", result:{items:{"聚灵草":2,"凝血花":2}, text:"溪边发现几株灵草。"}}
+     ]}
+   ]},
+  {id:"silver",  nm:"银质藏宝图", tier:2, desc:"通往一处中阶秘藏", minRealm:3,
+   steps:[
+     {text:"山洞入口有阵法残留，需要选择破阵方式。", choices:[
+       {label:"强攻破阵", result:{items:{"灵石":200}, text:"阵法崩碎，灵石散落。", hpCost:0.2}},
+       {label:"巧解机关", result:{items:{"凝神丹":3,"破障丹":1}, text:"精妙解阵，丹药完好。"}}
+     ]},
+     {text:"洞内分为两个密室。", choices:[
+       {label:"左室·兵器架", result:{equip:true, text:"兵器架上取下一件装备。"}},
+       {label:"右室·藏经阁", result:{cult:500, text:"经卷蕴含修行感悟。"}}
+     ]}
+   ]},
+  {id:"gold",    nm:"金质藏宝图", tier:3, desc:"指向上古修士洞府", minRealm:6,
+   steps:[
+     {text:"洞府外有护山大阵，灵气凝实。", choices:[
+       {label:"以力破阵", result:{items:{"灵石":500}, text:"大阵碎裂，灵石四溅！", hpCost:0.3}},
+       {label:"参悟阵理", result:{items:{"悟道茶":3}, text:"参透阵法奥义，领悟颇深。"}}
+     ]},
+     {text:"洞府主殿有一尊石像和一座丹炉。", choices:[
+       {label:"叩拜石像", result:{stat:{dao:3}, text:"石像开眼，道韵灌体！"}},
+       {label:"翻检丹炉", result:{items:{"五行淬体丹":2,"筑基丹":1}, text:"炉中残留数枚灵丹。"}}
+     ]},
+     {text:"密室深处有一个玉匣。", choices:[
+       {label:"直接打开", result:{items:{"灵石":800}, equip:true, text:"玉匣中装备与灵石俱在！"}},
+       {label:"小心试探", result:{items:{"万年灵芝精":1}, text:"匣中一株万年灵芝，寿元珍宝！"}}
+     ]}
+   ]},
+  {id:"jade",    nm:"玉质藏宝图", tier:4, desc:"记录着仙人遗宝之所", minRealm:10,
+   steps:[
+     {text:"仙域入口云雾缭绕，两条仙路若隐若现。", choices:[
+       {label:"剑气开路", result:{items:{"灵石":1500}, text:"剑气斩开云雾，灵石如雨。", hpCost:0.25}},
+       {label:"随风而行", result:{cult:2000, text:"顺势而为，修为精进。"}}
+     ]},
+     {text:"仙人书房留有两卷秘籍。", choices:[
+       {label:"取战技卷", result:{stat:{ling:5,shen:3}, text:"战技精妙，根骨蜕变！"}},
+       {label:"取养生卷", result:{stat:{ti:5}, lifespan:50, text:"养生之道，延寿五十载！"}}
+     ]},
+     {text:"最深处有一座传送阵。", choices:[
+       {label:"踏入传送", result:{items:{"蟠桃":1,"灵石":2000}, text:"被传至蟠桃园，摘得仙桃！"}},
+       {label:"拆解传送阵", result:{items:{"强化石":8}, text:"传送阵分解出大量强化石。"}}
+     ]}
+   ]},
+];
+
+function hasTreasureMap(p){
+  return TREASURE_MAPS.some(tm => (p.bag[tm.nm]||0) > 0);
+}
+
+function openTreasureExplore(){
+  const maps = TREASURE_MAPS.filter(tm => (P.bag[tm.nm]||0) > 0);
+  if(!maps.length){ log("你没有藏宝图。","hint"); return; }
+  const rows = maps.map(tm=>`<div class="shop-row">
+    <div><div class="nm">${tm.nm}</div><div class="ds">${tm.desc}（×${P.bag[tm.nm]}）</div></div>
+    <button class="sm" data-map="${tm.id}">探宝</button>
+  </div>`).join("");
+  showModal(`<h3>🗺 藏 宝 图</h3><div style="text-align:left">${rows}</div>
+    <div class="btns"><button id="map-close">关闭</button></div>`);
+  document.querySelectorAll(".modal [data-map]").forEach(b=>{
+    b.onclick = ()=>{ closeModal(); startTreasureHunt(b.dataset.map); };
+  });
+  $("map-close").onclick = closeModal;
+}
+
+function startTreasureHunt(mapId){
+  const tm = TREASURE_MAPS.find(t=>t.id===mapId);
+  if(!tm || !(P.bag[tm.nm]>0)) return;
+  P.bag[tm.nm]--;
+  if(P.bag[tm.nm]<=0) delete P.bag[tm.nm];
+  log(`📜 展开【${tm.nm}】，踏上探宝之旅……`, "epic");
+  SFX.chime();
+  addChronicle(`探宝：${tm.nm}`);
+  treasureStep(tm, 0);
+}
+
+function treasureStep(tm, idx){
+  if(idx >= tm.steps.length){
+    log("✦ 宝藏探索完毕！满载而归。","epic");
+    SFX.milestone();
+    passDays(P, 2);
+    afterAction();
+    return;
+  }
+  const step = tm.steps[idx];
+  const btns = step.choices.map((c,i)=>
+    `<button class="sm" data-ti="${i}" style="margin:6px">${c.label}</button>`
+  ).join("");
+  showModal(`<h3>🗺 ${tm.nm} · 第${idx+1}关</h3>
+    <p style="text-align:left;margin:12px 0">${step.text}</p>
+    <div class="btns">${btns}</div>`);
+  document.querySelectorAll(".modal [data-ti]").forEach(b=>{
+    b.onclick = ()=>{
+      closeModal();
+      const c = step.choices[parseInt(b.dataset.ti)];
+      applyTreasureResult(c, tm, idx);
+    };
+  });
+}
+
+function applyTreasureResult(c, tm, idx){
+  const r = c.result;
+  log(`✦ ${r.text}`, "good");
+  if(r.items){
+    for(const [k,v] of Object.entries(r.items)) addItem(P, k, v);
+  }
+  if(r.cult) gainCult(P, r.cult, "探宝");
+  if(r.stat){
+    for(const [k,v] of Object.entries(r.stat)){ P[k] = (P[k]||0) + v; }
+    recalcStats(P);
+  }
+  if(r.lifespan) P.lifespan += r.lifespan;
+  if(r.hpCost){
+    const cost = Math.floor(P.maxHp * r.hpCost);
+    P.hp = Math.max(1, P.hp - cost);
+    log(`受到陷阱伤害 ${cost} 点。`, "bad");
+  }
+  if(r.equip){
+    const tierPool = Object.entries(EQUIPS).filter(([k,v])=>v.tier <= Math.min(6, Math.ceil(tm.tier*1.5)));
+    if(tierPool.length){
+      const [ename] = choice(tierPool);
+      addItem(P, ename, 1);
+      log(`获得装备【${ename}】！`, "good");
+    }
+  }
+  passDays(P, 1);
+  refresh();
+  setTimeout(()=> treasureStep(tm, idx+1), 600);
 }
 
 // v17 · 阵法系统
@@ -5119,7 +5314,7 @@ function attackerOf(p, override){
   const desperateCritAdd = desperate ? 0.25 : 0;
   const desperateCritDmgAdd = desperate ? 0.8 : 0;
   return Object.assign({
-    atk:Math.floor(d.atk*buff.atkMul*desperateAtkMul*(1+(typeof disciplePassive==="function"?disciplePassive("fighter")*0.03:0))),
+    atk:Math.floor((d.atk+(p._dgAtkBuff||0))*buff.atkMul*desperateAtkMul*(1+(typeof disciplePassive==="function"?disciplePassive("fighter")*0.03:0))),
     crit:Math.min(0.95, d.crit + (buff.critAdd||0) + desperateCritAdd),
     critDmg:d.critDmg + desperateCritDmgAdd,
     hit:d.hit, pen:d.pen,
@@ -8396,6 +8591,7 @@ function dungeonNextFloor(){
     if(typeof bountyAdvance === "function") bountyAdvance("dungeon");
     sectTaskAdvance("dungeon");
     P.curDungeon = null;
+    delete P._dgAtkBuff;
     log(`✦ 秘境【${dg.def.n}】通关！`,"epic");
     addChronicle(`通关秘境【${dg.def.n}】${dg.def.floors} 层。`);
     refresh();saveGame(true);
@@ -8406,6 +8602,11 @@ function dungeonNextFloor(){
   if(dgMod && dgMod.flag==="blessing"){
     const h=Math.floor(P.maxHp*0.1); P.hp=Math.min(P.maxHp,P.hp+h);
     log(`✦ 祝福之力：恢复 ${h} 气血。`,"good");
+  }
+  // v27: 词缀「荒芜」每层灵石
+  if(dgMod && dgMod.flag==="barren"){
+    addItem(P,"灵石",50);
+    log("荒芜之地，拾得散落灵石 ×50。","good");
   }
   // v18: 互动层间事件（非首层、非Boss层，且本层未处理过）
   if(dg.floor > 1 && dg.floor < dg.def.floors && !dg._choiceDone){
@@ -8429,7 +8630,7 @@ function dungeonNextFloor(){
     P.monster.matk = Math.floor(P.monster.matk * 1.4);
     if(dgMod && dgMod.apply) dgMod.apply(P.monster);
   }else{
-    if(dg.floor > 1 && typeof DUNGEON_EVENTS !== "undefined"){
+    if(dg.floor > 1 && typeof DUNGEON_EVENTS !== "undefined" && !(dgMod && dgMod.flag==="barren")){
       for(const ev of DUNGEON_EVENTS){
         if(Math.random() < ev.prob){
           const msg = ev.fn(P);
@@ -8659,7 +8860,13 @@ function endBattle(win){
   if(win){
     log(`※ 你击败了「${m.name}」！`,"good");
     const wrCrMul = typeof worldRuleMul==="function" ? worldRuleMul("crMul") : 1;
-    gainCult(P,Math.floor(m.cr * wrCrMul),"斩妖");
+    const dgFrenzyMul = (fromDg && P.curDungeon?.mod?.flag==="frenzy") ? 1.6 : 1;
+    gainCult(P,Math.floor(m.cr * wrCrMul * dgFrenzyMul),"斩妖");
+    // v27: 轮回词缀 — 击杀回血15%
+    if(fromDg && P.curDungeon?.mod?.flag==="lifesteal"){
+      const h=Math.floor(P.maxHp*0.15); P.hp=Math.min(P.maxHp,P.hp+h);
+      log(`轮回之力：吸取生机，恢复 ${h} 气血。`,"good");
+    }
     const dgRichMul = (m.fromDungeon && P.curDungeon?.mod?.flag==="richLoot") ? 2 : 1;
     const tStoneMul = 1 + (typeof talentStat==="function" ? talentStat(P,"stoneMul") : 0);
     const wrSrMul = typeof worldRuleMul==="function" ? worldRuleMul("srMul") : 1;
@@ -8670,7 +8877,8 @@ function endBattle(win){
     const tDropAdd = typeof talentStat==="function" ? talentStat(P,"dropAdd") : 0;
     const dLucky = typeof disciplePassive==="function" ? disciplePassive("lucky")*0.05 : 0;
     const wrLootMul = typeof worldRuleMul==="function" ? worldRuleMul("lootMul") : 1;
-    const lootMul = (buff.lootMul || 1) * (weEff.lootMul || 1) * (1 + tDropAdd + dLucky) * wrLootMul;
+    const dgTreasureMul = (fromDg && P.curDungeon?.mod?.flag==="treasure") ? 1.8 : 1;
+    const lootMul = (buff.lootMul || 1) * (weEff.lootMul || 1) * (1 + tDropAdd + dLucky) * wrLootMul * dgTreasureMul;
     // 25% 丹药 / 5% 灵草 / 2% 装备
     if(Math.random()<0.25*lootMul){
       addItem(P,choice(["金创药","聚气丹","凝神丹","回元丹"]),1);
@@ -8709,6 +8917,15 @@ function endBattle(win){
       else if(fromDg && P.realmIdx >= 18 && Math.random() < 0.001){
         addItem(P, "九转还魂丹", 1);
         log("✦ 九转还魂丹现世！活死人肉白骨，逆天之物！","epic");
+      }
+    }
+    // v27 · 3% 掉落藏宝图
+    if(Math.random() < 0.03 * lootMul){
+      const mapPool = TREASURE_MAPS.filter(tm => P.realmIdx >= tm.minRealm);
+      if(mapPool.length){
+        const tm = choice(mapPool);
+        addItem(P, tm.nm, 1);
+        log(`🗺 获得【${tm.nm}】！`, "epic");
       }
     }
     if(m.isBoss && fromDg && P.curDungeon){
@@ -8775,7 +8992,7 @@ function endBattle(win){
     }
   }else{
     // 秘境失败：退出
-    if(fromDg) P.curDungeon = null;
+    if(fromDg){ P.curDungeon = null; delete P._dgAtkBuff; }
   }
   afterAction();
 }
@@ -10212,6 +10429,7 @@ if($("btn-talent")) $("btn-talent").onclick = openTalentPanel;
 if($("btn-bestiary")) $("btn-bestiary").onclick = openBestiary;
 if($("btn-salvage")) $("btn-salvage").onclick = openSalvagePanel;
 if($("btn-cave")) $("btn-cave").onclick = openCave;
+if($("btn-treasure")) $("btn-treasure").onclick = openTreasureExplore;
 $("btn-calendar").onclick= openCalendar;
 // v5：夙愿入口（按钮 + 状态行）
 $("btn-quest").onclick   = openQuestPanel;
