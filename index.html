@@ -499,6 +499,7 @@
         <button id="btn-arena">⚔ 擂 台</button>
         <button id="btn-dailies">📋 日 常</button>
         <button id="btn-talent">🌟 天 赋</button>
+        <button id="btn-salvage">⚒ 分 解</button>
       </div>
 
       <!-- 第 3 组：故事 / 工具 -->
@@ -2364,6 +2365,8 @@ const ITEMS = {
   "千年灵芝孢":{type:"种子",desc:"播种于灵田，90 天后收获千年灵芝"},
   "万年玄参苗":{type:"种子",desc:"播种于灵田，150 天后收获万年玄参"},
   "九叶玄参苗":{type:"种子",desc:"播种于灵田，240 天后收获九叶玄参"},
+  // v25 · 装备分解
+  "强化石":  {type:"材料",desc:"装备分解产物。强化时消耗可提升成功率 +10%"},
 };
 const MONSTERS = [
   // v11: 15 种怪物，填补等级空档，五行均衡
@@ -3848,6 +3851,71 @@ function checkTechMutation(p){
   }
 }
 
+// v25 · 悟道系统
+const ENLIGHTEN_PATHS = [
+  {id:"atk", nm:"锋锐之道", desc:"攻击",  perLv:{ling:2},           icon:"⚔"},
+  {id:"def", nm:"不动之道", desc:"防御",  perLv:{ti:2},             icon:"🛡"},
+  {id:"spd", nm:"迅捷之道", desc:"身法暴击",perLv:{shen:1, yun:1}, icon:"💨"},
+  {id:"life",nm:"长生之道", desc:"寿元气血",perLv:{ti:1, lifespan:15},icon:"🌿"},
+];
+const ENLIGHTEN_THRESHOLDS = [30, 80, 150, 250, 400];
+
+function getEnlightenLevel(p, pathId){
+  if(!p.enlighten) return 0;
+  return p.enlighten[pathId] || 0;
+}
+
+function checkEnlighten(p){
+  const total = p.streak || 0;
+  const maxSlots = ENLIGHTEN_THRESHOLDS.filter(t=>total>=t).length;
+  if(maxSlots <= 0) return;
+  const totalUsed = ENLIGHTEN_PATHS.reduce((s,path)=>s+getEnlightenLevel(p,path.id),0);
+  if(totalUsed >= maxSlots) return;
+  triggerEnlightenChoice(p);
+}
+
+function triggerEnlightenChoice(p){
+  const rows = ENLIGHTEN_PATHS.map(path=>{
+    const lv = getEnlightenLevel(p, path.id);
+    const maxLv = 5;
+    const desc = Object.entries(path.perLv).map(([k,v])=>{
+      if(k==="lifespan") return `寿元+${v}`;
+      const nm = STAT_DEF[k]?.nm || k;
+      return `${nm}+${v}`;
+    }).join("/");
+    return `<button data-enl="${path.id}" class="primary" style="width:100%;text-align:left;padding:8px 12px;margin:4px 0" ${lv>=maxLv?"disabled":""}>
+      ${path.icon} <b>${path.nm}</b> Lv.${lv}/${maxLv} <span style="color:#a89c7c;font-size:11px">（每级：${desc}）</span>
+    </button>`;
+  }).join("");
+  const total = p.streak||0;
+  const maxSlots = ENLIGHTEN_THRESHOLDS.filter(t=>total>=t).length;
+  const used = ENLIGHTEN_PATHS.reduce((s,path)=>s+getEnlightenLevel(p,path.id),0);
+  showModal(`<h3>🧘 悟 道</h3>
+    <p style="color:#a89c7c;font-size:11px">累计闭关 ${total} 次，可悟 ${maxSlots} 层（已悟 ${used}）</p>
+    <div>${rows}</div>
+    <div class="btns"><button id="enl-close">暂不选择</button></div>`);
+  document.querySelectorAll(".modal [data-enl]").forEach(b=>{
+    b.onclick = ()=>{
+      const pathId = b.dataset.enl;
+      const path = ENLIGHTEN_PATHS.find(x=>x.id===pathId);
+      if(!path) return;
+      if(!p.enlighten) p.enlighten = {};
+      p.enlighten[pathId] = (p.enlighten[pathId]||0) + 1;
+      const lv = p.enlighten[pathId];
+      for(const [k,v] of Object.entries(path.perLv)){
+        if(k === "lifespan") p.lifespan += v;
+        else p[k] = (p[k]||0) + v;
+      }
+      log(`✦ 悟道【${path.nm}】Lv.${lv}！`, "epic");
+      addChronicle(`悟道【${path.nm}】Lv.${lv}。`);
+      recalcStats(p);
+      closeModal();
+      refresh(); saveGame(true);
+    };
+  });
+  if($("enl-close")) $("enl-close").onclick = closeModal;
+}
+
 // v17 · 阵法系统
 const FORMATIONS = {
   "聚灵阵":  {tier:1, cultBonus:0.10, desc:"修炼效率 +10%",         price:300},
@@ -4068,6 +4136,8 @@ function newPlayer(name,rootName,elements){
     _techCultCount: 0,
     // —— v24 · 天道法则 ——
     worldRules: [],
+    // —— v25 · 悟道 ——
+    enlighten: {},
   };
   recalcStats(p);
   // 初始化后按当前 maxHp/maxMp 满血满蓝
@@ -5101,6 +5171,9 @@ function actCultivate(){
     log("✦ 累计闭关十五次，道行深厚（道行 +3 永久）", "epic");
     recalcStats(P);
   }
+
+  // v25 · 悟道检测
+  if(typeof checkEnlighten === "function") checkEnlighten(P);
 
   gainCult(P, total, `闭关${days}日`);
   // v23 · 功法突变检测
@@ -6852,18 +6925,27 @@ function openEnhance(slot){
       <div style="font-size:12px;color:#a89c7c;margin:4px 0">当前强化加成：${curDesc}</div>
       <div style="font-size:12px">强化至 +${lv+1}：成功率 <b style="color:${rate>=0.7?"#7fc7a3":"#e85050"}">${Math.floor(rate*100)}%</b></div>
       <div style="font-size:12px">消耗灵石：<b style="color:#d4b46a">${cost}</b>（持有 ${P.bag["灵石"]||0}）</div>
+      ${(P.bag["强化石"]||0)>0?`<div style="font-size:11px;color:#7fc7a3;margin-top:4px">💎 持有强化石 ×${P.bag["强化石"]}（使用可 +10% 成功率）</div>`:""}
       ${lv>=6?`<div style="font-size:11px;color:#e85050;margin-top:4px">⚠ +7 以上失败会降低 1 级</div>`:""}
     </div>
     <div class="btns">
       <button id="enh-go" class="primary" ${(P.bag["灵石"]||0)>=cost?"":"disabled"}>⚒ 强化</button>
+      ${(P.bag["强化石"]||0)>0?`<button id="enh-stone" class="primary" ${(P.bag["灵石"]||0)>=cost?"":"disabled"}>💎 强化（+石）</button>`:""}
       <button id="enh-close">取消</button>
     </div>`);
-  $("enh-go").onclick = ()=>{
+  function doEnhance(useStone){
     if((P.bag["灵石"]||0)<cost){ log("灵石不足。","hint"); return; }
     P.bag["灵石"] -= cost;
     if(!P.equipEnhance) P.equipEnhance = {};
+    let finalRate = rate;
+    if(useStone && (P.bag["强化石"]||0)>0){
+      P.bag["强化石"]--;
+      if(P.bag["强化石"]<=0) delete P.bag["强化石"];
+      finalRate = Math.min(1.0, rate + 0.10);
+      log(`💎 消耗强化石 ×1，成功率 ${Math.floor(rate*100)}% → ${Math.floor(finalRate*100)}%`,"hint");
+    }
     closeModal();
-    if(Math.random() < rate){
+    if(Math.random() < finalRate){
       P.equipEnhance[nm] = lv + 1;
       log(`✦ 强化成功！【${nm}】+${lv+1}！`,"epic");
       SFX.achieve();
@@ -6876,8 +6958,50 @@ function openEnhance(slot){
       }
     }
     recalcStats(P); refresh(); saveGame(true);
-  };
+  }
+  $("enh-go").onclick = ()=>doEnhance(false);
+  if($("enh-stone")) $("enh-stone").onclick = ()=>doEnhance(true);
   $("enh-close").onclick = closeModal;
+}
+
+// v25 · 装备分解
+const SALVAGE_YIELD = {1:{stone:20,shard:1},2:{stone:60,shard:2},3:{stone:150,shard:3},4:{stone:400,shard:5},5:{stone:1000,shard:8},6:{stone:3000,shard:12}};
+function salvageEquip(name){
+  const info = EQUIPS[name]; if(!info) return;
+  if(!(P.bag[name]>0)){ log("背包中没有该装备。","hint"); return; }
+  const y = SALVAGE_YIELD[info.tier] || {stone:10,shard:1};
+  P.bag[name]--;
+  if(P.bag[name]<=0) delete P.bag[name];
+  addItem(P, "灵石", y.stone);
+  addItem(P, "强化石", y.shard);
+  log(`⚒ 分解【${name}】→ 灵石 ×${y.stone}，强化石 ×${y.shard}`,"good");
+  SFX.hit();
+  refresh(); saveGame(true);
+}
+
+function openSalvagePanel(){
+  const eqItems = Object.entries(P.bag).filter(([k,v])=>EQUIPS[k]&&v>0);
+  if(!eqItems.length){
+    showModal(`<h3>⚒ 分 解</h3><p style="color:#a89c7c">背包中没有可分解的装备。</p>
+      <div class="btns"><button onclick="closeModal()">关 闭</button></div>`);
+    return;
+  }
+  const rows = eqItems.map(([name,cnt])=>{
+    const info = EQUIPS[name];
+    const y = SALVAGE_YIELD[info.tier]||{stone:10,shard:1};
+    return `<div class="shop-row"><div><div class="nm">${name} ×${cnt}</div>
+      <div class="ds">T${info.tier} → 灵石 ×${y.stone} + 强化石 ×${y.shard}</div></div>
+      <button class="sm" data-salv="${name}">分解</button></div>`;
+  }).join("");
+  showModal(`<h3>⚒ 装 备 分 解</h3>
+    <p style="color:#a89c7c;font-size:11px">分解多余装备获取灵石和强化石</p>
+    <div style="max-height:50vh;overflow-y:auto">${rows}</div>
+    <p style="font-size:11px;color:#7fc7a3;margin-top:6px">持有强化石：${P.bag["强化石"]||0}</p>
+    <div class="btns"><button id="salv-close">关 闭</button></div>`);
+  document.querySelectorAll(".modal [data-salv]").forEach(b=>{
+    b.onclick = ()=>{ closeModal(); salvageEquip(b.dataset.salv); openSalvagePanel(); };
+  });
+  $("salv-close").onclick = closeModal;
 }
 
 /* —— 本命法宝：祭炼（消耗 5000 灵石 + 一枚） —— */
@@ -9696,6 +9820,7 @@ function loadGame(){
     if(!d.dailies) d.dailies = null;
     if(d._techCultCount === undefined) d._techCultCount = 0;
     if(!d.worldRules) d.worldRules = [];
+    if(!d.enlighten) d.enlighten = {};
     // v4 寿元迁移：移除强制拉满逻辑（避免覆盖新机制），仅做异常兜底
     if(d.lifespan===undefined || d.lifespan<=0){
       d.lifespan = 80 + (d.realmIdx||0)*30;
@@ -9932,6 +10057,7 @@ if($("btn-arena")) $("btn-arena").onclick = openArena;
 if($("btn-dailies")) $("btn-dailies").onclick = openDailies;
 if($("btn-talent")) $("btn-talent").onclick = openTalentPanel;
 if($("btn-bestiary")) $("btn-bestiary").onclick = openBestiary;
+if($("btn-salvage")) $("btn-salvage").onclick = openSalvagePanel;
 $("btn-calendar").onclick= openCalendar;
 // v5：夙愿入口（按钮 + 状态行）
 $("btn-quest").onclick   = openQuestPanel;
