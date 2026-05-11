@@ -6958,6 +6958,45 @@ function autoTick(){
   // 修为达标自动突破（如果当前在自动模式且没在战斗）
   const t = nextThreshold(P);
   if(t!=null && P.cult>=t){
+    // v10.2 · 若还差击杀数/在冷却中，自动历练继续；自动闭关模式则提示切换
+    const nextIdx = P.realmIdx + 1;
+    const reqKills = nextIdx * 3;
+    const curKills = (P.stats?.kill||0);
+    const killsOk = curKills >= reqKills;
+    const cdRemain = (P._bkCooldown && (P.days||0) < P._bkCooldown) ? (P._bkCooldown - (P.days||0)) : 0;
+    const canBk = killsOk && cdRemain <= 0;
+
+    if(!canBk){
+      // 还不能突破：自动历练继续，自动闭关模式提示
+      if(AUTO.mode === "adv"){
+        // 节流：90 天提示一次，避免日志刷屏
+        if(!P._autoBkHintDay || (P.days - P._autoBkHintDay) >= 90){
+          const reason = !killsOk
+            ? `斩杀未足（${curKills}/${reqKills}）`
+            : `经脉恢复中（剩 ${cdRemain} 天）`;
+          log(`※ 修为已满，但${reason}。继续历练……`, "hint");
+          P._autoBkHintDay = P.days;
+        }
+        actAdventure();
+        return;
+      }else{
+        // 自动闭关：继续闭关既不涨击杀也不减冷却时间？—— 其实闭关能推进 days，所以冷却会自然消退；
+        //   但击杀数只能靠历练。若是击杀不足，必须切模式。
+        if(!killsOk){
+          autoStop(`修为已达【${REALMS[P.realmIdx+1][0]}】门槛，但需历经 ${reqKills} 场斩杀（当前 ${curKills}）。请切『自动历练』。`);
+          $("btn-bk").classList.add("primary");
+          return;
+        }
+        // 仅冷却未到：闭关能推时间，继续闭关即可（下一拍 days 增加后冷却就过了）
+        if(!P._autoBkHintDay || (P.days - P._autoBkHintDay) >= 90){
+          log(`※ 修为已满，经脉恢复中（剩 ${cdRemain} 天）。继续闭关静养……`, "hint");
+          P._autoBkHintDay = P.days;
+        }
+        actCultivate();
+        return;
+      }
+    }
+    // 可以突破了：正常停下让玩家突破
     autoStop(`修为已达【${REALMS[P.realmIdx+1][0]}】门槛，请手动突破`);
     // 让突破按钮闪一下
     $("btn-bk").classList.add("primary");
