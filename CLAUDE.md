@@ -3,7 +3,7 @@
 ## 项目概述
 
 单文件浏览器修仙挂机游戏。**零依赖**（纯 HTML+CSS+JS），双击 `index.html` 即玩。
-当前 ~11752 行，所有逻辑在一个 `<script>` 块内。存档用 localStorage。
+当前 ~11893 行，所有逻辑在一个 `<script>` 块内。存档用 localStorage。
 
 ## 技术架构
 
@@ -88,6 +88,8 @@ L8950-9900   DEV面板 + 帮助弹窗
 | `TREASURE_MAPS` | 4 种藏宝图（多步探索） |
 | `DESTINY_MISSIONS` | 8 种天命目标 |
 | `PET_ACTIVES` | 4 种灵宠主动技能 |
+| `REINCARNATION_SHOP` | 8 种轮回商店加成 |
+| `TRIBULATION_MODS` | 6 种天劫词缀 |
 
 ### P 对象关键字段
 

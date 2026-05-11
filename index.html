@@ -503,6 +503,7 @@
         <button id="btn-cave">🏠 洞 府</button>
         <button id="btn-treasure">🗺 探 宝</button>
         <button id="btn-destiny">⭐ 天 命</button>
+        <button id="btn-reincshop">🌀 轮 回</button>
       </div>
 
       <!-- 第 3 组：故事 / 工具 -->
@@ -3265,6 +3266,21 @@ const TRIBULATION_AT = {
   20: {name:"飞升仙劫",    bolts:15,dmg:[1600,3000],desc:"十五道九天雷 · 飞升或陨落"},
 };
 
+// v29 · 天劫词缀
+const TRIBULATION_MODS = [
+  {id:"wind",   nm:"风雷交加", desc:"伤害+20%，但每道雷后回5%HP",  dmgMul:1.2, healPct:0.05, color:"#7ab0d4"},
+  {id:"fire",   nm:"烈焰天劫", desc:"伤害+30%",                   dmgMul:1.3, healPct:0,    color:"#d96a6a"},
+  {id:"void",   nm:"虚空雷劫", desc:"伤害-10%，但无法服丹",        dmgMul:0.9, noPill:true,  color:"#c0a8d4"},
+  {id:"mercy",  nm:"天道垂怜", desc:"伤害-25%",                    dmgMul:0.75,healPct:0,    color:"#7fc7a3"},
+  {id:"chaos",  nm:"混沌劫雷", desc:"每道伤害随机波动±40%",         chaotic:true,             color:"#d4b46a"},
+  {id:"double", nm:"双雷齐落", desc:"每道雷打两次但各减半伤",       doubleBolt:true,          color:"#e8c547"},
+];
+
+function rollTribMod(){
+  if(Math.random() < 0.5) return null;
+  return TRIBULATION_MODS[Math.floor(Math.random()*TRIBULATION_MODS.length)];
+}
+
 /* —— 神通（按解锁境界索引） —— */
 const SKILLS = {
   "剑气斩":      {unlock:1,  cult:30,   dmg:1.8, desc:"剑气如虹，伤害 ×1.8，耗 30 修为"},
@@ -4379,6 +4395,91 @@ function openDestinyPanel(){
   $("dest-close").onclick = closeModal;
 }
 
+// v29 · 轮回商店
+const REINCARNATION_SHOP = [
+  {id:"fate_hp",   nm:"命格·坚体", desc:"每世起始HP+20",      cost:5,  max:10, apply:(p,lv)=>{p.maxHp+=20*lv;p.hp=p.maxHp}},
+  {id:"fate_atk",  nm:"命格·锋芒", desc:"每世起始ATK+3",      cost:8,  max:8,  apply:(p,lv)=>{p.atk+=3*lv}},
+  {id:"fate_stone", nm:"命格·富贵", desc:"每世起始灵石+50",    cost:5,  max:10, apply:(p,lv)=>{addItem(p,"灵石",50*lv)}},
+  {id:"fate_life",  nm:"命格·长寿", desc:"每世起始寿元+10",    cost:10, max:5,  apply:(p,lv)=>{p.lifespan+=10*lv}},
+  {id:"fate_dao",   nm:"命格·道心", desc:"每世起始道行+2",     cost:12, max:5,  apply:(p,lv)=>{p.dao+=2*lv}},
+  {id:"fate_cult",  nm:"命格·灵悟", desc:"每世修炼速度+3%",    cost:15, max:5,  apply:null, cultMul:0.03},
+  {id:"fate_luck",  nm:"命格·天运", desc:"每世掉率+5%",        cost:15, max:3,  apply:null, lootMul:0.05},
+  {id:"fate_pill",  nm:"命格·丹缘", desc:"每世起始聚气丹+3",   cost:6,  max:5,  apply:(p,lv)=>{addItem(p,"聚气丹",3*lv)}},
+];
+
+function openReincarnationShop(){
+  const L = loadLineage();
+  const pts = L.fatePoints || 0;
+  const bought = L.shopBought || {};
+  const rows = REINCARNATION_SHOP.map(item=>{
+    const lv = bought[item.id] || 0;
+    const maxed = lv >= item.max;
+    const canBuy = !maxed && pts >= item.cost;
+    return `<div class="shop-row">
+      <div><div class="nm">${item.nm} <span style="color:#7fc7a3;font-size:11px">Lv.${lv}/${item.max}</span></div><div class="ds">${item.desc}</div></div>
+      <div class="pr">${item.cost} 仙缘</div>
+      <button class="sm" data-fshop="${item.id}" ${canBuy?"":"disabled"}>${maxed?"已满":"购买"}</button>
+    </div>`;
+  }).join("");
+  showModal(`<h3>🌀 轮 回 商 店</h3>
+    <div style="text-align:center;color:#d4b46a;margin-bottom:8px">仙缘点：${pts}</div>
+    <div style="text-align:left">${rows}</div>
+    <div class="btns"><button id="fshop-close">关闭</button></div>`);
+  document.querySelectorAll(".modal [data-fshop]").forEach(b=>{
+    b.onclick = ()=>{
+      const id = b.dataset.fshop;
+      const item = REINCARNATION_SHOP.find(x=>x.id===id);
+      if(!item) return;
+      const LL = loadLineage();
+      const bght = LL.shopBought || {};
+      const clv = bght[id] || 0;
+      if(clv >= item.max || (LL.fatePoints||0) < item.cost) return;
+      LL.fatePoints -= item.cost;
+      bght[id] = clv + 1;
+      LL.shopBought = bght;
+      saveLineage(LL);
+      log(`轮回商店：购买【${item.nm}】Lv.${clv+1}！`, "epic");
+      closeModal();
+      openReincarnationShop();
+    };
+  });
+  $("fshop-close").onclick = closeModal;
+}
+
+function applyReincarnationShop(p){
+  const L = loadLineage();
+  const bought = L.shopBought || {};
+  for(const item of REINCARNATION_SHOP){
+    const lv = bought[item.id] || 0;
+    if(lv <= 0) continue;
+    if(item.apply) item.apply(p, lv);
+  }
+}
+
+function reincShopCultMul(){
+  const L = loadLineage();
+  const bought = L.shopBought || {};
+  let mul = 1;
+  for(const item of REINCARNATION_SHOP){
+    if(!item.cultMul) continue;
+    const lv = bought[item.id] || 0;
+    mul += item.cultMul * lv;
+  }
+  return mul;
+}
+
+function reincShopLootMul(){
+  const L = loadLineage();
+  const bought = L.shopBought || {};
+  let mul = 1;
+  for(const item of REINCARNATION_SHOP){
+    if(!item.lootMul) continue;
+    const lv = bought[item.id] || 0;
+    mul += item.lootMul * lv;
+  }
+  return mul;
+}
+
 // v17 · 阵法系统
 const FORMATIONS = {
   "聚灵阵":  {tier:1, cultBonus:0.10, desc:"修炼效率 +10%",         price:300},
@@ -4614,6 +4715,8 @@ function newPlayer(name,rootName,elements){
   applyLineage(p);
   // v28：天命分配
   if(typeof rollDestiny === "function") rollDestiny(p);
+  // v29：轮回商店加成
+  if(typeof applyReincarnationShop === "function") applyReincarnationShop(p);
   return p;
 }
 
@@ -4996,7 +5099,8 @@ function gainCult(p,base,reason){
   const dScholar = typeof disciplePassive==="function" ? disciplePassive("scholar")*0.05 : 0;
   const wrCultMul = typeof worldRuleMul==="function" ? worldRuleMul("cultMul") : 1;
   const caveMul = typeof caveCultBonus==="function" ? caveCultBonus(p) : 1;
-  const amt=Math.floor(base*rootMul(p)*TECHS[p.tech][0]*gearCultBonus(p)*buff.cultMul*bkMul*altMul*sectMul*weCultMul*tCultMul*(1+dScholar)*wrCultMul*caveMul);
+  const rsMul = typeof reincShopCultMul==="function" ? reincShopCultMul() : 1;
+  const amt=Math.floor(base*rootMul(p)*TECHS[p.tech][0]*gearCultBonus(p)*buff.cultMul*bkMul*altMul*sectMul*weCultMul*tCultMul*(1+dScholar)*wrCultMul*caveMul*rsMul);
   const prevCult = p.cult;
   p.cult+=amt;
   const tags = [];
@@ -7003,8 +7107,13 @@ function actAscension(){
     ).slice(-5);
     if(highlights.length) L.prevChronicle = highlights.map(c=>({...c, text:"【前世】"+c.text}));
   }
+  // v29: 飞升获得仙缘点
+  const destinyDone = (P.destiny||[]).filter(d=>d.done).length;
+  const fatePoints = 10 + Math.floor(P.realmIdx/2) + destinyDone*5 + (P.stats?.dungeon||0) + Math.floor((P.stats?.kill||0)/20);
+  L.fatePoints = (L.fatePoints||0) + fatePoints;
+  if(!L.shopBought) L.shopBought = {};
   // 仙缘事迹
-  const deed = `${P.name} · ${P.rootName}${P.elements.join("、")} · 修行 ${P.days} 天 · 飞升`;
+  const deed = `${P.name} · ${P.rootName}${P.elements.join("、")} · 修行 ${P.days} 天 · 飞升（+${fatePoints}仙缘）`;
   L.deeds = (L.deeds||[]).slice(-9).concat(deed);
   saveLineage(L);
   addChronicle(`羽化飞升！修行 ${P.days} 天，享年 ${P.age} 岁。`);
@@ -7032,6 +7141,7 @@ function actAscension(){
       ${L.inheritFormations&&L.inheritFormations.length?`<p>· 阵法传承：${L.inheritFormations.join("、")}</p>`:""}
       ${L.inheritArenaPts?`<p>· 擂台积分：${L.inheritArenaPts}</p>`:""}
       ${L.statEcho?`<p>· 根骨回响：前世修为化作先天底蕴</p>`:""}
+      <p style="color:#d4b46a">· 仙 缘 点：<b>+${fatePoints}</b>（累计 ${L.fatePoints}）— 可在轮回商店兑换</p>
     </div>
     <div class="btns"><button id="asc-rebirth" class="primary">入 轮 回 · 再 修 一 世</button></div>
   `);
@@ -7066,8 +7176,11 @@ function startTribulation(trib, nextIdx, useDan){
     if(pb){ partnerBonus = pb; }
   }
   // v6：tally 记录三种应对次数，用于结束时给差异化奖励
+  // v29: 天劫词缀
+  const tribMod = typeof rollTribMod==="function" ? rollTribMod() : null;
   P.tribulation = {trib, nextIdx, idx:0, bonus:(useDan?0.1:0)+karmaBonus+partnerBonus, hpStart:P.hp,
-    tally:{raw:0, pill:0, relic:0}};
+    tally:{raw:0, pill:0, relic:0}, mod:tribMod};
+  if(tribMod) log(`◆ 天劫词缀：【${tribMod.nm}】— ${tribMod.desc}`, "epic");
   if(Math.abs(karmaBonus) >= 0.05){
     log(`【业力·${karmaBonus>0?"善":"孽"}】${karmaBonus>0?"上苍垂怜，雷劫减伤 ":"业障牵引，雷劫增伤 "}${Math.round(Math.abs(karmaBonus)*100)}%`, "karma");
   }
@@ -7089,6 +7202,11 @@ function tribBoltRaw(){
   return processBolt(1.0, "硬 抗");
 }
 function tribBoltPill(){
+  // v29: 虚空雷劫禁止服丹
+  if(P.tribulation && P.tribulation.mod && P.tribulation.mod.noPill){
+    log("【虚空雷劫】灵力封锁，丹药无法服用！","bad");
+    return;
+  }
   // 找任意回血丹
   const hpPills = Object.keys(P.bag).filter(k=>ITEMS[k]&&ITEMS[k].hp);
   if(!hpPills.length){log("你身无回血丹药！","hint");return}
@@ -7134,12 +7252,29 @@ function processBolt(mul, tag){
   const raw = rand(tr.trib.dmg[0], tr.trib.dmg[1]);
   // 灵根加成减伤
   const rootReduce = (rootMul(P)-1)*0.05;
-  let dmg = Math.floor(raw * mul * (1 - rootReduce - (tr.bonus||0)));
+  // v29: 天劫词缀修饰
+  const tMod = tr.mod || {};
+  let modDmgMul = tMod.dmgMul || 1;
+  if(tMod.chaotic) modDmgMul = 0.6 + Math.random()*0.8;
+  if(tMod.doubleBolt) modDmgMul = 0.5;
+  let dmg = Math.floor(raw * mul * modDmgMul * (1 - rootReduce - (tr.bonus||0)));
   dmg = Math.max(1, dmg);
   // 防御减伤
   dmg = Math.max(1, dmg - Math.floor(totalDef(P)*0.3));
-  log(`▲ 第 ${tr.idx}/${tr.trib.bolts} 道雷降下（${tag}）→ 受 ${dmg} 伤害`, "bad");
-  takeDmg(P, dmg);
+  if(tMod.doubleBolt){
+    const dmg2 = Math.max(1, Math.floor(raw * mul * 0.5 * (1 - rootReduce - (tr.bonus||0))) - Math.floor(totalDef(P)*0.3));
+    log(`▲ 第 ${tr.idx}/${tr.trib.bolts} 道双雷齐落（${tag}）→ 受 ${dmg}+${dmg2} 伤害`, "bad");
+    takeDmg(P, dmg + dmg2);
+  } else {
+    log(`▲ 第 ${tr.idx}/${tr.trib.bolts} 道雷降下（${tag}）→ 受 ${dmg} 伤害`, "bad");
+    takeDmg(P, dmg);
+  }
+  // v29: 风雷交加回血
+  if(tMod.healPct && tMod.healPct > 0){
+    const h = Math.floor(P.maxHp * tMod.healPct);
+    P.hp = Math.min(P.maxHp, P.hp + h);
+    log(`风雷余韵化为灵力，恢复 ${h} 气血。`, "good");
+  }
 
   if(P.hp<=0){
     // v4：渡劫失败先大损寿元，未尽则重伤退出（劫消可再渡），尽则真坐化
@@ -9053,7 +9188,8 @@ function endBattle(win){
     const dLucky = typeof disciplePassive==="function" ? disciplePassive("lucky")*0.05 : 0;
     const wrLootMul = typeof worldRuleMul==="function" ? worldRuleMul("lootMul") : 1;
     const dgTreasureMul = (fromDg && P.curDungeon?.mod?.flag==="treasure") ? 1.8 : 1;
-    const lootMul = (buff.lootMul || 1) * (weEff.lootMul || 1) * (1 + tDropAdd + dLucky) * wrLootMul * dgTreasureMul;
+    const rsLootMul = typeof reincShopLootMul==="function" ? reincShopLootMul() : 1;
+    const lootMul = (buff.lootMul || 1) * (weEff.lootMul || 1) * (1 + tDropAdd + dLucky) * wrLootMul * dgTreasureMul * rsLootMul;
     // 25% 丹药 / 5% 灵草 / 2% 装备
     if(Math.random()<0.25*lootMul){
       addItem(P,choice(["金创药","聚气丹","凝神丹","回元丹"]),1);
@@ -10048,7 +10184,11 @@ function gameOver(){
       oldEcho[k] = Math.min(10, Math.max(oldEcho[k], Math.floor(peakStats[k]*0.03)));
     }
     L.statEcho = oldEcho;
-    const deed = `${P.name} · ${P.rootName} · 修行 ${P.days} 天 · 寿终 · ${REALMS[P.realmIdx][0]}`;
+    // v29: 寿终也获少量仙缘点
+    const deathFate = 3 + Math.floor(P.realmIdx/3);
+    L.fatePoints = (L.fatePoints||0) + deathFate;
+    if(!L.shopBought) L.shopBought = {};
+    const deed = `${P.name} · ${P.rootName} · 修行 ${P.days} 天 · 寿终 · ${REALMS[P.realmIdx][0]}（+${deathFate}仙缘）`;
     L.deeds = (L.deeds||[]).slice(-9).concat(deed);
     saveLineage(L);
     // —— 寿元耗尽：不可逆 ——
@@ -10615,6 +10755,7 @@ if($("btn-salvage")) $("btn-salvage").onclick = openSalvagePanel;
 if($("btn-cave")) $("btn-cave").onclick = openCave;
 if($("btn-treasure")) $("btn-treasure").onclick = openTreasureExplore;
 if($("btn-destiny")) $("btn-destiny").onclick = openDestinyPanel;
+if($("btn-reincshop")) $("btn-reincshop").onclick = openReincarnationShop;
 $("btn-calendar").onclick= openCalendar;
 // v5：夙愿入口（按钮 + 状态行）
 $("btn-quest").onclick   = openQuestPanel;
