@@ -458,6 +458,7 @@
     <div class="row"><span class="k"><i class="ico">💠</i>贡献</span><span class="v" id="s-contrib">0</span></div>
     <div class="row"><span class="k"><i class="ico">📅</i>修行</span><span class="v" id="s-days">0 天</span></div>
     <div class="row"><span class="k"><i class="ico">🏮</i>时节</span><span class="v" id="s-cal" style="font-size:12px">紫微 1 年 · 春 · 立春</span></div>
+    <div class="row" id="s-we-row" style="display:none"><span class="k"><i class="ico">🌌</i>天象</span><span class="v" id="s-we" style="font-size:12px">—</span></div>
     <button class="ghost" id="btn-stats" style="width:100%;margin-top:8px;font-size:12px">🔮 玄 机 详 情</button>
     <div id="panel-stats" style="display:none;margin-top:8px"></div>
   </aside>
@@ -3138,6 +3139,36 @@ const HERB_SEEDS = {
 };
 function gardenMaxPlots(){ return Math.min(6, 3 + Math.floor((P?P.realmIdx:0)/5)); }
 
+// v15 · 天象系统
+const WORLD_EVENTS = [
+  {id:"spirit_tide",  nm:"灵气潮汐", desc:"天地灵气涌动如潮，修炼效率大增！", dur:30,
+   effect:{cultMul:1.5}, color:"#7fc7a3"},
+  {id:"beast_surge",  nm:"妖兽暴动", desc:"妖气冲天，各路妖兽倾巢而出！", dur:20,
+   effect:{lootMul:1.5, encounterUp:true}, color:"#e85050"},
+  {id:"meteor",       nm:"天降陨铁", desc:"一颗流星划过天际，坠于荒野。", dur:1,
+   effect:{giveItem:["玄铁剑",1]}, color:"#d4b46a"},
+  {id:"void_rift",    nm:"虚空裂隙", desc:"时空裂隙撕开，异界灵气涌入。", dur:15,
+   effect:{cultMul:1.3, danger:true}, color:"#b47cd4"},
+  {id:"double_moon",  nm:"双月齐辉", desc:"两轮明月同升，阴阳调和。", dur:10,
+   effect:{dxRegen:5, hpRegen:0.05}, color:"#d4d4ff"},
+  {id:"herb_bloom",   nm:"百草齐放", desc:"灵田中草木疯长，收获加倍！", dur:20,
+   effect:{gardenSpeed:2}, color:"#7fc77a"},
+];
+
+// v15 · 心魔系统数据
+const DEMON_TYPES = [
+  {id:"obsession", nm:"执念心魔", desc:"你过往的执念凝成魔影，在识海中反复低语。",
+    fight:"你与自己的执念正面交锋。", flee:"你强行压制执念，但它仍在暗处窥伺。"},
+  {id:"fear",      nm:"恐惧心魔", desc:"内心深处的恐惧化为实质，黑雾弥漫你的神识。",
+    fight:"你直面恐惧，以道心之光驱散黑暗。", flee:"你逃离恐惧，但它留下了裂痕。"},
+  {id:"greed",     nm:"贪婪心魔", desc:"无尽的贪欲在你识海中疯长，要吞噬你的理智。",
+    fight:"你斩断贪念，回归本心。", flee:"你暂时抑制了贪念，但它根基仍在。"},
+  {id:"rage",      nm:"嗔怒心魔", desc:"过往积压的怒火爆发，你几乎要走火入魔。",
+    fight:"你以止水之心化解怒焰。", flee:"你暂时平息了怒火，但心头仍有余烬。"},
+  {id:"doubt",     nm:"疑心心魔", desc:"你开始怀疑修行的意义——这一切值得吗？",
+    fight:"你坚定了道心，疑虑烟消云散。", flee:"疑惑未解，道心蒙尘。"},
+];
+
 /* —— 炼丹配方 —— */
 const RECIPES = {
   "聚气丹":  {herbs:{"聚灵草":2},                 rate:0.85, lv:1},
@@ -3532,6 +3563,11 @@ function newPlayer(name,rootName,elements){
     // —— v14 · 灵田种植 ——
     garden: [],                                // [{seed,plantDay}]
     checkin: null,                             // {lastDate,streak} 每日签到
+    // —— v15 · 心魔 + 弟子 ——
+    _demonPower: 0,                            // 心魔蓄积(>=80触发Boss)
+    _totalContrib: 0,                          // 宗门累计贡献(声望)
+    disciples: [],                             // [{name,level,joinDay}]
+    worldEvent: null,                          // {id,endDay} 当前天象
   };
   recalcStats(p);
   // 初始化后按当前 maxHp/maxMp 满血满蓝
@@ -3857,7 +3893,11 @@ function gainCult(p,base,reason){
   }
   // P0-1 · 交替奖励临时倍率
   const altMul = p._advAltMul || 1;
-  const amt=Math.floor(base*rootMul(p)*TECHS[p.tech][0]*gearCultBonus(p)*buff.cultMul*bkMul*altMul);
+  // v15 · 宗门声望加成 + 天象加成
+  const sectMul = 1 + (typeof getSectCultBonus==="function" ? getSectCultBonus() : 0);
+  const weEffect = typeof getWorldEventEffect==="function" ? getWorldEventEffect() : {};
+  const weCultMul = weEffect.cultMul || 1;
+  const amt=Math.floor(base*rootMul(p)*TECHS[p.tech][0]*gearCultBonus(p)*buff.cultMul*bkMul*altMul*sectMul*weCultMul);
   const prevCult = p.cult;
   p.cult+=amt;
   const tags = [];
@@ -3968,6 +4008,38 @@ function passDays(p,n){
   // v7 · 道侣每日寿元推进 / 好感冷却
   if(typeof partnerTickAfterAction === "function"){
     partnerTickAfterAction(n);
+  }
+  // v15 · 天象检测
+  if(p.worldEvent && p.days >= p.worldEvent.endDay){
+    log(`天象【${(WORLD_EVENTS.find(e=>e.id===p.worldEvent.id)||{}).nm||""}】已消散。`,"hint");
+    p.worldEvent = null;
+  }
+  if(!p.worldEvent && Math.random() < 0.02 * n){
+    triggerWorldEvent(p);
+  }
+  // v15 · 百草齐放加速灵田
+  if(p.worldEvent && p.garden){
+    const we = WORLD_EVENTS.find(e=>e.id===p.worldEvent.id);
+    if(we && we.effect.gardenSpeed){
+      for(const plot of p.garden){
+        if(!plot.mature) plot.plantDay -= Math.floor(n * (we.effect.gardenSpeed - 1));
+      }
+    }
+  }
+  // v15 · 双月齐辉道心回复
+  if(p.worldEvent){
+    const we = WORLD_EVENTS.find(e=>e.id===p.worldEvent.id);
+    if(we && we.effect.dxRegen) p.dx = Math.min(p.maxDx, (p.dx||100) + we.effect.dxRegen * n);
+    if(we && we.effect.hpRegen) p.hp = Math.min(p.maxHp, p.hp + Math.floor(p.maxHp * we.effect.hpRegen * n));
+  }
+  // v15 · 弟子每日产出
+  if(p.disciples && p.disciples.length && n > 0){
+    let totalIncome = 0;
+    for(const d of p.disciples){
+      totalIncome += (5 + d.level * 3) * n;
+      if(Math.random() < 0.005 * n) d.level = Math.min(20, d.level + 1);
+    }
+    if(totalIncome > 0) addItem(p, "灵石", totalIncome);
   }
   // v14 · 灵田成熟检测
   if(p.garden && p.garden.length){
@@ -5338,6 +5410,10 @@ function actBreakthrough(){
         P._bkCooldown = (P.days||0) + 30;
         log("突破失败，经脉受损，修为倒退！","bad"); SFX.fail(); vfx("red"); screenShake();
         log(`经脉反噬，折寿 ${lifeLoss} 年！需静养30日方可再次冲关。（剩余寿元 ${Math.max(0, P.lifespan - P.age)} 年）`,"bad");
+        // v15：突破失败有概率触发心魔
+        if(P.realmIdx >= 3 && Math.random() < 0.3){
+          setTimeout(()=>triggerInnerDemon("breakthrough"), 600);
+        }
       }
       afterAction();
     },800);
@@ -5964,6 +6040,95 @@ function alchemyMake(name){
 }
 
 /* ==========================================================
+ *   v15 · 天象系统
+ * ========================================================== */
+function triggerWorldEvent(p){
+  const we = WORLD_EVENTS[Math.floor(Math.random()*WORLD_EVENTS.length)];
+  p.worldEvent = {id:we.id, endDay:p.days + we.dur};
+  log(`🌌 天象异变：【${we.nm}】— ${we.desc}（持续 ${we.dur} 天）`,"epic");
+  if(we.effect.giveItem){
+    addItem(p, we.effect.giveItem[0], we.effect.giveItem[1]);
+  }
+}
+function getWorldEventEffect(){
+  if(!P || !P.worldEvent) return {};
+  const we = WORLD_EVENTS.find(e=>e.id===P.worldEvent.id);
+  return we ? we.effect : {};
+}
+
+/* ==========================================================
+ *   v15 · 心魔系统（深化版）
+ * ========================================================== */
+function triggerInnerDemon(source){
+  if(!P || P.inBattle) return;
+  if(!P._demonPower) P._demonPower = 0;
+  P._demonPower += 10 + P.realmIdx * 2;
+  const demon = DEMON_TYPES[Math.floor(Math.random()*DEMON_TYPES.length)];
+  const power = P._demonPower;
+  const isBoss = power >= 80;
+  const title = isBoss ? `🔥 ${demon.nm}·觉醒` : `👁 ${demon.nm}`;
+  const descExtra = isBoss
+    ? `<p style="color:#e85050">心魔之力已蓄满（${power}），化为实体！</p>`
+    : `<p style="font-size:11px;color:#a89c7c">魔力蓄积：${power}/80</p>`;
+  showModal(`<h3>${title}</h3>
+    <p>${demon.desc}</p>${descExtra}
+    <div class="btns">
+      <button data-demon="fight">⚔ 正面对抗</button>
+      <button data-demon="meditate">🧘 禅定化解</button>
+      <button data-demon="embrace">🌑 与魔共存</button>
+    </div>`);
+  document.querySelectorAll(".modal [data-demon]").forEach(b=>{
+    b.onclick = ()=>{
+      const act = b.dataset.demon;
+      closeModal();
+      resolveDemon(demon, act, isBoss);
+    };
+  });
+}
+
+function resolveDemon(demon, action, isBoss){
+  const difficulty = isBoss ? 0.4 : 0.6;
+  if(action === "fight"){
+    if(Math.random() < difficulty){
+      P.dx = P.maxDx;
+      P._demonPower = 0;
+      const wuBonus = isBoss ? 8 : 3;
+      P.wu = (P.wu||0) + wuBonus;
+      recalcStats(P);
+      log(`✦ ${demon.fight} 道心圆满，悟性 +${wuBonus}！`,"epic");
+      if(isBoss){
+        const cultBonus = (P.realmIdx+1)*500;
+        gainCult(P, cultBonus, "心魔觉醒·降伏");
+        log(`击溃心魔，修为暴涨 +${cultBonus}！`,"epic");
+      }
+      SFX.achieve();
+    } else {
+      const dxLoss = isBoss ? 60 : 30;
+      const hpLoss = Math.floor(P.maxHp * (isBoss ? 0.4 : 0.2));
+      P.dx = Math.max(0, (P.dx||100) - dxLoss);
+      takeDmg(P, hpLoss);
+      log(`心魔反噬！道心 -${dxLoss}，气血 -${hpLoss}`,"bad");
+      if(isBoss) P._demonPower = 50;
+    }
+  } else if(action === "meditate"){
+    const dxGain = isBoss ? 15 : 25;
+    P.dx = Math.min(P.maxDx, (P.dx||100) + dxGain);
+    P._demonPower = Math.max(0, (P._demonPower||0) - (isBoss ? 20 : 30));
+    log(`${demon.flee} 道心 +${dxGain}，魔力消散一些。`,"good");
+  } else {
+    P.karma = Math.max(-100, (P.karma||0) - 8);
+    const cultBonus = (P.realmIdx+1)*300;
+    gainCult(P, cultBonus, "魔道");
+    P.ti = (P.ti||0) + 3;
+    P._demonPower = Math.max(0, (P._demonPower||0) - 15);
+    recalcStats(P);
+    log(`你吸纳了心魔的一部分力量（修为 +${cultBonus}，体魄 +3，业力 -8）`,"bad");
+  }
+  refresh(); saveGame(true);
+  if(P.hp <= 0) setTimeout(gameOver, 400);
+}
+
+/* ==========================================================
  *   v14 · 每日签到系统
  * ========================================================== */
 function getCheckinDateStr(){
@@ -6105,8 +6270,35 @@ function harvestPlot(idx){
 }
 
 /* ==========================================================
- *   宗门系统
+ *   宗门系统 (v15增强：声望阶级 + 弟子)
  * ========================================================== */
+const SECT_RANKS = [
+  {name:"外门弟子", need:0,    perk:""},
+  {name:"内门弟子", need:200,  perk:"修炼 +5%"},
+  {name:"核心弟子", need:800,  perk:"修炼 +10%，任务奖励 ×1.5"},
+  {name:"亲传弟子", need:2000, perk:"修炼 +15%，可收徒"},
+  {name:"长老",     need:5000, perk:"修炼 +20%，弟子上限 +1"},
+  {name:"太上长老", need:12000,perk:"修炼 +25%，弟子上限 +2，独享功法"},
+];
+function getSectRank(){
+  if(!P||!P.sect) return SECT_RANKS[0];
+  const total = P._totalContrib || 0;
+  let r = SECT_RANKS[0];
+  for(const rank of SECT_RANKS){ if(total >= rank.need) r = rank; }
+  return r;
+}
+function getSectCultBonus(){
+  if(!P||!P.sect) return 0;
+  const idx = SECT_RANKS.indexOf(getSectRank());
+  return [0, 0.05, 0.10, 0.15, 0.20, 0.25][idx] || 0;
+}
+function maxDisciples(){
+  const rank = getSectRank();
+  const idx = SECT_RANKS.indexOf(rank);
+  if(idx < 3) return 0;
+  return idx - 2;
+}
+
 function openSect(){
   if(P.inBattle){log("战斗中不可访。","hint");return}
   if(!P.sect){
@@ -6132,6 +6324,8 @@ function openSect(){
       b.onclick = ()=>{
         const s = b.dataset.sect;
         P.sect = s;
+        P._totalContrib = P._totalContrib || 0;
+        P.disciples = P.disciples || [];
         log(`※ 你拜入【${s}】门下，成为外门弟子。`,"epic");
         closeModal(); refresh(); saveGame(true);
       };
@@ -6184,12 +6378,35 @@ function renderSectPanel(){
   </div>`).join("");
   const sectInfo = SECTS[s];
   const buffDesc = sectInfo ? sectInfo.desc.split("·").pop().trim() : "";
+  const rank = getSectRank();
+  const nextRank = SECT_RANKS[SECT_RANKS.indexOf(rank)+1];
+  const rankBar = nextRank
+    ? `→ ${nextRank.name}（需累计贡献 ${nextRank.need}，当前 ${P._totalContrib||0}）`
+    : "（已达最高阶）";
+  // v15 弟子区
+  const mxDisc = maxDisciples();
+  const disciples = P.disciples || [];
+  let discHtml = "";
+  if(mxDisc > 0){
+    const discRows = disciples.map((d,i)=>{
+      const income = 5 + d.level * 3;
+      return `<div class="shop-row"><div><div class="nm">${d.name}</div><div class="ds">Lv.${d.level} · 每日产出灵石 ×${income}</div></div>
+        <button class="sm" data-dismiss="${i}">逐出</button></div>`;
+    }).join("") || `<div style="color:#a89c7c;font-size:11px">暂无弟子。</div>`;
+    discHtml = `<h2 style="color:#7fc7a3;font-size:13px;letter-spacing:3px;margin-top:10px">门 下 弟 子 (${disciples.length}/${mxDisc})</h2>
+      ${discRows}
+      ${disciples.length < mxDisc ? `<div style="margin-top:4px"><button class="sm" id="btn-recruit" style="font-size:11px">📢 招收弟子（200贡献）</button></div>` : ""}`;
+  }
   showModal(`<h3>🏯 ${s}</h3>
-    <p style="font-size:12px;color:#a89c7c">贡献点：<b style="color:#d4b46a">${P.contrib}</b>${buffDesc?` · <span style="color:#7fc7a3">门派加成：${buffDesc}</span>`:""}</p>
+    <p style="font-size:12px;color:#a89c7c">
+      <b style="color:#d4b46a">${rank.name}</b> · 贡献 ${P.contrib} ${buffDesc?`· <span style="color:#7fc7a3">${buffDesc}</span>`:""}<br>
+      <span style="font-size:11px">${rankBar}</span>
+    </p>
     <h2 style="color:#d4b46a;font-size:13px;letter-spacing:3px;margin-top:4px">宗 门 任 务</h2>
     ${taskHtml}
     <h2 style="color:#d4b46a;font-size:13px;letter-spacing:3px;margin-top:10px">贡 献 商 店</h2>
     <div class="box left" style="padding:0;border:none;background:none">${shopRows}</div>
+    ${discHtml}
     <div class="btns"><button id="sect-close">离山</button></div>`);
   document.querySelectorAll(".modal [data-task]").forEach(b=>{
     b.onclick = ()=>{
@@ -6212,6 +6429,28 @@ function renderSectPanel(){
   if($("sect-abandon")) $("sect-abandon").onclick = ()=>{
     P.sectTask=null; log("放弃任务。","hint");
     closeModal();refresh();saveGame(true);
+  };
+  // v15 弟子
+  document.querySelectorAll(".modal [data-dismiss]").forEach(b=>{
+    b.onclick = ()=>{
+      const idx = +b.dataset.dismiss;
+      const d = (P.disciples||[])[idx];
+      if(d) log(`逐出弟子【${d.name}】。`,"hint");
+      P.disciples.splice(idx, 1);
+      closeModal(); renderSectPanel(); saveGame(true);
+    };
+  });
+  if($("btn-recruit")) $("btn-recruit").onclick = ()=>{
+    if(P.contrib < 200){ log("贡献不足。","hint"); return; }
+    if((P.disciples||[]).length >= maxDisciples()){ log("弟子已满。","hint"); return; }
+    P.contrib -= 200;
+    const names = ["云青","星河","墨染","风铃","紫烟","霜月","玄冰","碧落","清远","素心","长空","归云"];
+    const nm = names[Math.floor(Math.random()*names.length)] + ["子","儿","生","道人"][Math.floor(Math.random()*4)];
+    const lv = Math.max(1, Math.floor(P.realmIdx/3));
+    if(!P.disciples) P.disciples = [];
+    P.disciples.push({name:nm, level:lv, joinDay:P.days});
+    log(`★ 收【${nm}】为门下弟子（Lv.${lv}）！弟子每日产出灵石。`,"epic");
+    closeModal(); renderSectPanel(); saveGame(true);
   };
   $("sect-close").onclick = closeModal;
 }
@@ -6240,6 +6479,15 @@ function sectTaskAdvance(type, extra){
       log(`◆ 参悟道法，永久 +${t.dao} 道行（当前 ${P.dao}）`,"epic");
     }
     log(`✦ 任务【${t.n}】达成！贡献 +${t.contrib}`,"epic");
+    // v15：累计贡献(声望)
+    const prevTotal = P._totalContrib||0;
+    P._totalContrib = prevTotal + t.contrib;
+    const newRank = getSectRank();
+    const prevRankIdx = SECT_RANKS.reduce((best,r,i) => prevTotal >= r.need ? i : best, 0);
+    const newRankIdx = SECT_RANKS.indexOf(newRank);
+    if(newRankIdx > prevRankIdx){
+      log(`★ 宗门声望提升：【${newRank.name}】！${newRank.perk}`,"epic");
+    }
     // 消耗型：扣除物品
     if(t.type==="item"){
       for(let i=0;i<t.cnt;i++) consume(t.item);
@@ -6744,7 +6992,8 @@ function endBattle(win){
     addItem(P,"灵石",m.sr * dgRichMul);
     // v4：节气 lootMul 加成掉落概率（小满+10%）
     const buff = getBuff(P);
-    const lootMul = buff.lootMul || 1;
+    const weEff = typeof getWorldEventEffect==="function" ? getWorldEventEffect() : {};
+    const lootMul = (buff.lootMul || 1) * (weEff.lootMul || 1);
     // 25% 丹药 / 5% 灵草 / 2% 装备
     if(Math.random()<0.25*lootMul){
       addItem(P,choice(["金创药","聚气丹","凝神丹","回元丹"]),1);
@@ -7164,6 +7413,20 @@ function refresh(){
     const cal = $("s-cal");
     cal.textContent = `紫微${dt.year}年·${dt.seasonName}·${dt.termName}·${CAL.DAY_NAMES[dt.day-1]}`;
     cal.title = (TERM_BUFFS[dt.termName]||{}).desc || "";
+  }
+  // v15：天象显示
+  const weRow = $("s-we-row"), weEl = $("s-we");
+  if(weRow && weEl){
+    if(P.worldEvent){
+      const we = WORLD_EVENTS.find(e=>e.id===P.worldEvent.id);
+      if(we){
+        weRow.style.display = "";
+        const remain = Math.max(0, P.worldEvent.endDay - P.days);
+        weEl.innerHTML = `<span style="color:${we.color}">${we.nm}</span> <span style="font-size:10px;color:#a89c7c">(${remain}天)</span>`;
+      }
+    } else {
+      weRow.style.display = "none";
+    }
   }
 
   // 背包
@@ -7913,6 +8176,11 @@ function loadGame(){
     // v14 字段（灵田 + 签到）
     if(!Array.isArray(d.garden)) d.garden = [];
     if(!d.checkin) d.checkin = null;
+    // v15 字段（心魔 + 弟子 + 天象）
+    if(d._demonPower===undefined) d._demonPower = 0;
+    if(d._totalContrib===undefined) d._totalContrib = d.contrib||0;
+    if(!Array.isArray(d.disciples)) d.disciples = [];
+    if(d.worldEvent===undefined) d.worldEvent = null;
     // v4 寿元迁移：移除强制拉满逻辑（避免覆盖新机制），仅做异常兜底
     if(d.lifespan===undefined || d.lifespan<=0){
       d.lifespan = 80 + (d.realmIdx||0)*30;
