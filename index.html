@@ -524,6 +524,7 @@
       <button data-tab="skill">✨ 神通</button>
       <button data-tab="pet">🐉 灵宠</button>
       <button data-tab="partner">💞 道侣</button>
+      <button data-tab="garden">🌱 灵田</button>
       <button data-tab="achieve">🏆 成就</button>
       <button data-tab="hall">📜 仙榜</button>
     </div>
@@ -572,6 +573,16 @@
       <div id="partner-list" style="font-size:12px"></div>
       <div style="font-size:11px;color:#a89c7c;line-height:1.7;margin-top:8px">
         道侣 NPC 系统：外出历练、闭关异事有概率相逢。好感 ≥30「相知」可双修加修为；≥60「道侣」；≥80 可共度天劫减伤 30%，三劫共度即结为「白首」。道侣有寿元，若不带她度劫，终将先你而去。
+      </div>
+    </div>
+
+    <!-- v14 · 灵田面板 -->
+    <div class="tab-pane" id="pane-garden">
+      <div id="garden-plots" style="font-size:12px"></div>
+      <div style="margin-top:8px"><button id="btn-plant" class="sm" style="font-size:12px">播 种</button></div>
+      <div style="font-size:11px;color:#a89c7c;line-height:1.7;margin-top:8px">
+        灵田可种植灵草种子，经过一段时日自动成熟后收获。<br>
+        种子可于坊市购买或历练获取。境界越高可开辟越多灵田。
       </div>
     </div>
 
@@ -2323,6 +2334,13 @@ const ITEMS = {
   "洗髓丹":    {type:"奇物",desc:"洗去一种灵根属性，重新选择五行"},
   "逆天改命丹":{type:"奇物",desc:"传说中的神物——若你是废灵根，或可改写命数"},
   "鸿蒙古玉":  {type:"奇物",desc:"上古鸿蒙之气所凝，与「无属之体」共鸣方显神威"},
+  // v14 · 灵草种子
+  "聚灵草种":  {type:"种子",desc:"播种于灵田，15 天后收获聚灵草"},
+  "凝血花种":  {type:"种子",desc:"播种于灵田，20 天后收获凝血花"},
+  "破障花种":  {type:"种子",desc:"播种于灵田，45 天后收获破障花"},
+  "千年灵芝孢":{type:"种子",desc:"播种于灵田，90 天后收获千年灵芝"},
+  "万年玄参苗":{type:"种子",desc:"播种于灵田，150 天后收获万年玄参"},
+  "九叶玄参苗":{type:"种子",desc:"播种于灵田，240 天后收获九叶玄参"},
 };
 const MONSTERS = [
   // v11: 15 种怪物，填补等级空档，五行均衡
@@ -3109,6 +3127,17 @@ const HERBS = {
   "九叶玄参":    {tier:5, price:3000,desc:"化神期丹药主药"},
 };
 
+// v14 · 灵田种植数据
+const HERB_SEEDS = {
+  "聚灵草种":  {herb:"聚灵草",   days:15,  tier:0, price:3,   yield:[1,3]},
+  "凝血花种":  {herb:"凝血花",   days:20,  tier:0, price:5,   yield:[1,2]},
+  "破障花种":  {herb:"破障花",   days:45,  tier:2, price:30,  yield:[1,2]},
+  "千年灵芝孢":{herb:"千年灵芝", days:90,  tier:3, price:120, yield:[1,1]},
+  "万年玄参苗":{herb:"万年玄参", days:150, tier:4, price:500, yield:[1,1]},
+  "九叶玄参苗":{herb:"九叶玄参", days:240, tier:5, price:2000,yield:[1,1]},
+};
+function gardenMaxPlots(){ return Math.min(6, 3 + Math.floor((P?P.realmIdx:0)/5)); }
+
 /* —— 炼丹配方 —— */
 const RECIPES = {
   "聚气丹":  {herbs:{"聚灵草":2},                 rate:0.85, lv:1},
@@ -3186,6 +3215,13 @@ const MARKET = {
     {nm:"千年灵芝", pr:250},
     {nm:"万年玄参", pr:1000},
     {nm:"九叶玄参", pr:4000},
+    // v14 · 灵草种子
+    {nm:"聚灵草种",  pr:3},
+    {nm:"凝血花种",  pr:5},
+    {nm:"破障花种",  pr:30},
+    {nm:"千年灵芝孢",pr:120},
+    {nm:"万年玄参苗",pr:500},
+    {nm:"九叶玄参苗",pr:2000},
     {nm:"青铜剑",   pr:100, eq:true},
     {nm:"玄铁剑",   pr:800, eq:true},
     {nm:"赤炎刀",   pr:4000,eq:true},
@@ -3493,6 +3529,9 @@ function newPlayer(name,rootName,elements){
     eventChains: {},                           // 多步事件链进度
     cultRun: 0,                                // 连续闭关次数（交替奖励）
     advRun: 0,                                 // 连续历练次数（交替奖励）
+    // —— v14 · 灵田种植 ——
+    garden: [],                                // [{seed,plantDay}]
+    checkin: null,                             // {lastDate,streak} 每日签到
   };
   recalcStats(p);
   // 初始化后按当前 maxHp/maxMp 满血满蓝
@@ -3929,6 +3968,17 @@ function passDays(p,n){
   // v7 · 道侣每日寿元推进 / 好感冷却
   if(typeof partnerTickAfterAction === "function"){
     partnerTickAfterAction(n);
+  }
+  // v14 · 灵田成熟检测
+  if(p.garden && p.garden.length){
+    for(const plot of p.garden){
+      if(plot.mature) continue;
+      const sd = HERB_SEEDS[plot.seed];
+      if(sd && p.days - plot.plantDay >= sd.days){
+        plot.mature = true;
+        log(`🌱 灵田中的【${sd.herb}】已成熟，可前往收获！`,"good");
+      }
+    }
   }
 }
 /* v4：节庆事件触发（从队列取首项弹窗，玩家选项后再处理下一项） */
@@ -5416,6 +5466,21 @@ function doBreakthroughSuccess(){
   log(`气血 ${oldMax} → ${P.maxHp}，寿元 +${lifeGain}（阳寿 ${P.age}/${P.lifespan}）`,"good");
   if(headStart > 0) log(`突破余势，修为 +${headStart}（下阶起手）`, "good");
   log(`※ 突破余韵：30日内修为 ×1.5`, "epic");
+  // v13: 境界解锁提示
+  const REALM_UNLOCKS = {
+    1: "练气期：外出历练遇怪概率提升",
+    3: "练气六层：解锁宗门系统，可拜入五大宗门",
+    5: "筑基期：解锁秘境「青木秘境」、坊市稀品轮换",
+    7: "筑基大圆满：解锁高阶炼丹配方",
+    9: "金丹期：解锁秘境「炎魔窟」、新神通",
+    12:"元婴期：本命法宝附灵，解锁秘境「上古遗迹」",
+    15:"化神期：解锁秘境「太古战场」、天劫真血系统",
+    18:"渡劫期：解锁秘境「仙古墓」",
+    20:"飞升在望：修行圆满，可尝试羽化登仙！",
+  };
+  if(REALM_UNLOCKS[P.realmIdx]){
+    log(`★ 新境界解锁：${REALM_UNLOCKS[P.realmIdx]}`,"epic");
+  }
   // v8 · 道侣突破反应
   const bkPartners = (P.partners||[]).filter(x=>!x.deceased && x.fondness >= 30);
   if(bkPartners.length){
@@ -5896,6 +5961,147 @@ function alchemyMake(name){
     if(P.hp<=0) setTimeout(gameOver,400);
     else openAlchemy();
   }, 600);
+}
+
+/* ==========================================================
+ *   v14 · 每日签到系统
+ * ========================================================== */
+function getCheckinDateStr(){
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function tryDailyCheckin(){
+  if(!P) return;
+  if(!P.checkin) P.checkin = {lastDate:null, streak:0};
+  const today = getCheckinDateStr();
+  if(P.checkin.lastDate === today) return;
+  const yesterday = new Date(); yesterday.setDate(yesterday.getDate()-1);
+  const yStr = `${yesterday.getFullYear()}-${String(yesterday.getMonth()+1).padStart(2,'0')}-${String(yesterday.getDate()).padStart(2,'0')}`;
+  P.checkin.streak = (P.checkin.lastDate === yStr) ? P.checkin.streak + 1 : 1;
+  P.checkin.lastDate = today;
+  const streak = P.checkin.streak;
+  const baseStone = 20 + P.realmIdx * 10;
+  const baseCult = 30 + P.realmIdx * 15;
+  addItem(P, "灵石", baseStone);
+  gainCult(P, baseCult);
+  let bonusText = "";
+  if(streak >= 7){
+    const bonusPool = ["聚气丹","金创药","回元丹","凝神丹","聚灵草种","凝血花种"];
+    const bonus = bonusPool[Math.floor(Math.random()*bonusPool.length)];
+    addItem(P, bonus, 1);
+    bonusText = `<br>🎁 连续签到 ${streak} 天，额外获得【${bonus}】×1`;
+  }
+  if(streak >= 30){
+    addItem(P, "破障丹", 1);
+    bonusText += `<br>🎊 月签满勤，获【破障丹】×1`;
+  }
+  showModal(`<h3>📅 每日签到</h3>
+    <p>连续签到第 <b style="color:var(--gold)">${streak}</b> 天</p>
+    <p>获得 灵石 ×${baseStone}、修为 +${baseCult}${bonusText}</p>
+    <div class="btns"><button onclick="closeModal()">收下</button></div>`);
+  saveGame(true);
+}
+
+/* ==========================================================
+ *   v14 · 灵田种植系统
+ * ========================================================== */
+function renderGardenPanel(){
+  if(!P) return;
+  const el = $("garden-plots");
+  if(!el) return;
+  const max = gardenMaxPlots();
+  const plots = P.garden || [];
+  let html = `<div style="color:#7fc7a3;font-size:13px;letter-spacing:2px;margin-bottom:6px">灵田 ${plots.length}/${max} 畦</div>`;
+  if(!plots.length){
+    html += `<div style="color:#a89c7c">尚未种植任何灵草。</div>`;
+  }
+  for(let i=0;i<plots.length;i++){
+    const p = plots[i];
+    const sd = HERB_SEEDS[p.seed];
+    if(!sd) continue;
+    const elapsed = P.days - p.plantDay;
+    const pct = Math.min(100, Math.floor(elapsed/sd.days*100));
+    const mature = p.mature || elapsed >= sd.days;
+    const remain = mature ? 0 : sd.days - elapsed;
+    html += `<div class="garden-plot" style="border:1px solid var(--line);padding:6px 8px;margin:4px 0;border-radius:4px;background:rgba(50,60,50,.15)">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <span>🌿 ${sd.herb}（${p.seed}）</span>
+        ${mature
+          ? `<button class="sm" data-harvest="${i}" style="color:#7fc7a3">收 获</button>`
+          : `<span style="color:#a89c7c;font-size:11px">剩余 ${remain} 天</span>`}
+      </div>
+      <div style="height:4px;background:rgba(0,0,0,.3);border-radius:2px;margin-top:4px">
+        <div style="height:100%;width:${pct}%;background:${mature?'#7fc7a3':'#d4b46a'};border-radius:2px;transition:width .3s"></div>
+      </div>
+    </div>`;
+  }
+  el.innerHTML = html;
+  el.querySelectorAll("[data-harvest]").forEach(b=>{
+    b.onclick = ()=>harvestPlot(parseInt(b.dataset.harvest));
+  });
+}
+
+function openPlantModal(){
+  if(!P) return;
+  const max = gardenMaxPlots();
+  if((P.garden||[]).length >= max){
+    log("灵田已满，无法播种。","hint"); return;
+  }
+  const seeds = Object.entries(HERB_SEEDS).filter(([k,v])=>
+    (P.bag[k]||0)>=1 && v.tier <= Math.floor(P.realmIdx/3)+1
+  );
+  if(!seeds.length){
+    showModal(`<h3>🌱 播 种</h3><p>你没有可种植的种子。可在坊市购买或历练获取。</p>
+      <div class="btns"><button onclick="closeModal()">知道了</button></div>`);
+    return;
+  }
+  const rows = seeds.map(([k,v])=>{
+    return `<div class="shop-row">
+      <div><div class="nm">${k}</div><div class="ds">产出 ${v.herb} · ${v.days}天成熟 · 持有 ${P.bag[k]||0}</div></div>
+      <button class="sm" data-plant="${k}">种</button>
+    </div>`;
+  }).join("");
+  showModal(`<h3>🌱 播 种</h3>
+    <p style="font-size:12px;color:#a89c7c">灵田 ${(P.garden||[]).length}/${max} 畦</p>
+    <div class="box left" style="padding:0;border:none;background:none">${rows}</div>
+    <div class="btns"><button onclick="closeModal()">返回</button></div>`);
+  document.querySelectorAll(".modal [data-plant]").forEach(b=>{
+    b.onclick = ()=>{
+      plantSeed(b.dataset.plant);
+      closeModal();
+      openPlantModal();
+    };
+  });
+}
+
+function plantSeed(seedName){
+  const sd = HERB_SEEDS[seedName];
+  if(!sd) return;
+  if((P.bag[seedName]||0)<1){ log("种子不足。","hint"); return; }
+  if((P.garden||[]).length >= gardenMaxPlots()){ log("灵田已满。","hint"); return; }
+  consume(seedName);
+  if(!P.garden) P.garden = [];
+  P.garden.push({seed:seedName, plantDay:P.days, mature:false});
+  log(`🌱 在灵田中播下了【${seedName}】，预计 ${sd.days} 天后成熟。`,"good");
+  renderGardenPanel();
+  saveGame(true);
+}
+
+function harvestPlot(idx){
+  if(!P || !P.garden || !P.garden[idx]) return;
+  const plot = P.garden[idx];
+  const sd = HERB_SEEDS[plot.seed];
+  if(!sd) return;
+  if(!plot.mature && P.days - plot.plantDay < sd.days){ log("尚未成熟。","hint"); return; }
+  const qty = rand(sd.yield[0], sd.yield[1]);
+  addItem(P, sd.herb, qty);
+  if(Math.random()<0.3){
+    addItem(P, plot.seed, 1);
+    log(`意外收获了一颗【${plot.seed}】！`,"good");
+  }
+  P.garden.splice(idx, 1);
+  renderGardenPanel();
+  saveGame(true);
 }
 
 /* ==========================================================
@@ -6546,6 +6752,11 @@ function endBattle(win){
     if(Math.random()<0.15*lootMul){
       addItem(P, choice(["聚灵草","凝血花","破障花","千年灵芝"].slice(0, Math.min(4, 1+Math.floor(P.realmIdx/4)))), 1);
     }
+    // v14 · 8% 掉落灵草种子
+    if(Math.random()<0.08*lootMul){
+      const seedPool = Object.keys(HERB_SEEDS).slice(0, Math.min(6, 1+Math.floor(P.realmIdx/3)));
+      addItem(P, choice(seedPool), 1);
+    }
     P.stats.kill_noEquip = (P.stats.kill_noEquip||0) + 1;
     const equipGuarantee = P.stats.kill_noEquip >= 8;  // 每8场保底
     if(equipGuarantee || Math.random()<0.12*lootMul){
@@ -6977,6 +7188,7 @@ function refresh(){
       }
       else if(RELICS[k]) icon="🔮";
       else if(HERBS[k]) icon="🌿";
+      else if(ITEMS[k]&&ITEMS[k].type==="种子") icon="🌱";
       div.innerHTML=`<span>${icon} ${k}<div class="desc">${desc}</div></span><span class="qty">×${qty}</span>`;
       if(ITEMS[k]&&ITEMS[k].type==="丹药"){
         div.title="点击服用";
@@ -7119,6 +7331,8 @@ function refresh(){
   // v12：成就 + 仙榜面板
   if(typeof renderAchievePanel === "function") renderAchievePanel();
   if(typeof renderHallPanel === "function") renderHallPanel();
+  // v14：灵田面板
+  if(typeof renderGardenPanel === "function") renderGardenPanel();
 }
 
 /* v3：渲染玄机详情面板 HTML */
@@ -7696,6 +7910,9 @@ function loadGame(){
     if(d.advRun===undefined) d.advRun = 0;
     // v12 字段（成就系统）
     if(!d.achievements) d.achievements = {};
+    // v14 字段（灵田 + 签到）
+    if(!Array.isArray(d.garden)) d.garden = [];
+    if(!d.checkin) d.checkin = null;
     // v4 寿元迁移：移除强制拉满逻辑（避免覆盖新机制），仅做异常兜底
     if(d.lifespan===undefined || d.lifespan<=0){
       d.lifespan = 80 + (d.realmIdx||0)*30;
@@ -7920,6 +8137,7 @@ $("btn-reset").onclick= ()=>{
 };
 // 新功能按钮
 $("btn-alchemy").onclick = openAlchemy;
+if($("btn-plant")) $("btn-plant").onclick = openPlantModal;
 $("btn-sect").onclick    = openSect;
 $("btn-market").onclick  = openMarket;
 $("btn-dungeon").onclick = openDungeon;
@@ -8121,6 +8339,8 @@ function bootstrap(){
       saveGame(true);
     }
     refresh();
+    // v14：每日签到
+    setTimeout(()=>tryDailyCheckin(), 300);
     // v5：老档无夙愿者，下一拍主动询问立愿
     if(!P.quest){
       setTimeout(()=>pickInitialQuest(()=>{ refresh(); saveGame(true); }), 600);
