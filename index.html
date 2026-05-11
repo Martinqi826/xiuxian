@@ -506,6 +506,7 @@
         <button id="btn-quest">🌙 夙 愿</button>
         <button id="btn-calendar">📅 道 历</button>
         <button id="btn-chronicle">📜 纪 要</button>
+        <button id="btn-bestiary">📖 图 鉴</button>
         <button id="btn-save">💾 存 档</button>
         <button id="btn-help">📖 指 引</button>
       </div>
@@ -2384,6 +2385,42 @@ const MONSTERS = [
   /*14*/ ["散修剑仙",   20,  100000, 900,  9000,  3000, "金"],
 ];
 
+// v23 · 稀有变异妖兽
+const RARE_MONSTERS = [
+  {prefix:"血煞·", hpMul:1.8, atkMul:1.5, crMul:3, srMul:3, color:"#d96a6a", minLv:3},
+  {prefix:"灵变·", hpMul:1.5, atkMul:1.3, crMul:2, srMul:2, color:"#c0a8d4", minLv:0},
+  {prefix:"远古·", hpMul:2.5, atkMul:2.0, crMul:5, srMul:5, color:"#d4b46a", minLv:8},
+];
+function tryRareMonster(m){
+  if(Math.random() > 0.06) return null;
+  const pool = RARE_MONSTERS.filter(r => m[1] >= r.minLv);
+  if(!pool.length) return null;
+  const r = choice(pool);
+  return {
+    name: r.prefix + m[0], idx:MONSTERS.indexOf(m), lvl:m[1],
+    hp:Math.floor(m[2]*r.hpMul), maxHp:Math.floor(m[2]*r.hpMul),
+    atk:Math.floor(m[3]*r.atkMul), cr:Math.floor(m[4]*r.crMul), sr:Math.floor(m[5]*r.srMul),
+    ele:m[6], isRare:true, rareType:r.prefix, rareColor:r.color
+  };
+}
+
+function openBestiary(){
+  const rows = MONSTERS.map((m,i)=>{
+    const kills = (P.petDex||{})[m[0]] || 0;
+    const seen = kills > 0;
+    const rareKills = Object.keys(P.petDex||{}).filter(k=>k.endsWith(m[0])&&k!==m[0]).reduce((s,k)=>(P.petDex||{})[k]+s,0);
+    return `<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid rgba(255,255,255,.06);opacity:${seen?1:0.4}">
+      <span>${seen?"":"？"} <b>${seen?m[0]:"???"}</b> <span style="color:#a89c7c;font-size:10px">Lv.${m[1]} · ${m[6]}属</span></span>
+      <span style="font-size:11px;color:#7fc7a3">${kills?`击杀 ${kills}${rareKills?` (变异 ${rareKills})`:""}`:"未遇"}</span>
+    </div>`;
+  }).join("");
+  const totalSeen = MONSTERS.filter((_,i)=>(P.petDex||{})[MONSTERS[i][0]]>0).length;
+  showModal(`<h3>📖 妖 兽 图 鉴</h3>
+    <p style="color:#a89c7c;font-size:11px">收录 ${totalSeen}/${MONSTERS.length} 种</p>
+    <div style="max-height:55vh;overflow-y:auto;font-size:12px">${rows}</div>
+    <div class="btns"><button onclick="closeModal()">关 闭</button></div>`);
+}
+
 /* ============================================================
  *   v6.2 · 灵宠契约系统 数据表
  *   PETS_META: 兼容 MONSTERS 的灵宠 + 4 个专属蛋孵化的灵宠
@@ -3531,6 +3568,7 @@ const ACHIEVEMENTS = [
   {id:"no_equip_win",nm:"赤手空拳", desc:"不穿装备击败一只怪",       reward:"灵石×200",  check:p=>p.flags?._ach_bareWin},
   {id:"combo_10",    nm:"连击无双", desc:"单场战斗达成 10 连击",      reward:"灵石×300",  check:p=>p.flags?._ach_combo10},
   {id:"lifespan_500",nm:"长生久视", desc:"寿元超过 500 年",           reward:"蟠桃×1",    check:p=>(p.lifespan||0)>=500},
+  {id:"bestiary_all",nm:"万兽通览", desc:"图鉴收录全部 15 种妖兽",    reward:"混沌蛋×1",  check:p=>MONSTERS.every(m=>(p.petDex||{})[m[0]]>0)},
 ];
 
 /* v22 · 天赋系统 — 累计里程碑解锁永久被动 */
@@ -3723,6 +3761,55 @@ const TECH_META = {
 };
 
 function hasTechPassive(id){ return (TECH_META[P?.tech]||{}).passive === id; }
+
+// v23 · 功法突变
+const TECH_MUTATIONS = [
+  {from:"引气诀",     to:"引气真解",   need:30, prob:0.15},
+  {from:"玄阴真经",   to:"太阴玄经",   need:25, prob:0.12},
+  {from:"烈阳剑诀",   to:"大日焚天诀", need:25, prob:0.12},
+  {from:"九转玄功",   to:"九转混元功", need:20, prob:0.10},
+  {from:"混元归一诀", to:"太初归元诀", need:20, prob:0.10},
+  {from:"长生诀",     to:"不朽真经",   need:30, prob:0.08},
+  {from:"杀生剑意",   to:"灭世剑意",   need:20, prob:0.10},
+  {from:"造化神功",   to:"造化圣功",   need:20, prob:0.10},
+  {from:"天魔功",     to:"无上天魔经", need:15, prob:0.08},
+];
+// 突变后功法数据
+TECHS["引气真解"]   = [1.5, 5,  "引气诀突变，修为大增"];
+TECHS["太阴玄经"]   = [1.8, 10, "太阴之力，冰寒彻骨"];
+TECHS["大日焚天诀"] = [1.6, 22, "大日焚天，所向披靡"];
+TECHS["九转混元功"] = [2.2, 15, "混元归真，九转圆满"];
+TECHS["太初归元诀"] = [1.9, 8,  "太初归元，炼丹+15%"];
+TECHS["不朽真经"]   = [1.5, 5,  "不朽之道，闭关+5寿元"];
+TECHS["灭世剑意"]   = [1.4, 35, "灭世剑意，杀伐无双"];
+TECHS["造化圣功"]   = [2.0, 10, "造化万物，灵田翻倍"];
+TECHS["无上天魔经"] = [2.5, 25, "魔道巅峰，代价深重"];
+TECH_META["引气真解"]   = {el:null, mp:5};
+TECH_META["太阴玄经"]   = {el:"水", mp:10};
+TECH_META["大日焚天诀"] = {el:"火", mp:10};
+TECH_META["九转混元功"] = {el:null, mp:15};
+TECH_META["太初归元诀"] = {el:null, mp:10, passive:"alchemyBoost"};
+TECH_META["不朽真经"]   = {el:null, mp:5,  passive:"longevity"};
+TECH_META["灭世剑意"]   = {el:"金", mp:12, passive:"bloodthirst"};
+TECH_META["造化圣功"]   = {el:"木", mp:10, passive:"gardenBoost"};
+TECH_META["无上天魔经"] = {el:null, mp:20, passive:"demonic"};
+
+function checkTechMutation(p){
+  if(!p.tech) return;
+  const mut = TECH_MUTATIONS.find(m => m.from === p.tech);
+  if(!mut) return;
+  p._techCultCount = (p._techCultCount||0) + 1;
+  if(p._techCultCount >= mut.need && Math.random() < mut.prob){
+    const oldTech = p.tech;
+    p.tech = mut.to;
+    p._techCultCount = 0;
+    log(`✦✦ 功法突变！《${oldTech}》领悟至极，蜕变为《${mut.to}》！`, "epic");
+    log(`修炼速度 ×${TECHS[mut.to][0]}，攻击加成 +${TECHS[mut.to][1]}`, "good");
+    SFX.milestone(); vfx("gold");
+    addChronicle(`功法突变：《${oldTech}》→《${mut.to}》`);
+    recalcStats(p);
+  }
+}
 
 // v17 · 阵法系统
 const FORMATIONS = {
@@ -3940,6 +4027,8 @@ function newPlayer(name,rootName,elements){
     arena: {pts:0, wins:0, todayDate:"", todayCnt:0},
     // —— v21 · 每日挑战 ——
     dailies: null,
+    // —— v23 · 功法突变 ——
+    _techCultCount: 0,
   };
   recalcStats(p);
   // 初始化后按当前 maxHp/maxMp 满血满蓝
@@ -4968,6 +5057,8 @@ function actCultivate(){
   }
 
   gainCult(P, total, `闭关${days}日`);
+  // v23 · 功法突变检测
+  if(typeof checkTechMutation === "function") checkTechMutation(P);
   // v16 · 功法被动效果
   if(hasTechPassive("longevity")){ P.lifespan += 2; }
   if(hasTechPassive("bloodthirst")){ P.dx = Math.max(0, (P.dx||100) - 3); }
@@ -7931,18 +8022,31 @@ function startBattle(m){
   let [name,lvl,mhp,matk,cr,sr,ele]=m;
   // v3：定位怪物 idx（用于读 MONSTER_META 的 spd/crit/karma）
   const idx = MONSTERS.indexOf(m);
+  // v23 · 稀有变异检测
+  let isRare = false, rareColor = null;
+  if(typeof tryRareMonster === "function" && !m.isBoss && !m.fromDungeon){
+    const rare = tryRareMonster(m);
+    if(rare){
+      name = rare.name; mhp = rare.hp; matk = rare.atk;
+      cr = rare.cr; sr = rare.sr;
+      isRare = true; rareColor = rare.rareColor;
+      log(`✦ 变异妖兽出现！【${name}】散发着异样气息！`, "epic");
+      SFX.rumble();
+    }
+  }
   // v10：怪物动态缩放 — 玩家境界越高于怪物等级，怪物指数增强
   const gap = Math.max(0, P.realmIdx - lvl);
   if(gap > 0){
-    const hpScale  = Math.pow(1.25, gap);  // 每级差 ×1.25 HP（指数）
-    const atkScale = Math.pow(1.18, gap);  // 每级差 ×1.18 ATK（指数）
+    const hpScale  = Math.pow(1.25, gap);
+    const atkScale = Math.pow(1.18, gap);
     mhp  = Math.floor(mhp * hpScale);
     matk = Math.floor(matk * atkScale);
   }
   P.inBattle=true;
   P.monster={name,lvl,mhp,maxMhp:mhp,matk,cr,sr,ele:ele||null,rounds:0,idx,
     breakGauge:0, breakMax:3+Math.floor(idx/2), breakRounds:0,
-    combo:0, telegraphing:false, telegraphCd:0, healCount:0};
+    combo:0, telegraphing:false, telegraphCd:0, healCount:0,
+    isRare, rareColor};
   const eleTip = ele?`，属${ele}`:"";
   log(`※ 一只「${name}」拦住了你的去路！（HP ${mhp}, ATK ${matk}${eleTip}）`,"sys");
   // 五行提示
@@ -9363,6 +9467,7 @@ function loadGame(){
     if(!d.equipEnhance || typeof d.equipEnhance!=="object") d.equipEnhance = {};
     if(!d.arena) d.arena = {pts:0, wins:0, todayDate:"", todayCnt:0};
     if(!d.dailies) d.dailies = null;
+    if(d._techCultCount === undefined) d._techCultCount = 0;
     // v4 寿元迁移：移除强制拉满逻辑（避免覆盖新机制），仅做异常兜底
     if(d.lifespan===undefined || d.lifespan<=0){
       d.lifespan = 80 + (d.realmIdx||0)*30;
@@ -9598,6 +9703,7 @@ if($("btn-chronicle")) $("btn-chronicle").onclick = openChronicle;
 if($("btn-arena")) $("btn-arena").onclick = openArena;
 if($("btn-dailies")) $("btn-dailies").onclick = openDailies;
 if($("btn-talent")) $("btn-talent").onclick = openTalentPanel;
+if($("btn-bestiary")) $("btn-bestiary").onclick = openBestiary;
 $("btn-calendar").onclick= openCalendar;
 // v5：夙愿入口（按钮 + 状态行）
 $("btn-quest").onclick   = openQuestPanel;
