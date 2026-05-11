@@ -547,8 +547,9 @@
         <div class="slot" data-slot="accessory"><div class="lbl">饰 品</div><div class="nm empty">— 空 —</div></div>
         <div class="slot" data-slot="mount"><div class="lbl">遁 光</div><div class="nm empty">— 空 —</div></div>
       </div>
+      <div id="eq-set-bonus" style="font-size:11px;color:#d4b46a;margin-top:4px"></div>
       <div style="font-size:11px;color:#a89c7c;line-height:1.7;margin-top:6px">
-        点击装备槽可卸下。在背包中点击装备可穿戴。<br>
+        点击装备槽可卸下/强化。同阶装备多件穿齐触发套装效果。<br>
         本命法宝长期温养，每次突破自动增强。
       </div>
       <h2>已 持 装 备</h2>
@@ -2555,6 +2556,32 @@ function petRecalc(pet){
 /* —— 灵宠等级上限：玩家境界 idx 决定 —— */
 function petLvCap(){ return Math.max(1, (P&&P.realmIdx)||1); }
 
+/* —— v20 · 灵宠进化 —— */
+const PET_EVOLVE_LV = [5, 10, 15];
+const PET_EVOLVE_PREFIX = ["灵·", "玄·", "仙·"];
+const PET_EVOLVE_SKILLS = ["灵魂冲击","五行吞噬","天地同辉"];
+function checkPetEvolve(pet){
+  if(!pet) return;
+  const stage = pet.evolveStage || 0;
+  if(stage >= PET_EVOLVE_LV.length) return;
+  if(pet.lv >= PET_EVOLVE_LV[stage]){
+    pet.evolveStage = stage + 1;
+    const meta = PETS_META[pet.key];
+    const prefix = PET_EVOLVE_PREFIX[stage];
+    if(!pet.nm.startsWith(prefix)) pet.nm = prefix + (meta?meta.nm:pet.nm);
+    const newSkill = PET_EVOLVE_SKILLS[stage];
+    pet.skill = newSkill;
+    const mul = 1.3;
+    pet.atk = Math.floor(pet.atk * mul);
+    pet.def = Math.floor(pet.def * mul);
+    pet.maxHp = Math.floor(pet.maxHp * mul);
+    pet.hp = pet.maxHp;
+    log(`✦✦ 【${pet.nm}】发生进化！阶段 ${stage+1}，属性大幅提升，习得【${newSkill}】！`,"epic");
+    SFX.achieve();
+    addChronicle(`灵宠【${pet.nm}】进化至第 ${stage+1} 阶段。`);
+  }
+}
+
 /* —— 灵宠喂经验 —— */
 function gainPetExp(pet, exp){
   if(!pet) return;
@@ -2565,8 +2592,8 @@ function gainPetExp(pet, exp){
     pet.lv++;
     petRecalc(pet);
     log(`✦ 【${pet.nm}】升级！现已 ${pet.lv} 级。`,"epic");
+    checkPetEvolve(pet);
   }
-  // 若已达境界上限，超出经验丢弃
   if(pet.lv >= cap) pet.exp = Math.min(pet.exp, petExpToNext(pet.lv)-1);
 }
 
@@ -2868,6 +2895,7 @@ function renderPetPanel(){
         <div style="font-size:11px;color:#d6cfb8;margin:3px 0">${meta.desc||""}</div>
         <div style="font-size:11px;margin-top:5px">
           Lv.<b style="color:#d4b46a">${cur.lv}</b>/<span style="color:#888">${petLvCap()}</span>
+          ${cur.evolveStage?` · <span style="color:#ffd966">进化${cur.evolveStage}阶</span>`:""}
           · 攻 ${cur.atk} · 防 ${cur.def}
           ${cur.skill?` · <span style="color:#c0a8d4">${cur.skill}</span>`:""}
         </div>
@@ -3042,6 +3070,46 @@ const ADVS = [
   {tag:"hidden", cond:p=>p.flags.wuTi && !p.bag["鸿蒙古玉"],
         t:"上古遗迹深处，一枚温润古玉自行飞入你怀中……",
         fn:p=>addItem(p,"鸿蒙古玉",1)},
+
+  // ============ v20 · 新增历练事件 ============
+  {t:"路遇一场修士斗法，飞剑余波震得你耳鸣——但也悟到了些许剑意。",
+   fn:p=>{p.ling=(p.ling||0)+2; recalcStats(p); log("灵力 +2（观战所悟）","good");}},
+  {t:"山腰茶棚中一老婆婆卖灵茶，你坐下喝了一碗。",
+   fn:p=>{heal(p,Math.floor(p.maxHp*0.2)); p.mp=Math.min(p.maxMp,p.mp+Math.floor(p.maxMp*0.2));
+   log("气血/真元各恢复 20%","good");}},
+  {t:"深夜赶路，你无意间踩碎了一块墓碑——周围阴风四起！",
+   cond:p=>p.realmIdx>=2,
+   fn:p=>{const cands=MONSTERS.filter(m=>m[1]<=p.realmIdx);const m=choice(cands.length?cands:[MONSTERS[0]]);
+   log(`一只【${m[0]}】从地底钻出！`,"bad"); startBattle(m);}},
+  {t:"你在悬崖边发现一株快要枯萎的仙草，小心翼翼地移植了下来。",
+   fn:p=>{const herbs=["聚灵草","凝血花","破障花"];const h=herbs[Math.min(2,Math.floor(p.realmIdx/4))];
+   addItem(p,h,rand(1,2));}},
+  {t:"一头受伤的灵兽在路边哀鸣，你上前为它疗伤。",
+   fn:p=>{p.karma=Math.min(100,(p.karma||0)+5);p.yun=(p.yun||0)+1;recalcStats(p);
+   log("业力 +5，气运 +1（善举）","good");}},
+  {t:"误入一处上古阵法遗迹，阵纹仍有微弱灵光。",
+   cond:p=>p.realmIdx>=4,
+   fn:p=>{gainCult(p,200+p.realmIdx*50,"阵法感悟");
+   if(Math.random()<0.2&&p.knownFormations){const pool=Object.keys(FORMATIONS).filter(f=>!p.knownFormations.includes(f));
+   if(pool.length){p.knownFormations.push(pool[0]);log(`领悟阵法【${pool[0]}】！`,"epic");}}}},
+  {t:"深山中遇到一群野生灵猴，它们向你投来灵果。",
+   fn:p=>{const h=Math.floor(p.maxHp*0.15);heal(p,h);addItem(p,"灵石",rand(10,30));}},
+  {t:"瀑布后面藏着一个小洞窟，里面散落着修士遗物。",
+   fn:p=>{const loot=["聚气丹","金创药","回元丹","凝神丹"];const item=choice(loot);
+   addItem(p,item,rand(1,2)); addItem(p,"灵石",rand(20,60));}},
+  {t:"途经一座破败道观，观中道碑刻满经文——你驻足参悟。",
+   cond:p=>p.realmIdx>=3,
+   fn:p=>{p.wu=(p.wu||0)+1;p.dao=(p.dao||0)+1;recalcStats(p);
+   log("悟性 +1，道行 +1（道碑参悟）","good");}},
+  {t:"天边忽现异象，一道流星划过夜空，在远处炸开。你循光而去。",
+   cond:p=>p.realmIdx>=5,
+   fn:p=>{if(Math.random()<0.3){addItem(p,"天劫真血",1);log("陨石中竟凝有一滴天劫真血！","epic");}
+   else{const s=100+p.realmIdx*30;addItem(p,"灵石",s);log(`陨石碎片中有 ${s} 灵石。`,"good");}}},
+  {t:"路过一个热闹的修士集市，摊位上有些稀奇物件。",
+   fn:p=>{const items=["火符","盾符","遁地符","聚灵草种","凝血花种"];const it=choice(items);
+   addItem(p,it,1);log(`集市上淘到【${it}】。`,"good");}},
+  {t:"夜宿山洞，墙壁上刻着一套拳法图谱，你照着比划了几遍。",
+   fn:p=>{p.ti=(p.ti||0)+2;recalcStats(p);log("体魄 +2（拳法淬体）","good");}},
 ];
 
 /* ==========================================================
@@ -3126,6 +3194,36 @@ const EQUIPS = {
   "夺魄铃":      {slot:"accessory",cult:0.4, atk:30, tier:3, desc:"修炼 +40% / +30 攻 · 稀有"},
   "血玉扳指":    {slot:"accessory",cult:0.6, hp:800, tier:4, desc:"修炼 +60% / +800 气血 · 稀有"},
 };
+
+// v20 · 装备套装效果
+const EQUIP_SETS = {
+  1: {name:"练气套", need:2, bonus:{ti:3, ling:3},               desc:"体魄+3 灵力+3"},
+  2: {name:"筑基套", need:2, bonus:{ti:5, ling:5, shen:3},       desc:"体魄+5 灵力+5 神识+3"},
+  3: {name:"金丹套", need:2, bonus:{ling:10, wu:5, critAdd:0.05}, desc:"灵力+10 悟性+5 暴击+5%"},
+  4: {name:"元婴套", need:3, bonus:{ti:15, ling:15, dao:5},       desc:"体魄+15 灵力+15 道行+5"},
+  5: {name:"化神套", need:3, bonus:{ti:25, ling:25, shen:10, dao:10}, desc:"六维大幅提升"},
+  6: {name:"仙器套", need:3, bonus:{ti:50, ling:50, shen:20, wu:20, dao:20}, desc:"仙级全属性加成"},
+};
+function calcSetBonus(p){
+  const tierCount = {};
+  for(const slot in p.equips){
+    const nm = p.equips[slot]; if(!nm) continue;
+    const eq = EQUIPS[nm]; if(!eq) continue;
+    tierCount[eq.tier] = (tierCount[eq.tier]||0) + 1;
+  }
+  const result = {ti:0, ling:0, shen:0, wu:0, yun:0, dao:0, critAdd:0};
+  const activeNames = [];
+  for(const [tier, set] of Object.entries(EQUIP_SETS)){
+    if((tierCount[+tier]||0) >= set.need){
+      for(const k in set.bonus){
+        result[k] = (result[k]||0) + set.bonus[k];
+      }
+      activeNames.push(set.name);
+    }
+  }
+  result._names = activeNames;
+  return result;
+}
 
 /* —— 本命法宝（独立槽，需祭炼）—— v6 数值翻倍 */
 const RELICS = {
@@ -3876,11 +3974,12 @@ function recalcStats(p){
   const bias = ROOT_STAT_BIAS[p.rootName] || ROOT_STAT_BIAS["四灵根"];
   const eq = equipStatBonus(p);
   const rl = relicStatBonus(p);
+  // v20：套装加成
+  const sb = (typeof calcSetBonus==="function") ? calcSetBonus(p) : {ti:0,ling:0,shen:0,wu:0,yun:0,dao:0};
 
   const eff = {};
   for(const k of STAT_KEYS){
-    // p[k] 是「本人加成」（突破/奇遇/丹药累加），base[k]*bias 是「境界+灵根天赋」
-    eff[k] = (p[k]||0) + Math.floor(base[k]*bias[k]) + eq[k] + rl[k];
+    eff[k] = (p[k]||0) + Math.floor(base[k]*bias[k]) + eq[k] + rl[k] + (sb[k]||0);
   }
 
   // 2) 八派生公式
@@ -3895,7 +3994,7 @@ function recalcStats(p){
   d.atk     =  Math.floor((eff.ling*2 + Math.floor((TECHS[p.tech]?TECHS[p.tech][1]:0)) + p.realmIdx*5) * (1+(sBuff.atk||0)) * (1+(fmn.atkBonus||0)));
   d.def     =  Math.floor((eff.ti*1.5 + eff.dao*0.5) * (1+(fmn.defBonus||0)));
   d.spd     =  10 + Math.floor(eff.shen*0.3) + p.realmIdx*2;
-  d.crit    =  0.05 + eff.shen*0.0015 + eff.yun*0.003 + (sBuff.crit||0);
+  d.crit    =  0.05 + eff.shen*0.0015 + eff.yun*0.003 + (sBuff.crit||0) + (sb.critAdd||0);
   d.critDmg =  1.50 + eff.yun*0.01;                         // 暴击倍率
   d.pen     =  Math.floor(eff.shen*0.2 + eff.dao*0.5);      // 破防（百分比形式：值/100）
   d.dodge   =  0.03 + eff.shen*0.0008 + eff.yun*0.0015;     // 闪避基础
@@ -8295,6 +8394,14 @@ function refresh(){
       sl.onclick = null;
     }
   });
+  // v20: 套装效果显示
+  const setEl = $("eq-set-bonus");
+  if(setEl && typeof calcSetBonus==="function"){
+    const sb = calcSetBonus(P);
+    if(sb._names && sb._names.length){
+      setEl.innerHTML = "✦ 套装效果：" + sb._names.map(n=>{const s=Object.values(EQUIP_SETS).find(x=>x.name===n);return `<b>${n}</b>（${s?s.desc:""}）`;}).join(" / ");
+    } else { setEl.innerHTML = ""; }
+  }
   // 装备/法宝子背包
   const ebag = $("eq-bag");
   if(ebag){

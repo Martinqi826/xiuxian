@@ -3,7 +3,7 @@
 ## 项目概述
 
 单文件浏览器修仙挂机游戏。**零依赖**（纯 HTML+CSS+JS），双击 `index.html` 即玩。
-当前 ~10350 行，所有逻辑在一个 `<script>` 块内。存档用 localStorage。
+当前 ~10450 行，所有逻辑在一个 `<script>` 块内。存档用 localStorage。
 
 ## 技术架构
 
@@ -69,6 +69,8 @@ L8950-9900   DEV面板 + 帮助弹窗
 | `DUNGEON_CHOICE_EVENTS` | 3 种秘境互动选择事件 |
 | `ARENA_NAMES` | 15 个擂台 NPC 名 |
 | `ENHANCE_COST/RATE` | 装备强化费用/成功率表 |
+| `EQUIP_SETS` | 6 套tier-based装备套装效果 |
+| `PET_EVOLVE_LV/PREFIX/SKILLS` | 灵宠进化数据 |
 | `ACHIEVEMENTS` | 24 个成就 |
 | `PETS_META` | 灵宠元数据 |
 | `RELICS` | 本命法宝 |
