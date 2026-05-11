@@ -502,6 +502,7 @@
         <button id="btn-salvage">⚒ 分 解</button>
         <button id="btn-cave">🏠 洞 府</button>
         <button id="btn-treasure">🗺 探 宝</button>
+        <button id="btn-destiny">⭐ 天 命</button>
       </div>
 
       <!-- 第 3 组：故事 / 工具 -->
@@ -2605,6 +2606,84 @@ function petRecalc(pet){
 function petLvCap(){ return Math.max(1, (P&&P.realmIdx)||1); }
 
 /* —— v20 · 灵宠进化 —— */
+// v28 · 灵宠主动技能
+const PET_ACTIVES = {
+  "狂暴嚎叫":{minLv:3,  mp:20,  cd:3, desc:"灵宠暴怒，下2回合攻击×2",
+    fn:(pet,m)=>{ pet._activeRage=(pet._activeRage||0)+2; log(`【${pet.nm}】狂暴嚎叫，攻击力暴增！`,"epic"); }},
+  "灵盾护主":{minLv:5,  mp:30,  cd:4, desc:"灵宠化作护盾，减伤40%",
+    fn:(pet,m)=>{ P.shield=Math.max(P.shield||0,0.4); log(`【${pet.nm}】化为灵盾，守护主人！`,"good"); }},
+  "吞噬精元":{minLv:8,  mp:40,  cd:5, desc:"灵宠吸取怪物生命，回复主人15%HP",
+    fn:(pet,m)=>{ const dmg=Math.floor(pet.atk*1.5); m.mhp-=dmg; const h=Math.floor(P.maxHp*0.15); P.hp=Math.min(P.maxHp,P.hp+h); log(`【${pet.nm}】吞噬精元，造成${dmg}伤害，主人回复${h}气血！`,"epic"); return m.mhp<=0?"killed":null; }},
+  "共鸣爆发":{minLv:12, mp:60,  cd:6, desc:"人宠共鸣，双方攻击各造成200%伤害",
+    fn:(pet,m)=>{ const d1=Math.floor(pet.atk*2); const d2=Math.floor((P._d?P._d.atk:P.atk)*0.5); m.mhp-=(d1+d2); log(`【${pet.nm}】与你心意相通，共鸣爆发！造成${d1+d2}伤害！`,"epic"); SFX.thunder(); vfx("gold"); return m.mhp<=0?"killed":null; }},
+};
+
+function getPetActiveSkills(pet){
+  if(!pet) return [];
+  return Object.entries(PET_ACTIVES).filter(([k,v])=>pet.lv>=v.minLv).map(([k,v])=>({name:k,...v}));
+}
+
+function usePetActive(skillName){
+  const pet = activePet();
+  const m = P.monster;
+  if(!pet || !m){ log("非战斗中或无出战灵宠。","hint"); return; }
+  const sk = PET_ACTIVES[skillName];
+  if(!sk){ log("未知技能。","hint"); return; }
+  if(pet.lv < sk.minLv){ log(`灵宠等级不足（需${sk.minLv}级）。`,"bad"); return; }
+  if((P.mp||0) < sk.mp){ log(`真元不足（需${sk.mp}）。`,"bad"); return; }
+  const cd = pet._activeCd || {};
+  if((cd[skillName]||0) > 0){ log(`【${skillName}】冷却中（${cd[skillName]}回合）。`,"hint"); return; }
+  P.mp -= sk.mp;
+  if(!pet._activeCd) pet._activeCd = {};
+  pet._activeCd[skillName] = sk.cd;
+  // 狂暴状态加成
+  if(pet._activeRage && pet._activeRage > 0){
+    const origAtk = pet.atk;
+    pet.atk = Math.floor(pet.atk * 2);
+    const result = sk.fn(pet, m);
+    pet.atk = origAtk;
+    pet._activeRage--;
+  } else {
+    const result = sk.fn(pet, m);
+    if(result === "killed"){ pet.kills = (pet.kills||0) + 1; endBattle(true); return; }
+  }
+  if(m.mhp <= 0){ pet.kills = (pet.kills||0) + 1; endBattle(true); return; }
+  // 怪物反击
+  if(monsterCounterPhase(m)){ endBattle(false); return; }
+  // 冷却递减
+  tickPetActiveCd(pet);
+  postActionPhase(m);
+}
+
+function tickPetActiveCd(pet){
+  if(!pet || !pet._activeCd) return;
+  for(const k in pet._activeCd){
+    if(pet._activeCd[k] > 0) pet._activeCd[k]--;
+  }
+}
+
+function openPetBattleSkills(){
+  const pet = activePet();
+  if(!pet){ log("无出战灵宠。","hint"); return; }
+  const skills = getPetActiveSkills(pet);
+  if(!skills.length){ log(`【${pet.nm}】尚未习得主动技能（3级解锁）。`,"hint"); return; }
+  const cd = pet._activeCd || {};
+  const rows = skills.map(sk=>{
+    const cdLeft = cd[sk.name]||0;
+    const canUse = cdLeft<=0 && (P.mp||0)>=sk.mp;
+    return `<div class="shop-row">
+      <div><div class="nm">${sk.name}</div><div class="ds">${sk.desc}（耗真元${sk.mp}，CD${sk.cd}回合）${cdLeft>0?`<span style="color:#d96a6a"> 冷却${cdLeft}</span>`:""}</div></div>
+      <button class="sm" data-petsk="${sk.name}" ${canUse?"":"disabled"}>施展</button>
+    </div>`;
+  }).join("");
+  showModal(`<h3>🐾 灵宠技能 · ${pet.nm}</h3><div style="text-align:left">${rows}</div>
+    <div class="btns"><button id="petsk-close">取消</button></div>`);
+  document.querySelectorAll(".modal [data-petsk]").forEach(b=>{
+    b.onclick = ()=>{ closeModal(); usePetActive(b.dataset.petsk); };
+  });
+  $("petsk-close").onclick = closeModal;
+}
+
 const PET_EVOLVE_LV = [5, 10, 15];
 const PET_EVOLVE_PREFIX = ["灵·", "玄·", "仙·"];
 const PET_EVOLVE_SKILLS = ["灵魂冲击","五行吞噬","天地同辉"];
@@ -4232,6 +4311,74 @@ function applyTreasureResult(c, tm, idx){
   setTimeout(()=> treasureStep(tm, idx+1), 600);
 }
 
+// v28 · 天命系统
+const DESTINY_MISSIONS = [
+  {id:"slayer",    nm:"杀生天命", desc:"击败 50 只妖兽",      icon:"⚔",
+   check:p=>(p.stats?.kill||0)>=50, reward:{items:{"灵石":500}, stat:{ling:3}, text:"杀伐果断，灵力觉醒！"}},
+  {id:"alchemist", nm:"丹道天命", desc:"成功炼丹 20 次",      icon:"🔥",
+   check:p=>(p.stats?.alchemy||0)>=20, reward:{items:{"五行淬体丹":3}, stat:{wu:3}, text:"丹成道果，悟性大涨！"}},
+  {id:"explorer",  nm:"探索天命", desc:"通关 5 次秘境",       icon:"🏔",
+   check:p=>(p.stats?.dungeon||0)>=5, reward:{items:{"灵石":1000}, lifespan:30, text:"历经万险，寿元延长！"}},
+  {id:"cultivator",nm:"修道天命", desc:"突破至金丹期",        icon:"🧘",
+   check:p=>p.realmIdx>=6, reward:{items:{"悟道茶":5}, stat:{dao:5}, text:"金丹已成，道行精进！"}},
+  {id:"wealthy",   nm:"聚财天命", desc:"持有灵石超过 5000",   icon:"💰",
+   check:p=>(p.bag["灵石"]||0)>=5000, reward:{stat:{yun:5}, text:"家财万贯，气运昌隆！"}},
+  {id:"survivor",  nm:"长生天命", desc:"存活超过 300 天",     icon:"🌿",
+   check:p=>p.days>=300, reward:{lifespan:80, stat:{ti:3}, text:"久历风雨，体魄强固！"}},
+  {id:"master",    nm:"宗师天命", desc:"功法突变一次",        icon:"📖",
+   check:p=>TECH_MUTATIONS.some(m=>p.tech===m.to), reward:{items:{"灵石":2000}, stat:{wu:5,ling:3}, text:"功法大成，天地共鸣！"}},
+  {id:"champion",  nm:"无双天命", desc:"擂台积分达 100",      icon:"🏆",
+   check:p=>(p.arena?.pts||0)>=100, reward:{items:{"强化石":10}, stat:{shen:5}, text:"武道至尊，身法如神！"}},
+];
+
+function rollDestiny(p){
+  const pool = DESTINY_MISSIONS.slice();
+  const picked = [];
+  const count = Math.random() < 0.3 ? 2 : 1;
+  for(let i=0; i<count && pool.length; i++){
+    const idx = Math.floor(Math.random()*pool.length);
+    picked.push(pool[idx].id);
+    pool.splice(idx, 1);
+  }
+  p.destiny = picked.map(id=>({id, done:false}));
+}
+
+function checkDestiny(p){
+  if(!p.destiny) return;
+  for(const d of p.destiny){
+    if(d.done) continue;
+    const def = DESTINY_MISSIONS.find(m=>m.id===d.id);
+    if(!def) continue;
+    if(def.check(p)){
+      d.done = true;
+      log(`✦✦ 天命达成：【${def.nm}】— ${def.desc}！`, "epic");
+      log(`${def.reward.text}`, "good");
+      SFX.milestone(); vfx("gold");
+      if(def.reward.items) for(const [k,v] of Object.entries(def.reward.items)) addItem(p, k, v);
+      if(def.reward.stat) for(const [k,v] of Object.entries(def.reward.stat)) p[k] = (p[k]||0) + v;
+      if(def.reward.lifespan) p.lifespan += def.reward.lifespan;
+      recalcStats(p);
+      addChronicle(`天命达成：${def.nm}`);
+    }
+  }
+}
+
+function openDestinyPanel(){
+  if(!P.destiny || !P.destiny.length){ log("本世无天命降临。","hint"); return; }
+  const rows = P.destiny.map(d=>{
+    const def = DESTINY_MISSIONS.find(m=>m.id===d.id);
+    if(!def) return "";
+    const status = d.done ? '<span style="color:#7fc7a3">✓ 已达成</span>' : '<span style="color:#d4b46a">进行中</span>';
+    return `<div class="shop-row">
+      <div><div class="nm">${def.icon} ${def.nm}</div><div class="ds">${def.desc}</div></div>
+      <div class="pr">${status}</div>
+    </div>`;
+  }).join("");
+  showModal(`<h3>⭐ 天 命</h3><div style="text-align:left">${rows}</div>
+    <div class="btns"><button id="dest-close">关闭</button></div>`);
+  $("dest-close").onclick = closeModal;
+}
+
 // v17 · 阵法系统
 const FORMATIONS = {
   "聚灵阵":  {tier:1, cultBonus:0.10, desc:"修炼效率 +10%",         price:300},
@@ -4456,6 +4603,8 @@ function newPlayer(name,rootName,elements){
     enlighten: {},
     // —— v26 · 洞府 ——
     cave: {},
+    // —— v28 · 天命 ——
+    destiny: [],
   };
   recalcStats(p);
   // 初始化后按当前 maxHp/maxMp 满血满蓝
@@ -4463,6 +4612,8 @@ function newPlayer(name,rootName,elements){
   p.mp = p.maxMp;
   // v6：注入转世传承
   applyLineage(p);
+  // v28：天命分配
+  if(typeof rollDestiny === "function") rollDestiny(p);
   return p;
 }
 
@@ -7098,10 +7249,31 @@ function battleSkill(){
       <button class="sm" data-sk="${k}" ${costOk?"":"disabled"}>施展</button>
     </div>`;
   }).join("");
-  showModal(`<h3>✨ 施 展 神 通</h3><div style="text-align:left">${btns}</div>
+  // v28: 灵宠主动技能
+  let petSection = "";
+  const _ap = activePet();
+  if(_ap){
+    const petSkills = getPetActiveSkills(_ap);
+    if(petSkills.length){
+      const _cd = _ap._activeCd || {};
+      const petBtns = petSkills.map(sk=>{
+        const cdLeft = _cd[sk.name]||0;
+        const canUse = cdLeft<=0 && (P.mp||0)>=sk.mp;
+        return `<div class="shop-row">
+          <div><div class="nm">🐾 ${sk.name}</div><div class="ds">${sk.desc}（真元${sk.mp}）${cdLeft>0?`<span style="color:#d96a6a"> CD${cdLeft}</span>`:""}</div></div>
+          <button class="sm" data-petsk="${sk.name}" ${canUse?"":"disabled"}>施展</button>
+        </div>`;
+      }).join("");
+      petSection = `<div style="margin-top:8px;border-top:1px solid rgba(255,255,255,.1);padding-top:8px"><div style="color:#c0a8d4;font-size:12px;margin-bottom:4px">灵宠·${_ap.nm}</div>${petBtns}</div>`;
+    }
+  }
+  showModal(`<h3>✨ 施 展 神 通</h3><div style="text-align:left">${btns}${petSection}</div>
     <div class="btns"><button id="sk-cancel">取消</button></div>`);
   document.querySelectorAll(".modal [data-sk]").forEach(b=>{
     b.onclick = ()=>{ closeModal(); castSkill(b.dataset.sk); };
+  });
+  document.querySelectorAll(".modal [data-petsk]").forEach(b=>{
+    b.onclick = ()=>{ closeModal(); usePetActive(b.dataset.petsk); };
   });
   $("sk-cancel").onclick = closeModal;
 }
@@ -8814,6 +8986,9 @@ function postActionPhase(m){
   checkTelegraph(m);
   tickBreak(m);
   regenMp(P, 0.015);
+  // v28: 灵宠技能CD递减
+  const _pet = activePet();
+  if(_pet) tickPetActiveCd(_pet);
   // v26 连招提示
   if(m._actionHistory && m._actionHistory.length >= 2){
     const h = m._actionHistory;
@@ -9620,6 +9795,7 @@ function afterAction(){
   saveGame(true);
   checkAchievements();
   checkTalentUnlocks();
+  if(typeof checkDestiny === "function") checkDestiny(P);
   if(!alive(P)){
     setTimeout(gameOver,400);
     return;
@@ -10059,6 +10235,13 @@ function rollRoot(name){
     if(P.lineage && P.lineage.immortalTimes>0){
       log(`◆ 此乃你第 ${P.lineage.immortalTimes+1} 世修仙路，前尘传承已注入。`, "epic");
     }
+    // v28: 天命显示
+    if(P.destiny && P.destiny.length){
+      for(const d of P.destiny){
+        const def = DESTINY_MISSIONS.find(m=>m.id===d.id);
+        if(def) log(`⭐ 天命降临：【${def.nm}】— ${def.desc}`, "epic");
+      }
+    }
     refresh();
     // v5：紧接着抽夙愿（弹窗链 createRole → rollRoot → pickInitialQuest）
     setTimeout(()=>{
@@ -10191,6 +10374,7 @@ function loadGame(){
     if(!d.worldRules) d.worldRules = [];
     if(!d.enlighten) d.enlighten = {};
     if(!d.cave) d.cave = {};
+    if(!d.destiny) d.destiny = [];
     // v4 寿元迁移：移除强制拉满逻辑（避免覆盖新机制），仅做异常兜底
     if(d.lifespan===undefined || d.lifespan<=0){
       d.lifespan = 80 + (d.realmIdx||0)*30;
@@ -10430,6 +10614,7 @@ if($("btn-bestiary")) $("btn-bestiary").onclick = openBestiary;
 if($("btn-salvage")) $("btn-salvage").onclick = openSalvagePanel;
 if($("btn-cave")) $("btn-cave").onclick = openCave;
 if($("btn-treasure")) $("btn-treasure").onclick = openTreasureExplore;
+if($("btn-destiny")) $("btn-destiny").onclick = openDestinyPanel;
 $("btn-calendar").onclick= openCalendar;
 // v5：夙愿入口（按钮 + 状态行）
 $("btn-quest").onclick   = openQuestPanel;
