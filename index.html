@@ -99,7 +99,35 @@
   .action-grid-4 button{padding:8px 6px;font-size:13px;letter-spacing:1px}
   .action-grid-4.collapsed{display:none!important}
   .sys-container{display:flex!important;flex-direction:column;gap:0!important}
-  .sys-label{cursor:pointer;font-size:11px;color:#a89c7c;letter-spacing:2px;padding:6px 0 3px;border-bottom:1px solid rgba(168,156,124,0.2);user-select:none}
+  .sys-label{cursor:pointer;font-size:11px;color:#a89c7c;letter-spacing:2px;padding:6px 0 3px;border-bottom:1px solid rgba(168,156,124,0.2);user-select:none;transition:color .15s}
+  .sys-label:hover{color:var(--gold)}
+  /* v50：折叠态用 ▸，展开态把第一个字符替换为 ▾ */
+  .sys-label.collapsed-label::first-letter{color:#a89c7c}
+  .sys-label:not(.collapsed-label){color:var(--gold)}
+  .sys-label:not(.collapsed-label)::first-letter{display:inline-block;transform:rotate(90deg)}
+
+  /* v53 · 古风悬浮提示词典（JS 驱动 fixed 定位，不被 panel overflow 裁剪） */
+  #tip-bubble{
+    position:fixed;
+    background:rgba(22,26,34,.97);
+    border:1px solid var(--gold);
+    color:var(--ink);
+    padding:8px 12px;
+    border-radius:4px;
+    font-size:12px;font-weight:normal;letter-spacing:1px;
+    line-height:1.7;
+    pointer-events:none;
+    z-index:10000;
+    box-shadow:0 4px 14px rgba(0,0,0,.5);
+    max-width:280px;
+    white-space:normal;
+    text-align:left;
+    opacity:0;
+    transition:opacity .15s;
+  }
+  #tip-bubble.show{opacity:1}
+  /* 移动端不显示（hover 不可靠） */
+  @media(hover:none){#tip-bubble{display:none!important}}
   /* 第 1 组里 突破按钮独占两列 */
   .action-group .span-2{grid-column:1 / -1}
   /* 主按钮 + 自动按钮 配对：主按钮占绝大部分，自动按钮只是右侧小贴片 */
@@ -119,6 +147,21 @@
   }
   /* 突破按钮不可用时整体隐藏（不占位） */
   #btn-bk.bk-hidden{display:none}
+  /* v52 · 突破按钮"不建议点击"态 — 修为够但有硬卡（斩杀/冷却/缺金丹/缺法宝/缺道行/缺真血）
+   * 规则：暗灰扁平、不发光、文字带 ⚠ 前缀显示原因；点击不弹模态，只闪一下行内提示 */
+  #btn-bk.bk-blocked{
+    background:linear-gradient(180deg,rgba(120,110,90,.18),rgba(120,110,90,.06))!important;
+    border-color:rgba(168,156,124,.35)!important;
+    color:#9a9384!important;
+    box-shadow:none!important;
+    letter-spacing:1px;
+    cursor:not-allowed;
+    opacity:.85;
+  }
+  #btn-bk.bk-blocked:hover{
+    background:linear-gradient(180deg,rgba(140,128,100,.22),rgba(140,128,100,.10))!important;
+    color:#c8c0a4!important;
+  }
   button{
     appearance:none;background:linear-gradient(180deg,rgba(212,180,106,.18),rgba(212,180,106,.06));
     border:1px solid var(--line);color:var(--ink);
@@ -157,6 +200,14 @@
   }
   .auto-bar .spd.active{background:rgba(212,180,106,.2);color:var(--gold);border-color:var(--gold)}
   .auto-bar .auto-status{margin-left:auto;color:var(--jade);font-size:12px}
+  /* v50 · 智能挂机按钮：突出但不抢眼 */
+  .auto-bar .auto-loop-btn{
+    padding:6px 12px;font-size:12px;letter-spacing:1px;color:#7fc7a3;
+    background:transparent;border:1px solid #7fc7a3;border-radius:3px;cursor:pointer;
+    transition:all .15s;
+  }
+  .auto-bar .auto-loop-btn:hover{background:rgba(127,199,163,.15)}
+  .auto-bar .auto-loop-btn.active{background:rgba(127,199,163,.25);color:#a5e6c2;border-color:#a5e6c2;box-shadow:0 0 6px rgba(127,199,163,.3)}
 
   /* 背包 */
   .bag{font-size:13px;line-height:1.9}
@@ -247,12 +298,13 @@
     .term-row{grid-template-columns:repeat(4,1fr)}
   }
 
-  /* v13 · 音量按钮 */
+  /* v13 · 音量按钮（v53 · 修复 emoji baseline 偏移） */
   #sfx-toggle{
     position:fixed;top:10px;right:52px;z-index:9998;
     width:32px;height:32px;border-radius:50%;
     background:#161a22;border:1px solid var(--line);color:var(--ink);
     font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;
+    line-height:1;padding:0;
     transition:border-color .2s;
   }
   #sfx-toggle:hover{border-color:var(--gold)}
@@ -273,7 +325,13 @@
   .cult-bar i{display:block;height:100%;background:linear-gradient(90deg,var(--gold),#e8c97a);border-radius:3px;transition:width .5s ease-out}
 
   /* v13 · 快捷键提示 */
-  .hotkey-hint{color:#5c5a4f;font-size:10px;text-align:center;margin-top:4px;letter-spacing:1px}
+  .hotkey-hint{color:#5c5a4f;font-size:10px;text-align:center;margin-top:4px;letter-spacing:1px;transition:color .3s}
+  /* v52 · 突破按钮 blocked 态点击后的临时警示 */
+  .hotkey-hint.bk-warn{color:#d96a6a;letter-spacing:2px;animation:bkWarnFlash 1.4s ease-out}
+  @keyframes bkWarnFlash{
+    0%  {color:#ff9090;text-shadow:0 0 8px rgba(217,106,106,.6)}
+    100%{color:#d96a6a;text-shadow:none}
+  }
 
   @media(max-width:900px){
     #sfx-toggle{top:auto;bottom:66px;right:46px}
@@ -430,43 +488,43 @@
 <div class="mist"></div>
 
 <div class="wrap">
-  <!-- 左：角色面板 -->
+  <!-- 左：角色面板（v53：.k 术语行加 data-tip 解释） -->
   <aside class="panel">
     <h1>道 友 状 态</h1>
     <div class="row"><span class="k"><i class="ico">🪪</i>道号</span><span class="v gold" id="s-name">—</span></div>
-    <div class="row"><span class="k"><i class="ico">🏷</i>境界</span><span class="v gold" id="s-realm">—</span></div>
-    <div class="row"><span class="k"><i class="ico">🌱</i>灵根</span><span class="v jade" id="s-root">—</span></div>
-    <div class="row"><span class="k"><i class="ico">🜍</i>五行</span><span class="v" id="s-elements">—</span></div>
-    <div class="row"><span class="k"><i class="ico">📖</i>功法</span><span class="v" id="s-tech">—</span></div>
-    <div class="row"><span class="k"><i class="ico">🏯</i>宗门</span><span class="v blue" id="s-sect">散修</span></div>
-    <div class="row"><span class="k"><i class="ico">🗺️</i>地图</span><span class="v" id="s-region" style="font-size:12px;color:#7ec8b4">灵山秘境</span></div>
-    <div class="row" id="s-quest-row" style="cursor:pointer" title="点击查看夙愿"><span class="k"><i class="ico">🌙</i>夙愿</span><span class="v" id="s-quest" style="font-size:12px">— 无 —</span></div>
+    <div class="row"><span class="k" data-tip="境界：21 阶（凡人→练气→筑基→…→仙人）。修为达标可突破"><i class="ico">🏷</i>境界</span><span class="v gold" id="s-realm">—</span></div>
+    <div class="row"><span class="k" data-tip="灵根：修炼天赋，分废/四/三/双/单/变异/天等级，影响修炼速度"><i class="ico">🌱</i>灵根</span><span class="v jade" id="s-root">—</span></div>
+    <div class="row"><span class="k" data-tip="五行：金木水火土，影响战斗属性克制（如水克火，被克 ×1.5 伤害）"><i class="ico">🜍</i>五行</span><span class="v" id="s-elements">—</span></div>
+    <div class="row"><span class="k" data-tip="功法：修炼心法，影响修炼速度/攻击加成/特殊被动"><i class="ico">📖</i>功法</span><span class="v" id="s-tech">—</span></div>
+    <div class="row"><span class="k" data-tip="宗门：加入后接任务赚贡献，兑换丹方/法宝/装备"><i class="ico">🏯</i>宗门</span><span class="v blue" id="s-sect">散修</span></div>
+    <div class="row"><span class="k" data-tip="历练地图：不同区域怪物/掉率/修为加成不同"><i class="ico">🗺️</i>地图</span><span class="v" id="s-region" style="font-size:12px;color:#7ec8b4">灵山秘境</span></div>
+    <div class="row" id="s-quest-row" style="cursor:pointer" data-tip="夙愿：开局立下的心结，达成有奖，失败或破碎影响结局"><span class="k"><i class="ico">🌙</i>夙愿</span><span class="v" id="s-quest" style="font-size:12px">— 无 —</span></div>
 
-    <h2><i class="ico">☯</i>修 为</h2>
+    <h2 data-tip="修为：累积到门槛即可尝试突破下一境界"><i class="ico">☯</i>修 为</h2>
     <div class="bar cult"><i id="bar-cult" style="width:0"></i></div>
     <div class="row"><span class="k">当前/目标</span><span class="v" id="s-cult">0 / 100</span></div>
 
-    <h2><i class="ico">❤</i>气 血</h2>
+    <h2 data-tip="气血：生命值，归零则重伤复活（战斗死）或永久陨落（寿尽死）"><i class="ico">❤</i>气 血</h2>
     <div class="bar hp"><i id="bar-hp" style="width:100%"></i></div>
     <div class="row"><span class="k">气血</span><span class="v" id="s-hp">100/100</span></div>
 
-    <h2><i class="ico">💧</i>真 元</h2>
+    <h2 data-tip="真元：灵力/法力，施展神通/符箓/禁术的消耗资源"><i class="ico">💧</i>真 元</h2>
     <div class="bar mp"><i id="bar-mp" style="width:100%"></i></div>
     <div class="row"><span class="k">真元</span><span class="v" id="s-mp">50/50</span></div>
 
-    <h2><i class="ico">⏳</i>寿 元</h2>
+    <h2 data-tip="寿元：当前岁数 / 阳寿上限。超过即寿终正寝（永久死亡）"><i class="ico">⏳</i>寿 元</h2>
     <div class="bar age"><i id="bar-age" style="width:20%"></i></div>
     <div class="row"><span class="k">岁 / 阳寿</span><span class="v" id="s-age">16/80</span></div>
 
     <h2><i class="ico">✦</i>其 他</h2>
-    <div class="row"><span class="k"><i class="ico">⚔</i>攻击</span><span class="v" id="s-atk">10</span></div>
-    <div class="row"><span class="k"><i class="ico">🛡</i>防御</span><span class="v" id="s-def">0</span></div>
-    <div class="row"><span class="k"><i class="ico">🧠</i>道心</span><span class="v jade" id="s-dx">100/100</span></div>
-    <div class="row"><span class="k"><i class="ico">⚖</i>业力</span><span class="v" id="s-karma">0</span></div>
-    <div class="row"><span class="k"><i class="ico">💠</i>贡献</span><span class="v" id="s-contrib">0</span></div>
-    <div class="row"><span class="k"><i class="ico">📅</i>修行</span><span class="v" id="s-days">0 天</span></div>
-    <div class="row"><span class="k"><i class="ico">🏮</i>时节</span><span class="v" id="s-cal" style="font-size:12px">紫微 1 年 · 春 · 立春</span></div>
-    <div class="row" id="s-we-row" style="display:none"><span class="k"><i class="ico">🌌</i>天象</span><span class="v" id="s-we" style="font-size:12px">—</span></div>
+    <div class="row"><span class="k" data-tip="攻击力：基础 ATK + 装备/功法/阵法加成"><i class="ico">⚔</i>攻击</span><span class="v" id="s-atk">10</span></div>
+    <div class="row"><span class="k" data-tip="防御力：非线性减伤，dmg = atk × (1 - def/(def+300))"><i class="ico">🛡</i>防御</span><span class="v" id="s-def">0</span></div>
+    <div class="row"><span class="k" data-tip="道心：信念值，0 时心魔入体。可通过闭关/双修/服丹回复"><i class="ico">🧠</i>道心</span><span class="v jade" id="s-dx">100/100</span></div>
+    <div class="row"><span class="k" data-tip="业力：善业（负数）/恶业（正数）。影响节气事件、渡劫难度、NPC 反应"><i class="ico">⚖</i>业力</span><span class="v" id="s-karma">0</span></div>
+    <div class="row"><span class="k" data-tip="宗门贡献度：完成任务/上交妖丹等获得，可兑换丹方/法宝"><i class="ico">💠</i>贡献</span><span class="v" id="s-contrib">0</span></div>
+    <div class="row"><span class="k" data-tip="累计修行天数（本世）"><i class="ico">📅</i>修行</span><span class="v" id="s-days">0 天</span></div>
+    <div class="row"><span class="k" data-tip="紫微道历：360 天/年，含 24 节气 buff 与 12 节庆事件"><i class="ico">🏮</i>时节</span><span class="v" id="s-cal" style="font-size:12px">紫微 1 年 · 春 · 立春</span></div>
+    <div class="row" id="s-we-row" style="display:none"><span class="k" data-tip="天象异变：全局环境效应（如妖兽暴动/百草齐放）"><i class="ico">🌌</i>天象</span><span class="v" id="s-we" style="font-size:12px">—</span></div>
     <button class="ghost" id="btn-stats" style="width:100%;margin-top:8px;font-size:12px">🔮 玄 机 详 情</button>
     <div id="panel-stats" style="display:none;margin-top:8px"></div>
   </aside>
@@ -492,81 +550,83 @@
           <button id="btn-auto-adv" class="auto auto-chip" title="自动历练">♺</button>
         </div>
         <button id="btn-bk" class="primary span-2">⚡ 尝试突破</button>
-        <div class="hotkey-hint">快捷键：1闭关 2历练 3突破 空格自动</div>
+        <div class="hotkey-hint" id="bk-hint">快捷键：1闭关 2历练 3突破 空格自动</div>
       </div>
 
-      <!-- 第 2 组：玩法系统（分类折叠） -->
+      <!-- 第 2 组：玩法系统（v50：默认全部折叠，按需展开 / v53：data-tip 词典） -->
       <div class="action-group sys-container" data-group="systems">
-        <div class="sys-label" onclick="this.parentElement.querySelector('.sys-core').classList.toggle('collapsed')">▸ 核 心 玩 法</div>
-        <div class="action-grid-4 sys-core">
-          <button id="btn-alchemy">🔥 炼 丹</button>
-          <button id="btn-sect">🏯 宗 门</button>
-          <button id="btn-market">🏪 坊 市</button>
-          <button id="btn-dungeon">🏔 秘 境</button>
-          <button id="btn-bounty">📋 悬 赏</button>
-          <button id="btn-arena">⚔ 擂 台</button>
-          <button id="btn-dailies">📋 日 常</button>
-          <button id="btn-rumors">📜 传 闻</button>
+        <div class="sys-label collapsed-label" onclick="this.classList.toggle('collapsed-label');this.parentElement.querySelector('.sys-core').classList.toggle('collapsed')">▸ 核 心 玩 法</div>
+        <div class="action-grid-4 sys-core collapsed">
+          <button id="btn-alchemy" data-tip="炼丹房：用灵草炼制丹药。突破/恢复/永久属性来源">🔥 炼 丹</button>
+          <button id="btn-sect"    data-tip="拜入宗门：领任务赚贡献，兑丹方/法宝/装备">🏯 宗 门</button>
+          <button id="btn-market"  data-tip="坊市：用灵石购买灵草/丹药/装备/秘籍">🏪 坊 市</button>
+          <button id="btn-dungeon" data-tip="秘境探索：多层挑战，首通有专属法宝；含 Boss 战">🏔 秘 境</button>
+          <button id="btn-bounty"  data-tip="悬赏令：定向猎杀/采药/历练，集中刷指定资源">📋 悬 赏</button>
+          <button id="btn-arena"   data-tip="天梯擂台：与同境界 NPC 比武攒积分换奖励">⚔ 擂 台</button>
+          <button id="btn-dailies" data-tip="每日挑战：每天 N 个小目标，完成获修为/灵石">📋 日 常</button>
+          <button id="btn-rumors"  data-tip="江湖传闻：随机刷新短期任务（猎杀/采药/历练/闭关）">📜 传 闻</button>
         </div>
-        <div class="sys-label" onclick="this.parentElement.querySelector('.sys-growth').classList.toggle('collapsed')">▸ 修 行 成 长</div>
-        <div class="action-grid-4 sys-growth">
-          <button id="btn-formation">🔮 阵 法</button>
-          <button id="btn-constellation">🌟 星 辰</button>
-          <button id="btn-talent">🌟 天 赋</button>
-          <button id="btn-fusion">🔄 融 合</button>
-          <button id="btn-insights">💡 心 法</button>
-          <button id="btn-secret">📃 秘 术</button>
-          <button id="btn-forbidden">⛧ 禁 术</button>
-          <button id="btn-faction">🏴 势 力</button>
+        <div class="sys-label collapsed-label" onclick="this.classList.toggle('collapsed-label');this.parentElement.querySelector('.sys-growth').classList.toggle('collapsed')">▸ 修 行 成 长</div>
+        <div class="action-grid-4 sys-growth collapsed">
+          <button id="btn-formation"     data-tip="阵法：常驻被动 buff（修炼/攻防加成）">🔮 阵 法</button>
+          <button id="btn-constellation" data-tip="星辰图谱：三条天赋树，消修为永久强化">🌟 星 辰</button>
+          <button id="btn-talent"        data-tip="天赋：修为里程碑解锁，永久被动加成">🌟 天 赋</button>
+          <button id="btn-fusion"        data-tip="功法融合：金丹期可将主功法与另一种融合（每世1次）">🔄 融 合</button>
+          <button id="btn-insights"      data-tip="心法领悟：累计击杀数解锁战斗被动（暴击/闪避等）">💡 心 法</button>
+          <button id="btn-secret"        data-tip="秘术残页：历练随机掉落碎片，集齐解锁特殊能力">📃 秘 术</button>
+          <button id="btn-forbidden"     data-tip="禁术：高代价主动技（消耗HP/寿元/道心换爆发）">⛧ 禁 术</button>
+          <button id="btn-faction"       data-tip="江湖势力：四大阵营声望，第三阶解锁被动">🏴 势 力</button>
         </div>
-        <div class="sys-label" onclick="this.parentElement.querySelector('.sys-equip').classList.toggle('collapsed')">▸ 装 备 锻 造</div>
-        <div class="action-grid-4 sys-equip">
-          <button id="btn-craft">⚒ 炼 器</button>
-          <button id="btn-engrave">✴ 铭 刻</button>
-          <button id="btn-synthesis">⚗ 合 成</button>
-          <button id="btn-salvage">⚒ 分 解</button>
+        <div class="sys-label collapsed-label" onclick="this.classList.toggle('collapsed-label');this.parentElement.querySelector('.sys-equip').classList.toggle('collapsed')">▸ 装 备 锻 造</div>
+        <div class="action-grid-4 sys-equip collapsed">
+          <button id="btn-craft"     data-tip="炼器：用炼器材料锻造高阶装备">⚒ 炼 器</button>
+          <button id="btn-engrave"   data-tip="铭刻：在装备上铭刻符文，赋予战斗特效">✴ 铭 刻</button>
+          <button id="btn-synthesis" data-tip="道具合成：低阶物品合成高阶（如3聚气丹→1筑基丹）">⚗ 合 成</button>
+          <button id="btn-salvage"   data-tip="装备分解：把闲置装备分解为强化石/碎片">⚒ 分 解</button>
         </div>
-        <div class="sys-label" onclick="this.parentElement.querySelector('.sys-explore').classList.toggle('collapsed')">▸ 探 索 社 交</div>
-        <div class="action-grid-4 sys-explore">
-          <button id="btn-region">🗺️ 地 图</button>
-          <button id="btn-cave">🏠 洞 府</button>
-          <button id="btn-treasure">🗺 探 宝</button>
-          <button id="btn-friends">🤝 仙 友</button>
-          <button id="btn-spar">⚔ 切 磋</button>
-          <button id="btn-petexp">🐾 远 征</button>
-          <button id="btn-leyline">🌀 灵 脉</button>
-          <button id="btn-forecast">🌤️ 天 象</button>
+        <div class="sys-label collapsed-label" onclick="this.classList.toggle('collapsed-label');this.parentElement.querySelector('.sys-explore').classList.toggle('collapsed')">▸ 探 索 社 交</div>
+        <div class="action-grid-4 sys-explore collapsed">
+          <button id="btn-region"   data-tip="历练地图：四大区域（灵山/赤炎/沧溟/幽冥），不同奖励偏向">🗺️ 地 图</button>
+          <button id="btn-cave"     data-tip="洞府：建造设施获被动加成（聚灵阵/丹房/演武场）">🏠 洞 府</button>
+          <button id="btn-treasure" data-tip="藏宝图：多步探索小游戏，终点有重宝">🗺 探 宝</button>
+          <button id="btn-friends"  data-tip="仙友：游历偶遇的NPC，好感够可获被动加成">🤝 仙 友</button>
+          <button id="btn-spar"     data-tip="切磋：与已结识仙友比武，胜获修为/负获道心">⚔ 切 磋</button>
+          <button id="btn-petexp"   data-tip="灵兽远征：派灵宠去固定地点采集（20-60天）">🐾 远 征</button>
+          <button id="btn-leyline"  data-tip="灵脉：占据后每日被动加成">🌀 灵 脉</button>
+          <button id="btn-forecast" data-tip="天象预报：推演未来 3 次天象异变，提前规划">🌤️ 天 象</button>
         </div>
-        <div class="sys-label" onclick="this.parentElement.querySelector('.sys-misc').classList.toggle('collapsed')">▸ 挑 战 杂 项</div>
-        <div class="action-grid-4 sys-misc">
-          <button id="btn-boss">👹 妖 王</button>
-          <button id="btn-trial">⚡ 试 炼</button>
-          <button id="btn-divine">🔮 推 演</button>
-          <button id="btn-wheel">🎡 转 盘</button>
-          <button id="btn-destiny">⭐ 天 命</button>
-          <button id="btn-reincshop">🌀 轮 回</button>
-          <button id="btn-codex">📖 图 鉴</button>
-          <button id="btn-prayer">🌌 祈 愿</button>
+        <div class="sys-label collapsed-label" onclick="this.classList.toggle('collapsed-label');this.parentElement.querySelector('.sys-misc').classList.toggle('collapsed')">▸ 挑 战 杂 项</div>
+        <div class="action-grid-4 sys-misc collapsed">
+          <button id="btn-boss"      data-tip="域外妖王：高阶 Boss 挑战，30 天冷却，掉稀有物">👹 妖 王</button>
+          <button id="btn-trial"     data-tip="天道试炼：10层无尽塔，逐层增强，可随时收奖退出">⚡ 试 炼</button>
+          <button id="btn-divine"    data-tip="天机推演：占卜未来事件，提前预知">🔮 推 演</button>
+          <button id="btn-wheel"     data-tip="气运转盘：每日抽奖，11 种奖品（含丹药/灵石/属性）">🎡 转 盘</button>
+          <button id="btn-destiny"   data-tip="天命目标：开局抽 N 个长线目标，达成获仙缘">⭐ 天 命</button>
+          <button id="btn-reincshop" data-tip="轮回商店：飞升后用仙缘点购买跨周目永久加成">🌀 轮 回</button>
+          <button id="btn-codex"     data-tip="天机阁图鉴：收集妖兽/物品，里程碑奖永久属性">📖 图 鉴</button>
+          <button id="btn-prayer"    data-tip="天象祈愿：消耗道心向天祈愿，求好天象/化解灾劫">🌌 祈 愿</button>
         </div>
       </div>
 
       <!-- 第 3 组：故事 / 工具 -->
       <div class="action-group action-grid-4" data-group="tools">
-        <button id="btn-quest">🌙 夙 愿</button>
-        <button id="btn-calendar">📅 道 历</button>
-        <button id="btn-chronicle">📜 纪 要</button>
-        <button id="btn-bestiary">📖 图 鉴</button>
-        <button id="btn-save">💾 存 档</button>
-        <button id="btn-help">📖 指 引</button>
+        <button id="btn-quest"     data-tip="夙愿：开局立下的心结，5 节点主线剧情">🌙 夙 愿</button>
+        <button id="btn-calendar"  data-tip="紫微道历：360 天/年，24 节气 buff + 12 节庆事件">📅 道 历</button>
+        <button id="btn-chronicle" data-tip="修行纪要：自动记录此世重大事件">📜 纪 要</button>
+        <button id="btn-bestiary"  data-tip="妖兽图鉴：累计击杀解锁，含资料 + 收服记录">📖 图 鉴</button>
+        <button id="btn-save"      data-tip="手动存档（自动保存已开启）">💾 存 档</button>
+        <button id="btn-help"      data-tip="新手指引：游戏机制说明">📖 指 引</button>
       </div>
     </div>
     <div class="auto-bar">
+      <button id="btn-auto-loop" class="auto-loop-btn" title="智能挂机：自动在闭关与历练间切换、自动突破">♺ 智 能</button>
       <span class="lbl">速度</span>
       <button class="spd" data-spd="1500">缓</button>
       <button class="spd active" data-spd="700">中</button>
       <button class="spd" data-spd="250">疾</button>
       <button class="spd" data-spd="233">3x</button>
       <button class="spd" data-spd="140">5x</button>
+      <button class="spd" data-spd="70">10x</button>
       <span class="auto-status" id="auto-status">自动：未启动</span>
       <!-- 重启按钮独立到角落，小字 -->
       <button id="btn-reset" class="danger reset-corner" title="重启轮回（清档）">☠</button>
@@ -1017,13 +1077,14 @@ function formatDate(days){
   return `紫微 ${d.year} 年 · ${d.seasonName} · ${d.termName} · ${CAL.DAY_NAMES[d.day-1]}`;
 }
 
+// v49: 练气阶段门槛 -30%~-25%（突破节奏改善），筑基略缓，金丹后保持
 const REALMS = [
-  ["凡人",0],["练气一层",100],["练气三层",350],["练气六层",800],["练气九层",1500],
-  ["筑基初期",2800],["筑基中期",5000],["筑基后期",8000],["筑基大圆满",13000],
-  ["金丹初期",22000],["金丹中期",35000],["金丹后期",55000],
-  ["元婴初期",90000],["元婴中期",140000],["元婴后期",210000],
-  ["化神期",320000],["炼虚期",500000],["合体期",780000],
-  ["大乘期",1200000],["渡劫期",1800000],["仙人",2800000],
+  ["凡人",0],["练气一层",70],["练气三层",240],["练气六层",560],["练气九层",1100],
+  ["筑基初期",2200],["筑基中期",4200],["筑基后期",7000],["筑基大圆满",11500],
+  ["金丹初期",20000],["金丹中期",33000],["金丹后期",52000],
+  ["元婴初期",85000],["元婴中期",135000],["元婴后期",205000],
+  ["化神期",315000],["炼虚期",495000],["合体期",775000],
+  ["大乘期",1195000],["渡劫期",1795000],["仙人",2795000],
 ];
 
 /* v8 · 修为里程碑（一次性奖励） */
@@ -2647,8 +2708,11 @@ function petRecalc(pet){
   if(pet.hp > pet.maxHp) pet.hp = pet.maxHp;
 }
 
-/* —— 灵宠等级上限：玩家境界 idx 决定 —— */
-function petLvCap(){ return Math.max(1, (P&&P.realmIdx)||1); }
+/* —— 灵宠等级上限：随玩家境界递增，凡人也保底可升 3 级 —— 
+ *  v51 修复：原 `Math.max(1, P.realmIdx||1)` 在凡人(idx=0)/练气一层(idx=1) 时都返回 1，
+ *           导致灵宠经验满了也无法升级。改为"基础上限 3 + 玩家境界 ×2"，
+ *           凡人=3 / 练气一=5 / 筑基初=13 / 仙人=43，更合理且永远不会卡死。 */
+function petLvCap(){ return 3 + ((P&&P.realmIdx)||0) * 2; }
 
 /* —— v20 · 灵宠进化 —— */
 // v28 · 灵宠主动技能
@@ -2764,7 +2828,9 @@ function gainPetExp(pet, exp){
     pet.exp -= petExpToNext(pet.lv);
     pet.lv++;
     petRecalc(pet);
+    // v51 · FEEDBACK_PALETTE：灵宠升级 = B 级里程碑，TEMPLATE_B_RARE_DROP 风格
     log(`✦ 【${pet.nm}】升级！现已 ${pet.lv} 级。`,"epic");
+    if(typeof SFX!=="undefined" && SFX.milestone) SFX.milestone();
     checkPetEvolve(pet);
   }
   if(pet.lv >= cap) pet.exp = Math.min(pet.exp, petExpToNext(pet.lv)-1);
@@ -5916,6 +5982,14 @@ function applyLineage(p){
   const L = loadLineage();
   if(!L || (L.runs||0) <= 0) return;
   p.lineage = {immortalTimes: L.immortalTimes||0, runs:L.runs||0};
+  // v53 · 成就跨周目持久化：把历世已得成就还原到 P.achievements
+  //   这样 checkAchievements 不会在新周目重复给历世已解锁的成就发奖励
+  if(L.achievements){
+    p.achievements = p.achievements || {};
+    for(const id in L.achievements){
+      if(!p.achievements[id]) p.achievements[id] = L.achievements[id];
+    }
+  }
   // 1) 法宝传承
   if(L.inheritRelic){
     p.relic = L.inheritRelic;
@@ -6196,6 +6270,69 @@ function regenMp(p, ratio){
 function nextThreshold(p){
   return p.realmIdx+1>=REALMS.length?null:REALMS[p.realmIdx+1][1];
 }
+
+/* v52 · 突破按钮态判定（单一事实源）
+ *  返回 {state, msg, nextRealmName, hasTrib}
+ *    state:
+ *      "maxed"     — 已是仙人，无可突破（按钮隐藏）
+ *      "lowCult"   — 修为不足（按钮隐藏）
+ *      "ready"     — 全部满足，可点击（金色 primary，天劫态加 epic）
+ *      "blocked"   — 修为够但硬卡（斩杀/冷却/金丹/法宝/道行/天劫真血等），按钮显示但暗灰
+ *    msg: "blocked" 时的具体原因（一行短字，UI 直接展示）
+ */
+function getBreakthroughReadiness(p){
+  p = p || P;
+  if(!p) return {state:"lowCult", msg:""};
+  const t = nextThreshold(p);
+  if(t === null) return {state:"maxed", msg:"已达修真巅峰"};
+  const nextIdx = p.realmIdx + 1;
+  const nextRealmName = REALMS[nextIdx][0];
+  const trib = (typeof TRIBULATION_AT !== "undefined") ? TRIBULATION_AT[nextIdx] : null;
+  const base = {nextRealmName, hasTrib: !!trib};
+  if(p.cult < t){
+    return Object.assign({state:"lowCult", msg:`修为 ${t - p.cult}/${t}`}, base);
+  }
+  // —— 修为已达，下面是硬卡判定 ——
+  // 1) 突破冷却（失败后 30 日静养）
+  if(p._bkCooldown && (p.days||0) < p._bkCooldown){
+    const remain = p._bkCooldown - (p.days||0);
+    return Object.assign({state:"blocked", msg:`经脉静养 ${remain} 日`}, base);
+  }
+  // 2) 斩杀门槛（v10：以战养道）
+  const reqKills = nextIdx * 3;
+  const curKills = (p.stats?.kill||0);
+  if(curKills < reqKills){
+    return Object.assign({state:"blocked", msg:`斩杀 ${curKills}/${reqKills}`}, base);
+  }
+  // 3) checkBreakthroughGate 硬卡（金丹/法宝/道行/天劫真血）
+  if(typeof checkBreakthroughGate === "function"){
+    const gate = checkBreakthroughGate(nextIdx);
+    if(gate.blocked){
+      // 提取一句简短原因（取冒号前/句号前）
+      const short = gate.msg.split(/[。：，,;]/).find(s=>s.trim()) || gate.msg;
+      return Object.assign({state:"blocked", msg:short.trim().slice(0,18), longMsg:gate.msg, hint:gate.hint}, base);
+    }
+  }
+  return Object.assign({state:"ready", msg:""}, base);
+}
+
+/* v52 · 在突破按钮下方的 hint 行短暂闪烁警示原因（不弹模态，C 级反馈） */
+function flashBkHint(msg){
+  const el = document.getElementById("bk-hint");
+  if(!el) return;
+  const old = el.dataset._origText || el.textContent;
+  if(!el.dataset._origText) el.dataset._origText = old;
+  el.textContent = `⚠ ${msg}`;
+  // 重启动画：移除 → 强制 reflow → 重新加 class
+  el.classList.remove("bk-warn");
+  void el.offsetWidth;
+  el.classList.add("bk-warn");
+  if(el._restoreTimer) clearTimeout(el._restoreTimer);
+  el._restoreTimer = setTimeout(()=>{
+    el.classList.remove("bk-warn");
+    el.textContent = el.dataset._origText || "快捷键：1闭关 2历练 3突破 空格自动";
+  }, 2600);
+}
 function totalAtk(p){
   // v3：直接读派生缓存，必要时重算
   if(!p._d) recalcStats(p);
@@ -6399,7 +6536,8 @@ function checkMilestones(p, prevCult){
       if(rewards.items){
         for(const [item,cnt] of Object.entries(rewards.items)){
           p.bag[item] = (p.bag[item]||0) + cnt;
-          log(`获得 ${item} ×${cnt}`, "epic");
+          // v51 · FEEDBACK_PALETTE：普通物品获得是 C 级（TEMPLATE_C_PICKUP），降级为 good
+          log(`获得 ${item} ×${cnt}`, "good");
         }
       }
       recalcStats(p);
@@ -6844,7 +6982,7 @@ function attackerOf(p, override){
   const desperateCritAdd = desperate ? 0.25 : 0;
   const desperateCritDmgAdd = desperate ? 0.8 : 0;
   return Object.assign({
-    atk:Math.floor((d.atk+(p._dgAtkBuff||0)+(typeof friendPassive==="function"?friendPassive("atkAdd"):0))*buff.atkMul*desperateAtkMul*(1+(typeof disciplePassive==="function"?disciplePassive("fighter")*0.03:0))*(typeof getStance==="function"?getStance().atkMul:1)*(p._forbiddenAtkMul||1)),
+    atk:Math.floor((d.atk+(p._dgAtkBuff||0)+(typeof friendPassive==="function"?friendPassive("atkAdd"):0))*buff.atkMul*desperateAtkMul*(1+(typeof disciplePassive==="function"?disciplePassive("fighter")*0.03:0))*(typeof getStance==="function"?getStance().atkMul:1)*(p._forbiddenAtkMul||1)*(p._chasedMark?0.85:1)),
     crit:Math.min(0.95, d.crit + (buff.critAdd||0) + desperateCritAdd + (P.curDungeon?.mod?.flag==="darkZone"?-0.10:0) + (P.curDungeon?.mod?.flag==="holyLight"?0.05:0)),
     critDmg:d.critDmg + desperateCritDmgAdd + (typeof teachingVal==="function"?teachingVal("critDmgAdd"):0) + (P.curDungeon?.mod?.flag==="darkZone"?0.50:0),
     hit:d.hit, pen:d.pen,
@@ -8226,6 +8364,16 @@ function actAdventure(){
 
 function actBreakthrough(){
   if(P.inBattle){log("战斗中无法突破。","hint");return}
+  // v52 · 统一前置判定（与 refresh 中按钮态同步）
+  // - 若 blocked：在 hint 行短暂闪烁原因，不弹任何 modal（C 级反馈）
+  // - 若 lowCult/maxed：仅日志一行
+  const rd = (typeof getBreakthroughReadiness==="function") ? getBreakthroughReadiness(P) : null;
+  if(rd && rd.state === "blocked"){
+    flashBkHint(rd.longMsg || rd.msg);
+    // 同时写 hint 日志，方便回查
+    log(`※ 暂不可突破：${rd.longMsg || rd.msg}`, "hint");
+    return;
+  }
   // v10：突破冷却 — 失败后经脉需恢复30天
   if(P._bkCooldown && (P.days||0) < P._bkCooldown){
     const remain = P._bkCooldown - (P.days||0);
@@ -8264,12 +8412,20 @@ function actBreakthrough(){
 
   const trib    = TRIBULATION_AT[nextIdx];
 
+  // v50 · 自动模式：破障丹自动决策（天劫前自动用，普通突破前用以保稳）
+  const inAutoMode = typeof AUTO !== "undefined" && AUTO.mode;
+
   // —— 走天劫流程 ——
   if(trib){
     if(P.bag["破障丹"]>0){
-      confirmBox(`即将渡【${trib.name}】！<br>是否服用「破障丹」助力？（剩 ${P.bag["破障丹"]} 枚）`,
-        ()=>startTribulation(trib, nextIdx, true),
-        ()=>startTribulation(trib, nextIdx, false));
+      if(inAutoMode){
+        // 自动模式：直接用丹（不弹窗）
+        startTribulation(trib, nextIdx, true);
+      }else{
+        confirmBox(`即将渡【${trib.name}】！<br>是否服用「破障丹」助力？（剩 ${P.bag["破障丹"]} 枚）`,
+          ()=>startTribulation(trib, nextIdx, true),
+          ()=>startTribulation(trib, nextIdx, false));
+      }
     }else{
       startTribulation(trib, nextIdx, false);
     }
@@ -8310,8 +8466,13 @@ function actBreakthrough(){
     },800);
   };
   if(P.bag["破障丹"]>0){
-    confirmBox(`是否服用「破障丹」助力突破？（剩 ${P.bag["破障丹"]} 枚）`,
-      ()=>tryBk(true), ()=>tryBk(false));
+    if(inAutoMode){
+      // v50 · 自动模式：直接用丹（不弹窗）
+      tryBk(true);
+    }else{
+      confirmBox(`是否服用「破障丹」助力突破？（剩 ${P.bag["破障丹"]} 枚）`,
+        ()=>tryBk(true), ()=>tryBk(false));
+    }
   }else{
     tryBk(false);
   }
@@ -8482,7 +8643,8 @@ function loadLineage(){
     if(!s) return {runs:0, totalDays:0, bestRealm:0, immortalTimes:0,
                    inheritRelic:null, inheritRelicLv:0,
                    karmaSum:0, daoSum:0, deeds:[], rerolls:0,
-                   inheritFormations:[], inheritArenaPts:0, statEcho:null, prevChronicle:null};
+                   inheritFormations:[], inheritArenaPts:0, statEcho:null, prevChronicle:null,
+                   achievements:{}};  // v53 · 跨周目成就
     return JSON.parse(s);
   }catch{ return {runs:0, totalDays:0, bestRealm:0, immortalTimes:0,
                   inheritRelic:null, inheritRelicLv:0,
@@ -11294,10 +11456,11 @@ function startBattle(m){
     }
   }
   // v10：怪物动态缩放 — 玩家境界越高于怪物等级，怪物指数增强
+  // v49：缩放略减（1.25→1.20 / 1.18→1.15），缓和高境界打低级怪的硬碾压
   const gap = Math.max(0, P.realmIdx - lvl);
   if(gap > 0){
-    const hpScale  = Math.pow(1.25, gap);
-    const atkScale = Math.pow(1.18, gap);
+    const hpScale  = Math.pow(1.20, gap);
+    const atkScale = Math.pow(1.15, gap);
     mhp  = Math.floor(mhp * hpScale);
     matk = Math.floor(matk * atkScale);
   }
@@ -11361,8 +11524,10 @@ function addBreakGauge(m, amt){
     m.breakRounds = 2;
     m.breakGauge = 0;
     m.telegraphing = false;
-    log(`※※「${m.name}」破绽大开！（2回合：伤害翻倍·无法反击）`, "epic");
-    SFX.thunder(); vfx("gold"); screenShake();
+    // v51 · FEEDBACK_PALETTE 红线修复：原 thunder+vfx(gold)+screenShake 是 S 级排场，
+    //   但破绽是每场战斗都可能多次触发的 B/C 级事件。降级为 B 级 TEMPLATE_B_RARE_DROP 风格。
+    log(`※「${m.name}」破绽大开！（2回合：伤害翻倍·无法反击）`, "good");
+    SFX.milestone();
   }
 }
 
@@ -11415,7 +11580,14 @@ function monsterCounterPhase(m){
     const specialMul = sp ? sp.dmgMul : 2.0;
     const md = calcDamage(monsterAttacker(m), defenderOf(P), {mul:specialMul});
     log(`「${m.name}」施展【${sp?sp.name:"蓄力一击"}】！`, "crit");
-    SFX.rumble(); vfx("red"); screenShake();
+    // v51 · FEEDBACK_PALETTE：A 级 DANGER 模板特许 vfx+screenShake 同用，
+    //   但每场战斗多次触发会过载。本场前 2 次满排场，第 3 次起降级为 SFX.fail 单通道
+    m._telegraphCount = (m._telegraphCount||0) + 1;
+    if(m._telegraphCount <= 2){
+      SFX.rumble(); vfx("red"); screenShake();
+    }else{
+      SFX.fail();
+    }
     applyDamageToP(md, m.name);
     m.telegraphing = false;
     m.combo = 0;
@@ -11494,6 +11666,7 @@ function endBattle(win){
   const fromDg = m && m.fromDungeon;
   P.inBattle=false;P.monster=null;P._nearDeathLine=false;P._stance="balanced";
   delete P._forbiddenAtkMul; delete P._forbiddenDefMul;
+  delete P._chasedMark;  // v49：战斗结束清除追魂印
   setScene("凡 人 修 仙 路","— 一 缕 神 识 自 虚 空 降 临 —","");
   // 恢复按钮
   bindMainButtons();
@@ -11546,8 +11719,8 @@ function endBattle(win){
       addItem(P, choice(seedPool), 1);
     }
     P.stats.kill_noEquip = (P.stats.kill_noEquip||0) + 1;
-    const equipGuarantee = P.stats.kill_noEquip >= 8;  // 每8场保底
-    if(equipGuarantee || Math.random()<0.12*lootMul){
+    const equipGuarantee = P.stats.kill_noEquip >= 6;  // v49：保底 8 场 → 6 场
+    if(equipGuarantee || Math.random()<0.15*lootMul){  // v49：装备掉率 12% → 15%
       const tier = Math.min(5, 1+Math.floor(P.realmIdx/4));
       const pool = Object.entries(EQUIPS).filter(([k,v])=>v.tier<=tier);
       const [nm,eqData] = choice(pool);
@@ -11558,7 +11731,8 @@ function endBattle(win){
         if(aff){
           if(!P.equipAffixes) P.equipAffixes = {};
           P.equipAffixes[nm] = aff;
-          log(`✦ 装备【${nm}】附带词缀「${aff.nm}」！（${EQUIP_AFFIXES.find(a=>a.id===aff.id)?.desc||""}${aff.val}）`, "epic");
+          // v51 · FEEDBACK_PALETTE：战斗掉装备词缀是 B 级（每几场战斗一次），TEMPLATE_B_RARE_DROP
+          log(`✦ 装备【${nm}】附带词缀「${aff.nm}」！（${EQUIP_AFFIXES.find(a=>a.id===aff.id)?.desc||""}${aff.val}）`, "good");
         }
       }
       P.stats.kill_noEquip = 0;
@@ -11771,22 +11945,39 @@ function battleFlee(){
   // v26 连招检测（金蝉脱壳 = 必定脱身）
   const chain = checkComboChain(m);
   if(chain){ const cr = applyComboChain(chain, m); if(cr==="fled") return; if(cr==="killed"){endBattle(true);return} }
+  // v49 · 反复逃跑代价：同场战斗内逃跑计数，3 次起施加"追魂印"
+  m._fleeAttempts = (m._fleeAttempts||0) + 1;
+  if(m._fleeAttempts >= 3 && !P._chasedMark){
+    P._chasedMark = true;      // 本场内攻击 -15%
+    P.lifespan = Math.max(P.age+1, (P.lifespan||0) - 2);
+    log("☠ 屡次遁逃惊动了天机，被烙下『追魂印』！本战攻击 -15%，折寿 2 年。","crit");
+    if(typeof vfx==="function") vfx("red");
+  }
+  // v49 · 在战逃跑消耗 5% 当前真元（金蝉脱壳除外，已在上方 return）
+  if(P.mp && P.mp > 0){
+    const cost = Math.max(1, Math.floor((P.maxMp||50) * 0.05));
+    P.mp = Math.max(0, P.mp - cost);
+  }
   const bonus = gearFleeBonus(P);
   const buff = getBuff(P);
   const talisFleeM = P._talismanFleeMul || 1;
   if(P._talismanFleeMul) delete P._talismanFleeMul;
-  const baseRate = 0.5+0.05*(P.realmIdx-m.lvl)+bonus;
+  // v49 · 多次逃跑成功率衰减（每次 -8%）
+  const fleePenalty = Math.max(0, (m._fleeAttempts - 1) * 0.08);
+  const baseRate = 0.5+0.05*(P.realmIdx-m.lvl)+bonus - fleePenalty;
   if(Math.random()<baseRate*buff.fleeMul*talisFleeM){
     log("你脚踏遁光，成功逃离。","sys"); SFX.dodge();
     P.inBattle=false;P.monster=null;
+    // 离场后清理追魂印
+    delete P._chasedMark;
     setScene("凡 人 修 仙 路","— 一 缕 神 识 自 虚 空 降 临 —","");
     bindMainButtons();
     afterAction();
   }else{
     log("逃跑失败！","bad");
-    // v10.3 · 逃跑失败被追击：1.3x 基础攻击；10% 概率致命追击 ×2.2
-    const isFatalChase = Math.random() < 0.10;
-    const chaseDmg = Math.floor(m.matk * (isFatalChase ? 2.2 : 1.3));
+    // v10.3 → v49：致命追击 10%→15%；普通追击 1.3x→1.4x（同级时不变更）
+    const isFatalChase = Math.random() < 0.15;
+    const chaseDmg = Math.floor(m.matk * (isFatalChase ? 2.2 : 1.4));
     takeDmg(P, chaseDmg);
     if(isFatalChase){
       log(`※※ 致命追击！「${m.name}」凶猛扑下，受 ${chaseDmg} 点重伤！`,"crit");
@@ -12196,23 +12387,39 @@ function refresh(){
     });
   }
 
-  // 突破按钮
+  // 突破按钮 v52 · 三态：ready / blocked / lowCult|maxed（隐藏）
   if(!P.inBattle){
-    const canBk = (t!=null && P.cult>=t);
-    $("btn-bk").disabled = !canBk;
-    // v10.1 · 不可突破时整体隐藏（战斗中此按钮复用为"祭出法宝"故不隐藏）
-    $("btn-bk").classList.toggle("bk-hidden", !canBk);
-    const trib = TRIBULATION_AT[P.realmIdx+1];
-    if(trib && canBk){
-      $("btn-bk").textContent = `⛈ 渡 · ${trib.name}`;
-      $("btn-bk").classList.add("epic");
+    const rd = getBreakthroughReadiness(P);
+    const btn = $("btn-bk");
+    // 清理旧 class（每次刷新都重置）
+    btn.classList.remove("bk-hidden","bk-blocked","epic","primary");
+    btn.classList.add("primary"); // primary 为基础态
+    if(rd.state === "ready"){
+      btn.disabled = false;
+      btn.removeAttribute("data-bk-msg");
+      if(rd.hasTrib){
+        btn.textContent = `⛈ 渡 · ${TRIBULATION_AT[P.realmIdx+1].name}`;
+        btn.classList.add("epic");
+      }else{
+        btn.textContent = "⚡ 尝试突破";
+      }
+      btn.title = `冲击【${rd.nextRealmName}】`;
+    }else if(rd.state === "blocked"){
+      btn.disabled = false;          // 仍可点（点击给提示，不弹模态）
+      btn.classList.remove("primary");
+      btn.classList.add("bk-blocked");
+      btn.textContent = `⚠ 暂不可突破 · ${rd.msg}`;
+      btn.title = rd.longMsg || rd.msg;
+      btn.setAttribute("data-bk-msg", rd.longMsg || rd.msg);
     }else{
-      $("btn-bk").textContent = "⚡ 尝试突破";
-      $("btn-bk").classList.remove("epic");
+      // lowCult 或 maxed：整体隐藏（保留 v10.1 行为）
+      btn.disabled = true;
+      btn.classList.add("bk-hidden");
+      btn.textContent = "⚡ 尝试突破";
     }
   }else{
-    // 战斗中：移除 hidden 标记，让按钮正常显示
-    $("btn-bk").classList.remove("bk-hidden");
+    // 战斗中：移除 hidden 标记，让按钮正常显示（按钮在战斗中复用为"祭出法宝/脚踏遁光"）
+    $("btn-bk").classList.remove("bk-hidden","bk-blocked");
   }
   // v3：玄机详情面板（若打开则刷新内容）
   const psEl = $("panel-stats");
@@ -12369,6 +12576,16 @@ function checkAchievements(){
     showAchieveToast(a.nm);
     SFX.achieve();
     log(`🏆 成就解锁：${a.nm} — ${a.desc}`,"epic");
+    // v53 · 成就跨周目持久化：同步到 lineage（飞升/转世后不丢）
+    try{
+      if(typeof loadLineage==="function" && typeof saveLineage==="function"){
+        const L = loadLineage();
+        L.achievements = L.achievements || {};
+        // 取最早解锁时间（如果之前周目已得过，保留旧时间）
+        if(!L.achievements[a.id]) L.achievements[a.id] = P.achievements[a.id];
+        saveLineage(L);
+      }
+    }catch(e){}
   }
 }
 function grantAchievementReward(a){
@@ -12386,14 +12603,23 @@ function showAchieveToast(name){
 function renderAchievePanel(){
   const el = document.getElementById("achieve-list");
   if(!el) return;
-  const achs = P?.achievements || {};
+  // v53 · 取并集：本周目 P.achievements + 跨周目 lineage.achievements
+  const cur = P?.achievements || {};
+  let cross = {};
+  try{
+    if(typeof loadLineage==="function") cross = loadLineage().achievements || {};
+  }catch(e){}
   const total = ACHIEVEMENTS.length;
-  const done = ACHIEVEMENTS.filter(a=>achs[a.id]).length;
-  let h = `<div style="color:var(--gold);font-size:13px;margin-bottom:8px">已解锁 ${done}/${total}</div>`;
+  const done = ACHIEVEMENTS.filter(a => cur[a.id] || cross[a.id]).length;
+  let h = `<div style="color:var(--gold);font-size:13px;margin-bottom:8px">已解锁 ${done}/${total} <span style="color:#7fc7a3;font-size:11px">（含历世传承）</span></div>`;
   for(const a of ACHIEVEMENTS){
-    const unlocked = !!achs[a.id];
+    const inCur = !!cur[a.id];
+    const inCross = !!cross[a.id];
+    const unlocked = inCur || inCross;
+    const tag = inCur ? "🏆" : (inCross ? "📜" : "🔒");
+    const subtitle = !inCur && inCross ? `<span style="color:#a89c7c;font-size:10px">（前世已得）</span>` : "";
     h += `<div class="ach-item${unlocked?"":" locked"}">
-      <div class="ach-name">${unlocked?"🏆":"🔒"} ${a.nm}</div>
+      <div class="ach-name">${tag} ${a.nm} ${subtitle}</div>
       <div class="ach-desc">${a.desc}</div>
       <div class="ach-reward">奖励：${a.reward}</div>
     </div>`;
@@ -12954,8 +13180,10 @@ function setAutoStatus(){
   const s = $("auto-status");
   $("btn-auto-cult").classList.toggle("active", AUTO.mode==="cult");
   $("btn-auto-adv").classList.toggle("active", AUTO.mode==="adv");
+  const loopBtn = $("btn-auto-loop");
+  if(loopBtn) loopBtn.classList.toggle("active", AUTO.mode==="loop");
   if(!AUTO.mode){ s.textContent = "自动：未启动"; return; }
-  const name = AUTO.mode==="cult" ? "闭关" : "历练";
+  const name = AUTO.mode==="cult" ? "闭关" : AUTO.mode==="adv" ? "历练" : "智能";
   // v6.3 · 弹窗时显示暂停
   if(typeof isModalShowing === "function" && isModalShowing()){
     s.textContent = `⏸ 自动${name}（待您决断）`;
@@ -12971,14 +13199,32 @@ function autoStop(reason){
   const was = AUTO.mode;
   AUTO.mode = null;
   setAutoStatus();
-  if(was && reason) log(`【自动${was==="cult"?"闭关":"历练"}已停止】${reason}`,"hint");
+  if(was && reason){
+    const label = was==="cult"?"闭关":was==="adv"?"历练":"智能";
+    log(`【自动${label}已停止】${reason}`,"hint");
+  }
 }
 
 function autoTick(){
   if(!P || !alive(P)) { autoStop("生死有定"); return; }
   // v6.3 · 全暂停：任何弹窗显示中 → 暂停所有自动行为，等玩家关掉弹窗后自然恢复
+  // v50 · 改进：自动模式下尝试由 modalResolver 自动应答非关键弹窗（灵宠收服/夙愿/确认框/节庆等）
   if(typeof isModalShowing === "function" && isModalShowing()){
     setAutoStatus();  // 刷新状态栏显示"⏸ 暂停"
+    // v50 · 尝试自动应答弹窗（仅在自动模式下）
+    if(AUTO.mode && typeof window.DEV !== "undefined" && window.DEV._internal && window.DEV._internal.modalResolver){
+      // 标记当前弹窗为"自动场景"，避免天劫等关键弹窗被自动点击：
+      // 检查弹窗内是否含有 [data-bolt]/[data-tribch] 等天劫专用按钮，若有则跳过自动
+      const m = document.getElementById("modal");
+      const isCritical = m && m.querySelector && (
+        m.querySelector("[data-bolt]") ||
+        m.querySelector("[data-tribch]") ||
+        m.querySelector(".tribulation-choice")
+      );
+      if(!isCritical){
+        try{ window.DEV._internal.modalResolver(P); }catch(e){}
+      }
+    }
     return;
   }
   // 战斗中：执行自动战斗 AI
@@ -12995,54 +13241,49 @@ function autoTick(){
     }
   }
   // 修为达标自动突破（如果当前在自动模式且没在战斗）
+  // v52 · 改用统一 getBreakthroughReadiness 判定，避免与 UI 按钮态漂移
   const t = nextThreshold(P);
   if(t!=null && P.cult>=t){
-    // v10.2 · 若还差击杀数/在冷却中，自动历练继续；自动闭关模式则提示切换
-    const nextIdx = P.realmIdx + 1;
-    const reqKills = nextIdx * 3;
-    const curKills = (P.stats?.kill||0);
-    const killsOk = curKills >= reqKills;
-    const cdRemain = (P._bkCooldown && (P.days||0) < P._bkCooldown) ? (P._bkCooldown - (P.days||0)) : 0;
-    const canBk = killsOk && cdRemain <= 0;
-
-    if(!canBk){
-      // 还不能突破：自动历练继续，自动闭关模式提示
-      if(AUTO.mode === "adv"){
-        // 节流：90 天提示一次，避免日志刷屏
-        if(!P._autoBkHintDay || (P.days - P._autoBkHintDay) >= 90){
-          const reason = !killsOk
-            ? `斩杀未足（${curKills}/${reqKills}）`
-            : `经脉恢复中（剩 ${cdRemain} 天）`;
-          log(`※ 修为已满，但${reason}。继续历练……`, "hint");
-          P._autoBkHintDay = P.days;
-        }
-        actAdventure();
-        return;
-      }else{
-        // 自动闭关：继续闭关既不涨击杀也不减冷却时间？—— 其实闭关能推进 days，所以冷却会自然消退；
-        //   但击杀数只能靠历练。若是击杀不足，必须切模式。
-        if(!killsOk){
-          autoStop(`修为已达【${REALMS[P.realmIdx+1][0]}】门槛，但需历经 ${reqKills} 场斩杀（当前 ${curKills}）。请切『自动历练』。`);
-          $("btn-bk").classList.add("primary");
-          return;
-        }
-        // 仅冷却未到：闭关能推时间，继续闭关即可（下一拍 days 增加后冷却就过了）
-        if(!P._autoBkHintDay || (P.days - P._autoBkHintDay) >= 90){
-          log(`※ 修为已满，经脉恢复中（剩 ${cdRemain} 天）。继续闭关静养……`, "hint");
-          P._autoBkHintDay = P.days;
-        }
-        actCultivate();
-        return;
+    const rd = getBreakthroughReadiness(P);
+    if(rd.state === "blocked"){
+      // 修为够但有硬卡（斩杀/冷却/金丹/法宝/道行/真血等）
+      // 区分能"靠时间/历练补"的（斩杀/冷却）vs 需要手动获取（金丹/法宝/道行/真血）
+      const reqKills = (P.realmIdx + 1) * 3;
+      const curKills = (P.stats?.kill||0);
+      const killsShort = curKills < reqKills;
+      const cdRemain = (P._bkCooldown && (P.days||0) < P._bkCooldown) ? (P._bkCooldown - (P.days||0)) : 0;
+      // 节流：90 天提示一次
+      if(!P._autoBkHintDay || (P.days - P._autoBkHintDay) >= 90){
+        log(`※ 修为已满，但「${rd.msg}」。${killsShort ? '继续历练补斩杀' : (cdRemain>0 ? '继续闭关静养' : '需手动准备资源')}……`, "hint");
+        P._autoBkHintDay = P.days;
       }
+      if(killsShort){
+        actAdventure();
+      }else if(cdRemain > 0){
+        actCultivate();
+      }else{
+        // 缺金丹/法宝/道行/真血等需手动准备：autoStop 让玩家处理
+        autoStop(`修为已满，但${rd.msg}。请手动处理。`);
+      }
+      return;
     }
-    // 可以突破了：正常停下让玩家突破
-    autoStop(`修为已达【${REALMS[P.realmIdx+1][0]}】门槛，请手动突破`);
-    // 让突破按钮闪一下
-    $("btn-bk").classList.add("primary");
-    return;
+    if(rd.state === "ready"){
+      // v50 · 可以突破了：自动模式下直接突破，不再停机等玩家
+      // 天劫境界会弹模态，autoTick 下一拍会被 isModalShowing 暂停，由玩家手动渡劫
+      log(`※ 修为已达【${rd.nextRealmName}】门槛，自动尝试突破……`, "epic");
+      actBreakthrough();
+      return;
+    }
+    // maxed：仙人不再推进
+    if(rd.state === "maxed"){ autoStop("已达修真巅峰"); return; }
   }
   if(AUTO.mode==="cult") actCultivate();
   else if(AUTO.mode==="adv") actAdventure();
+  else if(AUTO.mode==="loop"){
+    // v50 · 智能循环：低血/缺药时优先闭关，否则历练
+    if(P.hp < P.maxHp*0.6) actCultivate();
+    else actAdventure();
+  }
 }
 
 /* —— 自动战斗 AI ——
@@ -13228,6 +13469,9 @@ document.querySelectorAll("#side-tabs button").forEach(b=>{
 });
 $("btn-auto-cult").onclick = ()=>autoStart("cult");
 $("btn-auto-adv").onclick  = ()=>autoStart("adv");
+// v50 · 智能挂机模式：自动循环+自动突破
+const btnAutoLoop = $("btn-auto-loop");
+if(btnAutoLoop) btnAutoLoop.onclick = ()=>autoStart("loop");
 document.querySelectorAll(".auto-bar .spd").forEach(b=>{
   b.onclick = ()=>{
     document.querySelectorAll(".auto-bar .spd").forEach(x=>x.classList.remove("active"));
@@ -13268,6 +13512,67 @@ $("btn-help").onclick = ()=>{
   function upd(){ btn.textContent = SFX.muted?"🔇":"🔊"; btn.classList.toggle("muted", SFX.muted); }
   upd();
   btn.onclick = ()=>{ SFX.toggle(); upd(); };
+})();
+
+/* v53 · 全局 hover 提示词典：data-tip="..." 即可触发，自动避让屏幕边缘
+ *  设计：单一 #tip-bubble 元素，事件委托。fixed 定位，不被 panel overflow 裁剪。 */
+(function initTipBubble(){
+  // 防御：无 document（headless harness）或 addEventListener 不可用时直接退出
+  if(typeof document === "undefined" || !document.addEventListener) return;
+  if(typeof window === "undefined" || typeof window.addEventListener !== "function") return;
+  let bubble = null;
+  function ensureBubble(){
+    if(bubble) return bubble;
+    bubble = document.createElement("div");
+    bubble.id = "tip-bubble";
+    document.body.appendChild(bubble);
+    return bubble;
+  }
+  function showTip(target){
+    const text = target.getAttribute("data-tip");
+    if(!text) return;
+    const b = ensureBubble();
+    b.textContent = text;
+    b.classList.add("show");
+    // 测量
+    const r = target.getBoundingClientRect();
+    // 暂时贴右侧测一次尺寸，再决定方向
+    b.style.left = "0px"; b.style.top = "0px";
+    const bw = b.offsetWidth, bh = b.offsetHeight;
+    const vw = window.innerWidth, vh = window.innerHeight;
+    // 优先 上方居中
+    let x = r.left + r.width/2 - bw/2;
+    let y = r.top - bh - 10;
+    // 如果上方放不下 → 放下方
+    if(y < 8) y = r.bottom + 10;
+    // 横向溢出修正
+    if(x < 8) x = 8;
+    if(x + bw > vw - 8) x = vw - bw - 8;
+    // 纵向最终修正
+    if(y + bh > vh - 8) y = vh - bh - 8;
+    b.style.left = x + "px";
+    b.style.top  = y + "px";
+  }
+  function hideTip(){
+    if(bubble) bubble.classList.remove("show");
+  }
+  // 事件委托：mouseover/mouseout（mouseenter/leave 不冒泡，需 capture）
+  document.addEventListener("mouseover", e=>{
+    const t = e.target.closest && e.target.closest("[data-tip]");
+    if(!t) return;
+    showTip(t);
+  });
+  document.addEventListener("mouseout", e=>{
+    const t = e.target.closest && e.target.closest("[data-tip]");
+    if(!t) return;
+    // 若移到子元素仍在 [data-tip] 内则不隐藏
+    const rel = e.relatedTarget;
+    if(rel && rel.closest && rel.closest("[data-tip]") === t) return;
+    hideTip();
+  });
+  // 滚动/失焦 → 隐藏
+  window.addEventListener("scroll", hideTip, true);
+  window.addEventListener("blur", hideTip);
 })();
 
 /* v13 · 键盘快捷键 */
@@ -13456,6 +13761,8 @@ bootstrap();
     width:36px;height:36px;border-radius:50%;
     background:#161a22;border:1px solid #d4b46a;color:#d4b46a;
     font-size:18px;cursor:pointer;letter-spacing:0;
+    /* v53 · 修复 emoji 字符 baseline 偏移导致 icon 不居中 */
+    display:flex;align-items:center;justify-content:center;line-height:1;padding:0;
     box-shadow:0 0 12px rgba(212,180,106,.35);
     transition:transform .2s}
   #dev-fab:hover{transform:rotate(45deg)}
