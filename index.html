@@ -524,6 +524,8 @@
         <button id="btn-rumors">📜 传 闻</button>
         <button id="btn-petexp">🐾 远 征</button>
         <button id="btn-spar">⚔ 切 磋</button>
+        <button id="btn-secret">📃 秘 术</button>
+        <button id="btn-forecast">🌤️ 天 象</button>
       </div>
 
       <!-- 第 3 组：故事 / 工具 -->
@@ -4537,6 +4539,86 @@ function openSpar(){
   });
 }
 
+// v47 · 秘术残页 — 收集碎片解锁隐藏功能
+const SECRET_TECHNIQUES = [
+  {id:"double_strike", nm:"双重斩击", desc:"普攻有15%概率连击两次", need:5, color:"#d96a6a"},
+  {id:"spirit_shield", nm:"灵气护体", desc:"受击时10%概率减伤40%", need:8, color:"#7ec8b4"},
+  {id:"treasure_sense", nm:"寻宝嗅觉", desc:"装备掉率+15%", need:6, color:"#d4b46a"},
+  {id:"quick_recover", nm:"速愈之法", desc:"战斗后回复15%HP", need:10, color:"#c0a8d4"},
+  {id:"death_resist", nm:"不死金身", desc:"致死伤害时20%概率存活（HP=1）", need:12, color:"#e8c56a"},
+];
+function hasSecretTech(id){ return (P._secretTechs||[]).includes(id); }
+function checkFragmentUnlock(){
+  if(!P._fragments) P._fragments = {};
+  for(const st of SECRET_TECHNIQUES){
+    if(hasSecretTech(st.id)) continue;
+    if((P._fragments[st.id]||0) >= st.need){
+      if(!P._secretTechs) P._secretTechs = [];
+      P._secretTechs.push(st.id);
+      log(`✦✦ 秘术解锁：【${st.nm}】— ${st.desc}！`,"epic");
+      addChronicle(`解锁秘术【${st.nm}】。`);
+      SFX.chime();
+    }
+  }
+}
+function tryDropFragment(){
+  if(Math.random()>0.12) return;
+  const candidates = SECRET_TECHNIQUES.filter(st=>!hasSecretTech(st.id));
+  if(!candidates.length) return;
+  const st = candidates[Math.floor(Math.random()*candidates.length)];
+  if(!P._fragments) P._fragments = {};
+  P._fragments[st.id] = (P._fragments[st.id]||0) + 1;
+  log(`📃 获得秘术残页【${st.nm}】（${P._fragments[st.id]}/${st.need}）`,"sys");
+  checkFragmentUnlock();
+}
+function openSecretTechs(){
+  if(!P._fragments) P._fragments = {};
+  const rows = SECRET_TECHNIQUES.map(st=>{
+    const have = P._fragments[st.id]||0;
+    const unlocked = hasSecretTech(st.id);
+    const pct = Math.min(100, Math.floor(have/st.need*100));
+    return `<div class="shop-row">
+      <div><div class="nm" style="color:${unlocked?st.color:'#888'}">${unlocked?"✦":"○"} ${st.nm}</div>
+      <div class="ds">${st.desc}</div>
+      <div class="ds" style="color:#999">残页 ${Math.min(have,st.need)}/${st.need}</div>
+      ${!unlocked?`<div style="background:rgba(0,0,0,0.3);border-radius:3px;height:4px;margin-top:3px"><div style="width:${pct}%;height:4px;border-radius:3px;background:${st.color}"></div></div>`:""}</div>
+    </div>`;
+  }).join("");
+  const activeList = SECRET_TECHNIQUES.filter(st=>hasSecretTech(st.id));
+  const summary = activeList.length ? activeList.map(s=>`${s.nm}`).join("、") : "尚无秘术";
+  showModal(`<h3>📃 秘 术 残 页</h3>
+    <p style="font-size:12px;color:#a89c7c">历练中偶获残页碎片，集齐可解锁秘术。</p>
+    <p style="font-size:11px;color:#e8c56a">已激活：${summary}</p>
+    <div class="box left" style="padding:0;border:none;background:none">${rows}</div>
+    <div class="btns"><button onclick="closeModal()">关 闭</button></div>`);
+}
+
+// v47 · 天象预报 — 预测未来天象
+function openForecast(){
+  const forecasts = [];
+  const eventPool = (typeof WORLD_EVENTS!=="undefined") ? WORLD_EVENTS : [];
+  if(!eventPool.length){ showModal(`<h3>🌤️ 天象预报</h3><p>无可推演之天象。</p><div class="btns"><button onclick="closeModal()">关闭</button></div>`); return; }
+  const seed = (P.days||0);
+  for(let i=0;i<3;i++){
+    const daysAhead = 20 + i*30 + Math.floor(((seed*7+i*13)%17));
+    const evIdx = (seed+i*37)%eventPool.length;
+    const ev = eventPool[evIdx];
+    forecasts.push({day:(P.days||0)+daysAhead, event:ev});
+  }
+  const rows = forecasts.map(f=>{
+    return `<div class="shop-row">
+      <div><div class="nm" style="color:${f.event.color||"#a89c7c"}">${f.event.icon||"🌌"} ${f.event.nm}</div>
+      <div class="ds">${f.event.desc}</div>
+      <div class="ds" style="color:#999">预计 ${f.day-(P.days||0)} 日后降临</div></div>
+    </div>`;
+  }).join("");
+  const cost = 20 + P.realmIdx*10;
+  showModal(`<h3>🌤️ 天象预报</h3>
+    <p style="font-size:12px;color:#a89c7c">观星推演未来天象走势（仅供参考，天道无常）。</p>
+    <div class="box left" style="padding:0;border:none;background:none">${rows}</div>
+    <div class="btns"><button onclick="closeModal()">关 闭</button></div>`);
+}
+
 // v24 · 天道法则 — 每一世随机抽取的全局修饰规则
 const WORLD_RULES = [
   {id:"barren",  nm:"灵气枯竭", desc:"修炼速度 -20%，掉率 +30%",  cultMul:0.80, lootMul:1.30, color:"#d96a6a"},
@@ -5776,6 +5858,8 @@ function newPlayer(name,rootName,elements){
     _lastInsightCheck: 0,
     _forbiddenCd: {},
     rumors: [],
+    _fragments: {},
+    _secretTechs: [],
   };
   recalcStats(p);
   // 初始化后按当前 maxHp/maxMp 满血满蓝
@@ -6770,8 +6854,18 @@ function applyDamageToP(d, src){
   if(rs) dmg = Math.floor(dmg*(1-rs));
   // 神通护盾
   if(P.shield){ dmg = Math.floor(dmg*(1-P.shield)); P.shield=0; }
+  // v47: 秘术·灵气护体
+  if(typeof hasSecretTech==="function" && hasSecretTech("spirit_shield") && Math.random()<0.10){
+    dmg = Math.floor(dmg*0.6);
+    log("✦ 灵气护体发动，减伤40%！","good");
+  }
   dmg = Math.max(1, dmg);
   P.hp = Math.max(0, P.hp-dmg);
+  // v47: 秘术·不死金身
+  if(P.hp<=0 && typeof hasSecretTech==="function" && hasSecretTech("death_resist") && Math.random()<0.20){
+    P.hp = 1;
+    log("✦✦ 不死金身发动！绝处逢生！","epic");
+  }
   const tag = d.log ? `[${d.log}] ` : "";
   // v10.3 · 凶兆触发：红光 + 抖屏 + 音效
   if(d.isOmen){
@@ -8025,6 +8119,7 @@ function actAdventure(){
   if(typeof tryAdventureChain === "function") tryAdventureChain();
   if(typeof tryDiscoverLeyline === "function") tryDiscoverLeyline();
   if(typeof tryDiscoverRecipe === "function") tryDiscoverRecipe();
+  if(typeof tryDropFragment === "function") tryDropFragment();
   if(typeof gainFactionRep === "function") gainFactionRep("rogue",1);
   const _region = (typeof getRegion==="function") ? getRegion() : null;
   if(_region) P._advRegion = _region.id;
@@ -11400,7 +11495,8 @@ function endBattle(win){
     const eaLoot = typeof equipAffixBonus==="function" ? equipAffixBonus(P,"loot")*0.01 : 0;
     const rpLoot = typeof getRealmPassives==="function" ? getRealmPassives(P.realmIdx).reduce((s,rp)=>s+(rp.lootPct||0),0) : 0;
     const regLootMul = (P._advRegionBattle && typeof getRegion==="function") ? getRegion().lootMul||1 : 1;
-    const lootMul = (buff.lootMul || 1) * (weEff.lootMul || 1) * (1 + tDropAdd + dLucky + eaLoot + rpLoot) * wrLootMul * dgTreasureMul * rsLootMul * regLootMul;
+    const stTreasure = (typeof hasSecretTech==="function" && hasSecretTech("treasure_sense")) ? 1.15 : 1;
+    const lootMul = (buff.lootMul || 1) * (weEff.lootMul || 1) * (1 + tDropAdd + dLucky + eaLoot + rpLoot) * wrLootMul * dgTreasureMul * rsLootMul * regLootMul * stTreasure;
     // 25% 丹药 / 5% 灵草 / 2% 装备
     if(Math.random()<0.25*lootMul){
       addItem(P,choice(["金创药","聚气丹","凝神丹","回元丹"]),1);
@@ -11475,6 +11571,12 @@ function endBattle(win){
     if(typeof codexRegister==="function") codexRegister("monsters", m.name.replace(/^(血煞·|灵变·|远古·)/,""));
     if(typeof checkNewInsight==="function") checkNewInsight();
     if(typeof rumorAdvance==="function") rumorAdvance("kill");
+    // v47: 秘术·速愈之法
+    if(typeof hasSecretTech==="function" && hasSecretTech("quick_recover")){
+      const heal = Math.floor(P.maxHp*0.15);
+      P.hp = Math.min(P.maxHp, P.hp+heal);
+      log(`✦ 速愈之法：回复 ${heal} 气血。`,"good");
+    }
     if(typeof checkSpiritAwaken==="function") checkSpiritAwaken();
     if(typeof gainFactionRep==="function"){ gainFactionRep("demon",1); gainFactionRep("rogue",1); }
     // v16: 悬赏令进度
@@ -11554,6 +11656,13 @@ function battleAttack(){
   if(myEle && m.ele && OVERCOME[myEle] === m.ele) addBreakGauge(m, 1);
   const killed = applyDamageToM(m, d, null);
   if(killed){endBattle(true);return}
+  // v47: 秘术·双重斩击
+  if(typeof hasSecretTech==="function" && hasSecretTech("double_strike") && Math.random()<0.15){
+    const d2x = calcDamage(attackerOf(P), monsterDefender(m), {mul:0.7});
+    log("✦ 双重斩击！追加一击！","epic");
+    const k2x = applyDamageToM(m, d2x, null);
+    if(k2x){endBattle(true);return}
+  }
   // 打断蓄力检查
   tryInterrupt(m, d.dmg);
   // 先手系统
@@ -12786,6 +12895,8 @@ function loadGame(){
     if(!d._lastInsightCheck) d._lastInsightCheck = 0;
     if(!d._forbiddenCd) d._forbiddenCd = {};
     if(!d.rumors) d.rumors = [];
+    if(!d._fragments) d._fragments = {};
+    if(!d._secretTechs) d._secretTechs = [];
     // v4 寿元迁移：移除强制拉满逻辑（避免覆盖新机制），仅做异常兜底
     if(d.lifespan===undefined || d.lifespan<=0){
       d.lifespan = 80 + (d.realmIdx||0)*30;
@@ -13049,6 +13160,8 @@ if($("btn-forbidden")) $("btn-forbidden").onclick = ()=>{ if(typeof openForbidde
 if($("btn-rumors")) $("btn-rumors").onclick = ()=>{ if(typeof openRumors==="function") openRumors(); };
 if($("btn-petexp")) $("btn-petexp").onclick = ()=>{ if(typeof openPetExpedition==="function") openPetExpedition(); };
 if($("btn-spar")) $("btn-spar").onclick = ()=>{ if(typeof openSpar==="function") openSpar(); };
+if($("btn-secret")) $("btn-secret").onclick = ()=>{ if(typeof openSecretTechs==="function") openSecretTechs(); };
+if($("btn-forecast")) $("btn-forecast").onclick = ()=>{ if(typeof openForecast==="function") openForecast(); };
 $("btn-calendar").onclick= openCalendar;
 // v5：夙愿入口（按钮 + 状态行）
 $("btn-quest").onclick   = openQuestPanel;
