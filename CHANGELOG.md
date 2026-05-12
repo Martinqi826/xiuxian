@@ -4,6 +4,29 @@
 
 ---
 
+## [v44] — 2026-05-12 · 天机阁 + 心法领悟
+
+### 动机
+
+游戏缺乏收集向目标，玩家没有理由追求全面探索；战斗次数积累缺少正反馈，杀了几百只怪没有任何被动成长感。
+
+### 改动
+
+**天机阁（图鉴系统）**
+- `CODEX_MILESTONES`（6阶）：收集5/10/15/20/25/30条分别解锁永久属性加成
+- `codexRegister(type,name)` — 击杀新怪物或获取新物品时自动注册（去重，稀有变异剥离前缀）
+- `openCodex()` 面板展示妖兽/物品图鉴（已发现高亮，未发现显示???）+ 里程碑进度
+- 里程碑奖励整合进 `recalcStats`（atk/def/hp/allStat）和 `gainCult`（cultPct）
+
+**心法领悟**
+- `COMBAT_INSIGHTS`（6阶）：20/50/100/150/250/400击杀解锁被动
+- 铁皮术(def+5%), 明察秋毫(crit+2%), 嗜血之怒(atk+5%), 鬼魅步(dodge+3%), 护魂罩(hp+8%), 道心坚固(critDmg+20%)
+- `checkNewInsight()` 在每次击杀后检测并通知
+- `openInsights()` 面板展示所有心法进度条
+- 整合进 `recalcStats`（atkPct/defPct/hpPct/critAdd/critDmgAdd/dodgeAdd）
+
+---
+
 ## [v43] — 2026-05-12 · 功法融合 + 历练地图
 
 ### 动机
