@@ -95,6 +95,11 @@
   .action-group{display:grid;grid-template-columns:1fr 1fr;gap:8px}
   .action-group.action-grid-4{grid-template-columns:repeat(4,1fr);gap:6px}
   .action-group.action-grid-4 button{padding:8px 6px;font-size:13px;letter-spacing:1px}
+  .action-grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;padding:6px 0}
+  .action-grid-4 button{padding:8px 6px;font-size:13px;letter-spacing:1px}
+  .action-grid-4.collapsed{display:none!important}
+  .sys-container{display:flex!important;flex-direction:column;gap:0!important}
+  .sys-label{cursor:pointer;font-size:11px;color:#a89c7c;letter-spacing:2px;padding:6px 0 3px;border-bottom:1px solid rgba(168,156,124,0.2);user-select:none}
   /* 第 1 组里 突破按钮独占两列 */
   .action-group .span-2{grid-column:1 / -1}
   /* 主按钮 + 自动按钮 配对：主按钮占绝大部分，自动按钮只是右侧小贴片 */
@@ -215,6 +220,8 @@
     button{min-height:44px}
     .action-group.action-grid-4{grid-template-columns:1fr 1fr;gap:6px}
     .action-group.action-grid-4 button{padding:10px 6px;font-size:13px}
+    .action-grid-4{grid-template-columns:1fr 1fr;gap:6px}
+    .action-grid-4 button{padding:10px 6px;font-size:13px}
 
     .auto-bar{flex-wrap:wrap;gap:4px;padding:6px 8px}
     .auto-bar .spd{padding:6px 10px;min-height:36px}
@@ -488,44 +495,59 @@
         <div class="hotkey-hint">快捷键：1闭关 2历练 3突破 空格自动</div>
       </div>
 
-      <!-- 第 2 组：玩法系统（4 个副系统） -->
-      <div class="action-group action-grid-4" data-group="systems">
-        <button id="btn-alchemy">🔥 炼 丹</button>
-        <button id="btn-sect">🏯 宗 门</button>
-        <button id="btn-market">🏪 坊 市</button>
-        <button id="btn-dungeon">🏔 秘 境</button>
-        <button id="btn-bounty">📋 悬 赏</button>
-        <button id="btn-formation">🔮 阵 法</button>
-        <button id="btn-synthesis">⚗ 合 成</button>
-        <button id="btn-arena">⚔ 擂 台</button>
-        <button id="btn-dailies">📋 日 常</button>
-        <button id="btn-talent">🌟 天 赋</button>
-        <button id="btn-salvage">⚒ 分 解</button>
-        <button id="btn-cave">🏠 洞 府</button>
-        <button id="btn-treasure">🗺 探 宝</button>
-        <button id="btn-destiny">⭐ 天 命</button>
-        <button id="btn-reincshop">🌀 轮 回</button>
-        <button id="btn-friends">🤝 仙 友</button>
-        <button id="btn-leyline">🌀 灵 脉</button>
-        <button id="btn-prayer">🌌 祈 愿</button>
-        <button id="btn-craft">⚒ 炼 器</button>
-        <button id="btn-engrave">✴ 铭 刻</button>
-        <button id="btn-divine">🔮 推 演</button>
-        <button id="btn-boss">👹 妖 王</button>
-        <button id="btn-trial">⚡ 试 炼</button>
-        <button id="btn-wheel">🎡 转 盘</button>
-        <button id="btn-constellation">🌟 星 辰</button>
-        <button id="btn-faction">🏴 势 力</button>
-        <button id="btn-fusion">🔄 融 合</button>
-        <button id="btn-region">🗺️ 地 图</button>
-        <button id="btn-codex">📖 图 鉴</button>
-        <button id="btn-insights">💡 心 法</button>
-        <button id="btn-forbidden">⛧ 禁 术</button>
-        <button id="btn-rumors">📜 传 闻</button>
-        <button id="btn-petexp">🐾 远 征</button>
-        <button id="btn-spar">⚔ 切 磋</button>
-        <button id="btn-secret">📃 秘 术</button>
-        <button id="btn-forecast">🌤️ 天 象</button>
+      <!-- 第 2 组：玩法系统（分类折叠） -->
+      <div class="action-group sys-container" data-group="systems">
+        <div class="sys-label" onclick="this.parentElement.querySelector('.sys-core').classList.toggle('collapsed')">▸ 核 心 玩 法</div>
+        <div class="action-grid-4 sys-core">
+          <button id="btn-alchemy">🔥 炼 丹</button>
+          <button id="btn-sect">🏯 宗 门</button>
+          <button id="btn-market">🏪 坊 市</button>
+          <button id="btn-dungeon">🏔 秘 境</button>
+          <button id="btn-bounty">📋 悬 赏</button>
+          <button id="btn-arena">⚔ 擂 台</button>
+          <button id="btn-dailies">📋 日 常</button>
+          <button id="btn-rumors">📜 传 闻</button>
+        </div>
+        <div class="sys-label" onclick="this.parentElement.querySelector('.sys-growth').classList.toggle('collapsed')">▸ 修 行 成 长</div>
+        <div class="action-grid-4 sys-growth">
+          <button id="btn-formation">🔮 阵 法</button>
+          <button id="btn-constellation">🌟 星 辰</button>
+          <button id="btn-talent">🌟 天 赋</button>
+          <button id="btn-fusion">🔄 融 合</button>
+          <button id="btn-insights">💡 心 法</button>
+          <button id="btn-secret">📃 秘 术</button>
+          <button id="btn-forbidden">⛧ 禁 术</button>
+          <button id="btn-faction">🏴 势 力</button>
+        </div>
+        <div class="sys-label" onclick="this.parentElement.querySelector('.sys-equip').classList.toggle('collapsed')">▸ 装 备 锻 造</div>
+        <div class="action-grid-4 sys-equip">
+          <button id="btn-craft">⚒ 炼 器</button>
+          <button id="btn-engrave">✴ 铭 刻</button>
+          <button id="btn-synthesis">⚗ 合 成</button>
+          <button id="btn-salvage">⚒ 分 解</button>
+        </div>
+        <div class="sys-label" onclick="this.parentElement.querySelector('.sys-explore').classList.toggle('collapsed')">▸ 探 索 社 交</div>
+        <div class="action-grid-4 sys-explore">
+          <button id="btn-region">🗺️ 地 图</button>
+          <button id="btn-cave">🏠 洞 府</button>
+          <button id="btn-treasure">🗺 探 宝</button>
+          <button id="btn-friends">🤝 仙 友</button>
+          <button id="btn-spar">⚔ 切 磋</button>
+          <button id="btn-petexp">🐾 远 征</button>
+          <button id="btn-leyline">🌀 灵 脉</button>
+          <button id="btn-forecast">🌤️ 天 象</button>
+        </div>
+        <div class="sys-label" onclick="this.parentElement.querySelector('.sys-misc').classList.toggle('collapsed')">▸ 挑 战 杂 项</div>
+        <div class="action-grid-4 sys-misc">
+          <button id="btn-boss">👹 妖 王</button>
+          <button id="btn-trial">⚡ 试 炼</button>
+          <button id="btn-divine">🔮 推 演</button>
+          <button id="btn-wheel">🎡 转 盘</button>
+          <button id="btn-destiny">⭐ 天 命</button>
+          <button id="btn-reincshop">🌀 轮 回</button>
+          <button id="btn-codex">📖 图 鉴</button>
+          <button id="btn-prayer">🌌 祈 愿</button>
+        </div>
       </div>
 
       <!-- 第 3 组：故事 / 工具 -->
@@ -3833,6 +3855,17 @@ const ACHIEVEMENTS = [
   {id:"skill_up",    nm:"神通大成", desc:"进阶一个神通",               reward:"灵石×800",  check:p=>p.skillUse&&Object.keys(SKILL_UPGRADES).some(k=>(p.skillUse[k]||0)>=SKILL_UPGRADES[k].need)},
   {id:"treasure_all",nm:"寻宝达人", desc:"完成所有 4 种藏宝图",        reward:"万年灵芝精×1",check:p=>p.flags?._treasure_copper&&p.flags?._treasure_silver&&p.flags?._treasure_gold&&p.flags?._treasure_jade},
   {id:"meditation",  nm:"禅定入微", desc:"触发 10 次入定冥想",          reward:"悟道茶×3",  check:p=>(p.stats?.meditation||0)>=10},
+  // v48 · 新系统成就
+  {id:"codex_15",    nm:"博物多识", desc:"天机阁收录15条",               reward:"灵石×500",  check:p=>(typeof codexCount==="function"?codexCount(p):0)>=15},
+  {id:"codex_30",    nm:"天机全览", desc:"天机阁收录30条",               reward:"蟠桃×1",    check:p=>(typeof codexCount==="function"?codexCount(p):0)>=30},
+  {id:"insight_3",   nm:"百战通明", desc:"领悟3种心法",                  reward:"灵石×800",  check:p=>(typeof getInsights==="function"?getInsights(p).length:0)>=3},
+  {id:"insight_all", nm:"战意无双", desc:"领悟全部6种心法",              reward:"天劫真血×1",check:p=>(typeof getInsights==="function"?getInsights(p).length:0)>=6},
+  {id:"secret_1",    nm:"秘术初窥", desc:"解锁首个秘术",                reward:"灵石×300",  check:p=>(p._secretTechs||[]).length>=1},
+  {id:"secret_all",  nm:"秘术全通", desc:"解锁全部5种秘术",              reward:"万年灵芝精×1",check:p=>(p._secretTechs||[]).length>=5},
+  {id:"forbidden",   nm:"禁忌之力", desc:"施展一次禁术",                 reward:"灵石×500",  check:p=>p.flags?._ach_forbidden},
+  {id:"region_all",  nm:"四方游历", desc:"前往过全部4个历练区域",          reward:"悟道茶×3",  check:p=>p.codex?.regions?.length>=4},
+  {id:"fusion",      nm:"道法自然", desc:"成功融合功法",                  reward:"灵石×1000", check:p=>!!p._techFused},
+  {id:"spar_win",    nm:"切磋王者", desc:"切磋中获胜",                   reward:"灵石×200",  check:p=>p.flags?._ach_sparWin},
 ];
 
 /* v22 · 天赋系统 — 累计里程碑解锁永久被动 */
@@ -4162,6 +4195,7 @@ function openRegionMap(){
     b.onclick = ()=>{
       P._advRegion = b.dataset.reg;
       const r = getRegion();
+      if(typeof codexRegister==="function") codexRegister("regions", r.id);
       closeModal();
       log(`🗺️ 前往${r.icon}【${r.nm}】— ${r.desc}`,"good");
       addChronicle(`转修至${r.nm}。`);
@@ -4319,6 +4353,7 @@ function useForbiddenArt(id){
     }
     if(e.cultMul){ P._forbiddenCultMul = e.cultMul; P._forbiddenCultLeft = e.duration; }
     if(e.permAtkPct){ P._permAtkBonus = (P._permAtkBonus||0) + e.permAtkPct; recalcStats(P); }
+    if(!P.flags) P.flags={}; P.flags._ach_forbidden=true;
     log(`⛧ 禁术【${art.nm}】发动！${art.desc}`,"epic");
     addChronicle(`施展禁术【${art.nm}】。`);
     SFX.rumble();
@@ -4526,6 +4561,7 @@ function openSpar(){
       if(win){
         const cultReward = 50 + P.realmIdx * 30;
         gainCult(P, cultReward, "切磋");
+        if(!P.flags) P.flags={}; P.flags._ach_sparWin=true;
         log(`⚔ 切磋胜！${npc.nm}拱手认输。修为 +${cultReward}`,"good");
         if(fond<100){ P.friends[npcId].fond = Math.min(100, fond+3); }
       } else {
