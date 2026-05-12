@@ -506,6 +506,7 @@
         <button id="btn-reincshop">🌀 轮 回</button>
         <button id="btn-friends">🤝 仙 友</button>
         <button id="btn-leyline">🌀 灵 脉</button>
+        <button id="btn-prayer">🌌 祈 愿</button>
       </div>
 
       <!-- 第 3 组：故事 / 工具 -->
@@ -3617,6 +3618,16 @@ const DUNGEONS = [
   {n:"太古战场",  need:15, floors:7, ele:"土", reward:{cult:50000, stone:30000, item:"化神丹"},      monster:[9,10,11],  boss:11, bossItem:"天心玉"},
   {n:"仙古墓",    need:18, floors:9, ele:"金", reward:{cult:200000,stone:100000,item:"化神丹"},      monster:[12,13,14], boss:14, bossItem:"虚空挪移符"},
 ];
+// v35 · 秘境Boss能力
+const DUNGEON_BOSS_ABILITIES = {
+  "青木秘境":  {id:"regen",   nm:"生命回春", desc:"每回合回复5%气血",    regenPct:0.05},
+  "玄冰谷":    {id:"freeze",  nm:"寒冰护甲", desc:"受伤减15%",          dmgReduce:0.15},
+  "炎魔窟":    {id:"rage",    nm:"狂暴烈焰", desc:"气血低于50%时攻击翻倍", rageThreshold:0.5, rageMul:2},
+  "上古遗迹":  {id:"reflect", nm:"元气反震", desc:"反弹20%伤害",         reflectPct:0.20},
+  "太古战场":  {id:"drain",   nm:"噬魂汲取", desc:"攻击吸取20%伤害回血",  drainPct:0.20},
+  "仙古墓":    {id:"phase",   nm:"虚实幻影", desc:"30%概率闪避攻击",     dodgePct:0.30},
+};
+
 const DUNGEON_EVENTS = [
   {name:"灵泉",   prob:0.18, fn:p=>{const h=Math.floor(p.maxHp*0.3);p.hp=Math.min(p.maxHp,p.hp+h);return `发现灵泉，恢复 ${h} 气血！`;}},
   {name:"宝箱",   prob:0.14, fn:p=>{const s=50+p.realmIdx*30;p.bag["灵石"]=(p.bag["灵石"]||0)+s;return `打开宝箱，获得 ${s} 灵石！`;}},
@@ -6077,7 +6088,27 @@ function applyDamageToM(m, d, srcName){
     SFX.dodge(); floatDmg("闪避","dodge");
     return false;
   }
+  // v35 · Boss能力：闪避
+  if(m._bossAbil?.dodgePct && Math.random() < m._bossAbil.dodgePct){
+    log(`「${m.name}」虚实变幻，你的攻击穿透了幻影！`,"dodge");
+    SFX.dodge(); floatDmg("幻影","dodge");
+    return false;
+  }
+  // v35 · Boss能力：减伤
+  if(m._bossAbil?.dmgReduce) d.dmg = Math.max(1, Math.floor(d.dmg * (1 - m._bossAbil.dmgReduce)));
   m.mhp -= d.dmg;
+  // v35 · Boss能力：反弹
+  if(m._bossAbil?.reflectPct){
+    const ref = Math.floor(d.dmg * m._bossAbil.reflectPct);
+    P.hp = Math.max(1, P.hp - ref);
+    log(`⚡ 元气反震！你受到 ${ref} 点反弹伤害！`,"bad");
+  }
+  // v35 · Boss能力：吸血
+  if(m._bossAbil?.drainPct){
+    const drain = Math.floor(d.dmg * m._bossAbil.drainPct);
+    m.mhp = Math.min(m.hp, m.mhp + drain);
+    log(`💀 噬魂汲取：Boss回复 ${drain} 气血！`,"bad");
+  }
   SFX.hit(); floatDmg("-"+d.dmg, d.isCrit?"crit":"");
   // v10.3 · 绝境暴击 → 用 epic 染色 + 特效
   const hpRatio = (P.hp||0) / Math.max(1, P.maxHp||1);
@@ -8673,6 +8704,46 @@ function triggerWorldEvent(p){
     addItem(p, we.effect.giveItem[0], we.effect.giveItem[1]);
   }
 }
+// v35 · 天象祈愿
+function openWeatherPrayer(){
+  if(P.inBattle){ log("战斗中无法祈愿。","hint"); return; }
+  const curWe = P.worldEvent ? WORLD_EVENTS.find(e=>e.id===P.worldEvent.id) : null;
+  const extendCost = curWe ? 200 + P.realmIdx * 30 : 0;
+  const invokeCost = 500 + P.realmIdx * 50;
+  const favorable = WORLD_EVENTS.filter(e=>e.effect.cultMul||e.effect.lootMul||e.effect.dxRegen||e.effect.gardenSpeed);
+  let html = `<h3>🌌 天 象 祈 愿</h3>`;
+  if(curWe){
+    const left = Math.max(0, P.worldEvent.endDay - (P.days||0));
+    html += `<p style="font-size:12px;color:${curWe.color}">当前天象：【${curWe.nm}】（剩${left}天）</p>
+      <div class="shop-row"><div><div class="nm">延长天象 +${curWe.dur}天</div><div class="ds">消耗 ${extendCost} 灵石</div></div>
+        <button class="sm primary" id="wp-extend" ${(P.bag["灵石"]||0)>=extendCost?"":"disabled"}>延长</button></div>`;
+  }else{
+    html += `<p style="font-size:12px;color:#a89c7c">当前无天象</p>`;
+  }
+  html += `<div class="shop-row"><div><div class="nm">祈愿吉象</div><div class="ds">消耗 ${invokeCost} 灵石，随机召唤有利天象</div></div>
+    <button class="sm primary" id="wp-invoke" ${(P.bag["灵石"]||0)>=invokeCost&&!P.worldEvent?"":"disabled"}>祈愿</button></div>`;
+  html += `<div class="btns"><button onclick="closeModal()">关 闭</button></div>`;
+  showModal(html);
+  if($("wp-extend")) $("wp-extend").onclick = ()=>{
+    if((P.bag["灵石"]||0)<extendCost){ log("灵石不足。","hint"); return; }
+    addItem(P,"灵石",-extendCost);
+    P.worldEvent.endDay += curWe.dur;
+    closeModal();
+    log(`🌌 祈愿成功！【${curWe.nm}】延长 ${curWe.dur} 天！`,"epic");
+    refresh(); saveGame(true);
+  };
+  if($("wp-invoke")) $("wp-invoke").onclick = ()=>{
+    if((P.bag["灵石"]||0)<invokeCost||P.worldEvent) return;
+    addItem(P,"灵石",-invokeCost);
+    closeModal();
+    const we = choice(favorable);
+    P.worldEvent = {id:we.id, endDay:(P.days||0)+we.dur};
+    log(`🌌 祈愿天降吉象：【${we.nm}】！${we.desc}（持续${we.dur}天）`,"epic");
+    if(we.effect.giveItem) addItem(P, we.effect.giveItem[0], we.effect.giveItem[1]);
+    refresh(); saveGame(true);
+  };
+}
+
 function getWorldEventEffect(){
   if(!P || !P.worldEvent) return {};
   const we = WORLD_EVENTS.find(e=>e.id===P.worldEvent.id);
@@ -9650,6 +9721,12 @@ function dungeonNextFloor(){
     P.monster.mhp  = Math.floor(P.monster.mhp * 1.8);
     P.monster.hp   = P.monster.mhp;
     P.monster.matk = Math.floor(P.monster.matk * 1.4);
+    // v35 · Boss特殊能力
+    const bossAbil = DUNGEON_BOSS_ABILITIES[dg.def.n];
+    if(bossAbil){
+      P.monster._bossAbil = bossAbil;
+      log(`⚠ Boss能力：【${bossAbil.nm}】${bossAbil.desc}`,"bad");
+    }
     if(dgMod && dgMod.apply) dgMod.apply(P.monster);
   }else{
     if(dg.floor > 1 && typeof DUNGEON_EVENTS !== "undefined" && !(dgMod && dgMod.flag==="barren")){
@@ -9833,6 +9910,18 @@ function monsterCounterPhase(m){
 /* 统一回合末处理 */
 function postActionPhase(m){
   if(!m) return;
+  // v35 · Boss能力：回血
+  if(m._bossAbil?.regenPct){
+    const regen = Math.floor(m.hp * m._bossAbil.regenPct);
+    m.mhp = Math.min(m.hp, m.mhp + regen);
+    log(`🌿 Boss回春：恢复 ${regen} 气血（${m.mhp}/${m.hp}）`,"bad");
+  }
+  // v35 · Boss能力：狂暴
+  if(m._bossAbil?.rageThreshold && !m._raged && m.mhp < m.hp * m._bossAbil.rageThreshold){
+    m._raged = true;
+    m.matk = Math.floor(m.matk * (m._bossAbil.rageMul||2));
+    log(`🔥 Boss狂暴！攻击力暴涨！`,"epic");
+  }
   checkTelegraph(m);
   tickBreak(m);
   regenMp(P, 0.015);
@@ -11513,6 +11602,7 @@ if($("btn-destiny")) $("btn-destiny").onclick = openDestinyPanel;
 if($("btn-reincshop")) $("btn-reincshop").onclick = openReincarnationShop;
 if($("btn-friends")) $("btn-friends").onclick = openFriendsPanel;
 if($("btn-leyline")) $("btn-leyline").onclick = ()=>{ if(typeof openLeylinePanel==="function") openLeylinePanel(); };
+if($("btn-prayer")) $("btn-prayer").onclick = ()=>{ if(typeof openWeatherPrayer==="function") openWeatherPrayer(); };
 $("btn-calendar").onclick= openCalendar;
 // v5：夙愿入口（按钮 + 状态行）
 $("btn-quest").onclick   = openQuestPanel;
