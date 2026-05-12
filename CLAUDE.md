@@ -3,7 +3,7 @@
 ## 项目概述
 
 单文件浏览器修仙挂机游戏。**零依赖**（纯 HTML+CSS+JS），双击 `index.html` 即玩。
-当前 ~11893 行，所有逻辑在一个 `<script>` 块内。存档用 localStorage。
+当前 ~12036 行，所有逻辑在一个 `<script>` 块内。存档用 localStorage。
 
 ## 技术架构
 
@@ -90,6 +90,8 @@ L8950-9900   DEV面板 + 帮助弹窗
 | `PET_ACTIVES` | 4 种灵宠主动技能 |
 | `REINCARNATION_SHOP` | 8 种轮回商店加成 |
 | `TRIBULATION_MODS` | 6 种天劫词缀 |
+| `WANDERING_NPCS` | 6 种游历NPC（仙友系统） |
+| `EQUIP_AFFIXES` | 6 种装备词缀 |
 
 ### P 对象关键字段
 
@@ -132,6 +134,9 @@ L8950-9900   DEV面板 + 帮助弹窗
   worldRules: [],                // 天道法则(每世随机)
   // v25+ 新增
   enlighten: {atk:0,def:0,spd:0,life:0}, // 悟道层级
+  // v30+ 新增
+  friends: {npcId: {fond,met,bonusApplied}}, // 仙友好感
+  equipAffixes: {装备名: {id,nm,stat,val,color}}, // 装备词缀
 }
 ```
 

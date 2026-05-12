@@ -504,6 +504,7 @@
         <button id="btn-treasure">🗺 探 宝</button>
         <button id="btn-destiny">⭐ 天 命</button>
         <button id="btn-reincshop">🌀 轮 回</button>
+        <button id="btn-friends">🤝 仙 友</button>
       </div>
 
       <!-- 第 3 组：故事 / 工具 -->
@@ -2932,7 +2933,8 @@ function petAssistAttack(){
   // 灵宠攻击 - 怪物防御
   const meta = MONSTER_META[m.idx]||{};
   const mDef = Math.floor((m.matk||0)*0.2);          // 怪物简易防御
-  let dmg = Math.max(1, Math.floor((pet.atk - mDef) * dmgMul * (0.85+Math.random()*0.3)));
+  const fpPetMul = 1 + (typeof friendPassive==="function" ? friendPassive("petAtkMul") : 0);
+  let dmg = Math.max(1, Math.floor((pet.atk - mDef) * dmgMul * fpPetMul * (0.85+Math.random()*0.3)));
   // 五行克制（除非神通指定 ignoreEle）
   if(!(skillMeta && skillMeta.ignoreEle)){
     if(pet.ele && m.ele && OVERCOME[pet.ele]===m.ele) dmg = Math.floor(dmg*1.4);
@@ -4132,6 +4134,109 @@ function triggerEnlightenChoice(p){
   if($("enl-close")) $("enl-close").onclick = closeModal;
 }
 
+// v30 · 仙友系统
+const WANDERING_NPCS = [
+  {id:"herbalist", nm:"采药老翁",  desc:"深山隐居的炼丹散修", minRealm:0,
+   gift:"聚气丹", bonus:{alchemyAdd:0.02}, bonusDesc:"炼丹成功率+2%"},
+  {id:"swordsman", nm:"游侠剑客", desc:"四方云游的剑道修士", minRealm:2,
+   gift:"金创药",  bonus:{atkAdd:5},       bonusDesc:"攻击+5"},
+  {id:"merchant",  nm:"行商散人", desc:"坊市间辗转的灵石商", minRealm:3,
+   gift:"灵石",    bonus:{stoneMul:0.05},  bonusDesc:"灵石掉率+5%"},
+  {id:"scholar",   nm:"书痴道人", desc:"痴迷经卷的老学究",   minRealm:5,
+   gift:"悟道茶",  bonus:{cultAdd:0.03},   bonusDesc:"修炼速度+3%"},
+  {id:"beast",     nm:"驭兽仙姑", desc:"与灵兽相伴的女修",   minRealm:8,
+   gift:"凝血花",  bonus:{petAtkMul:0.1},  bonusDesc:"灵宠攻击+10%"},
+  {id:"elder",     nm:"太虚老人", desc:"不知几千岁的神秘高人",minRealm:12,
+   gift:"破障丹",  bonus:{defAdd:8,lifeAdd:20}, bonusDesc:"防御+8，寿元+20"},
+];
+
+function tryMeetWanderingNPC(){
+  if(!P || Math.random() > 0.06) return;
+  const pool = WANDERING_NPCS.filter(n=>P.realmIdx>=n.minRealm);
+  if(!pool.length) return;
+  const npc = choice(pool);
+  if(!P.friends) P.friends = {};
+  const f = P.friends[npc.id] || {met:0, fond:0};
+  f.met++;
+  f.fond = Math.min(100, f.fond + rand(5,15));
+  P.friends[npc.id] = f;
+  const giftAmt = npc.gift==="灵石" ? 30+P.realmIdx*10 : 1;
+  addItem(P, npc.gift, giftAmt);
+  if(f.met === 1){
+    log(`✦ 偶遇【${npc.nm}】— ${npc.desc}。互相见礼，赠你${npc.gift}${giftAmt>1?`×${giftAmt}`:""}。`, "good");
+  } else {
+    log(`✦ 再遇旧识【${npc.nm}】，好感+${f.fond>=60?"（已成挚友）":""}。赠${npc.gift}${giftAmt>1?`×${giftAmt}`:""}。`, "good");
+  }
+  if(f.fond >= 60 && !f.bonusApplied){
+    f.bonusApplied = true;
+    log(`✦✦ 与【${npc.nm}】结为挚友！获得被动加成：${npc.bonusDesc}`, "epic");
+    SFX.chime();
+    if(npc.bonus.lifeAdd) P.lifespan += npc.bonus.lifeAdd;
+    addChronicle(`与【${npc.nm}】结为挚友。`);
+  }
+}
+
+function friendPassive(key){
+  if(!P || !P.friends) return 0;
+  let total = 0;
+  for(const npc of WANDERING_NPCS){
+    const f = P.friends[npc.id];
+    if(!f || f.fond < 60) continue;
+    if(npc.bonus[key]) total += npc.bonus[key];
+  }
+  return total;
+}
+
+function openFriendsPanel(){
+  if(!P.friends || !Object.keys(P.friends).length){ log("尚未结识仙友。","hint"); return; }
+  const rows = WANDERING_NPCS.map(npc=>{
+    const f = P.friends[npc.id];
+    if(!f) return "";
+    const isFriend = f.fond >= 60;
+    return `<div class="shop-row">
+      <div><div class="nm">${npc.nm} <span style="color:${isFriend?"#7fc7a3":"#888"};font-size:11px">${isFriend?"挚友":"相识"} (${f.fond}/100)</span></div>
+      <div class="ds">${npc.desc}${isFriend?` · ${npc.bonusDesc}`:""}</div></div>
+      <div class="pr">遇${f.met}次</div>
+    </div>`;
+  }).filter(Boolean).join("");
+  showModal(`<h3>🤝 仙 友</h3><div style="text-align:left">${rows}</div>
+    <div class="btns"><button id="fr-close">关闭</button></div>`);
+  $("fr-close").onclick = closeModal;
+}
+
+// v30 · 装备词缀系统
+const EQUIP_AFFIXES = [
+  {id:"sharp",  nm:"锋锐", desc:"攻击+",  stat:"atk", val:[3,5,8,12,18,25],   color:"#d96a6a"},
+  {id:"sturdy", nm:"坚固", desc:"防御+",  stat:"def", val:[2,4,6,10,15,20],   color:"#7ab0d4"},
+  {id:"vital",  nm:"生机", desc:"气血+",  stat:"hp",  val:[15,30,50,80,120,200],color:"#7fc7a3"},
+  {id:"spirit", nm:"灵动", desc:"修炼+%", stat:"cult",val:[2,3,4,5,7,10],     color:"#c0a8d4"},
+  {id:"lucky",  nm:"福运", desc:"掉率+%", stat:"loot",val:[2,3,4,5,6,8],      color:"#d4b46a"},
+  {id:"swift",  nm:"迅捷", desc:"暴击+%", stat:"crit",val:[1,2,3,4,5,7],      color:"#e8c547"},
+];
+
+function rollEquipAffix(tier){
+  if(Math.random() > 0.25) return null;
+  const affix = EQUIP_AFFIXES[Math.floor(Math.random()*EQUIP_AFFIXES.length)];
+  const valIdx = Math.min(affix.val.length-1, tier-1);
+  return {id:affix.id, nm:affix.nm, stat:affix.stat, val:affix.val[valIdx], color:affix.color};
+}
+
+function getEquipAffix(name){
+  if(!P || !P.equipAffixes) return null;
+  return P.equipAffixes[name] || null;
+}
+
+function equipAffixBonus(p, stat){
+  if(!p || !p.equipAffixes) return 0;
+  let total = 0;
+  for(const slot in p.equips){
+    const eq = p.equips[slot]; if(!eq || typeof eq !== "string") continue;
+    const aff = p.equipAffixes[eq];
+    if(aff && aff.stat === stat) total += aff.val;
+  }
+  return total;
+}
+
 // v26 · 战斗连招系统
 const COMBO_CHAINS = [
   {id:"破甲斩",  seq:["attack","attack","skill"],  desc:"三连攻势，最后一击神通破防",
@@ -4706,6 +4811,9 @@ function newPlayer(name,rootName,elements){
     cave: {},
     // —— v28 · 天命 ——
     destiny: [],
+    // —— v30 · 仙友 ——
+    friends: {},
+    equipAffixes: {},
   };
   recalcStats(p);
   // 初始化后按当前 maxHp/maxMp 满血满蓝
@@ -4884,6 +4992,14 @@ function recalcStats(p){
         p._appliedTalents.lifeAdd = lifeBonus;
       }
     }
+  }
+
+  // v30: 装备词缀加成
+  if(typeof equipAffixBonus === "function"){
+    d.atk  += equipAffixBonus(p, "atk");
+    d.def  += equipAffixBonus(p, "def");
+    d.maxHp += equipAffixBonus(p, "hp");
+    d.crit += equipAffixBonus(p, "crit") * 0.01;
   }
 
   // 上下限保护
@@ -5100,7 +5216,9 @@ function gainCult(p,base,reason){
   const wrCultMul = typeof worldRuleMul==="function" ? worldRuleMul("cultMul") : 1;
   const caveMul = typeof caveCultBonus==="function" ? caveCultBonus(p) : 1;
   const rsMul = typeof reincShopCultMul==="function" ? reincShopCultMul() : 1;
-  const amt=Math.floor(base*rootMul(p)*TECHS[p.tech][0]*gearCultBonus(p)*buff.cultMul*bkMul*altMul*sectMul*weCultMul*tCultMul*(1+dScholar)*wrCultMul*caveMul*rsMul);
+  const fpCult = typeof friendPassive==="function" ? friendPassive("cultAdd") : 0;
+  const eaCult = typeof equipAffixBonus==="function" ? equipAffixBonus(p,"cult")*0.01 : 0;
+  const amt=Math.floor(base*rootMul(p)*TECHS[p.tech][0]*gearCultBonus(p)*buff.cultMul*bkMul*altMul*sectMul*weCultMul*tCultMul*(1+dScholar)*wrCultMul*caveMul*rsMul*(1+fpCult+eaCult));
   const prevCult = p.cult;
   p.cult+=amt;
   const tags = [];
@@ -5569,7 +5687,7 @@ function attackerOf(p, override){
   const desperateCritAdd = desperate ? 0.25 : 0;
   const desperateCritDmgAdd = desperate ? 0.8 : 0;
   return Object.assign({
-    atk:Math.floor((d.atk+(p._dgAtkBuff||0))*buff.atkMul*desperateAtkMul*(1+(typeof disciplePassive==="function"?disciplePassive("fighter")*0.03:0))),
+    atk:Math.floor((d.atk+(p._dgAtkBuff||0)+(typeof friendPassive==="function"?friendPassive("atkAdd"):0))*buff.atkMul*desperateAtkMul*(1+(typeof disciplePassive==="function"?disciplePassive("fighter")*0.03:0))),
     crit:Math.min(0.95, d.crit + (buff.critAdd||0) + desperateCritAdd),
     critDmg:d.critDmg + desperateCritDmgAdd,
     hit:d.hit, pen:d.pen,
@@ -5582,7 +5700,7 @@ function defenderOf(p, override){
   const d = p._d;
   const buff = getBuff(p);
   return Object.assign({
-    def:Math.floor(d.def*buff.defMul),
+    def:Math.floor((d.def+(typeof friendPassive==="function"?friendPassive("defAdd"):0))*buff.defMul),
     dodge:d.dodge, defEls:d.defEls, lv:p.realmIdx,
   }, override||{});
 }
@@ -6736,6 +6854,7 @@ function actAdventure(){
   }
   // v16：机缘触发（独立于其他事件）
   if(typeof tryFortuneEncounter === "function") tryFortuneEncounter();
+  if(typeof tryMeetWanderingNPC === "function") tryMeetWanderingNPC();
   if(Math.random()<0.55){
     // 过滤可触发的奇遇（满足 cond）
     const pool = ADVS.filter(e=>!e.cond || e.cond(P));
@@ -7686,6 +7805,7 @@ function alchemyMake(name){
   if(typeof talentStat==="function") rate += talentStat(P,"alchAdd");
   if(typeof disciplePassive==="function") rate += disciplePassive("alchemy") * 0.03;
   if(typeof caveAlchemyBonus==="function") rate += caveAlchemyBonus(P);
+  if(typeof friendPassive==="function") rate += friendPassive("alchemyAdd");
   rate = Math.min(0.95, rate);
   log(`丹炉升起，炼制【${name}】，成功率 ${Math.floor(rate*100)}%……`, "sys");
   setTimeout(()=>{
@@ -9178,7 +9298,8 @@ function endBattle(win){
       log(`轮回之力：吸取生机，恢复 ${h} 气血。`,"good");
     }
     const dgRichMul = (m.fromDungeon && P.curDungeon?.mod?.flag==="richLoot") ? 2 : 1;
-    const tStoneMul = 1 + (typeof talentStat==="function" ? talentStat(P,"stoneMul") : 0);
+    const fpStoneMul = typeof friendPassive==="function" ? friendPassive("stoneMul") : 0;
+    const tStoneMul = 1 + (typeof talentStat==="function" ? talentStat(P,"stoneMul") : 0) + fpStoneMul;
     const wrSrMul = typeof worldRuleMul==="function" ? worldRuleMul("srMul") : 1;
     addItem(P,"灵石",Math.floor(m.sr * dgRichMul * tStoneMul * wrSrMul));
     // v4：节气 lootMul 加成掉落概率（小满+10%）
@@ -9189,7 +9310,8 @@ function endBattle(win){
     const wrLootMul = typeof worldRuleMul==="function" ? worldRuleMul("lootMul") : 1;
     const dgTreasureMul = (fromDg && P.curDungeon?.mod?.flag==="treasure") ? 1.8 : 1;
     const rsLootMul = typeof reincShopLootMul==="function" ? reincShopLootMul() : 1;
-    const lootMul = (buff.lootMul || 1) * (weEff.lootMul || 1) * (1 + tDropAdd + dLucky) * wrLootMul * dgTreasureMul * rsLootMul;
+    const eaLoot = typeof equipAffixBonus==="function" ? equipAffixBonus(P,"loot")*0.01 : 0;
+    const lootMul = (buff.lootMul || 1) * (weEff.lootMul || 1) * (1 + tDropAdd + dLucky + eaLoot) * wrLootMul * dgTreasureMul * rsLootMul;
     // 25% 丹药 / 5% 灵草 / 2% 装备
     if(Math.random()<0.25*lootMul){
       addItem(P,choice(["金创药","聚气丹","凝神丹","回元丹"]),1);
@@ -9207,8 +9329,17 @@ function endBattle(win){
     if(equipGuarantee || Math.random()<0.12*lootMul){
       const tier = Math.min(5, 1+Math.floor(P.realmIdx/4));
       const pool = Object.entries(EQUIPS).filter(([k,v])=>v.tier<=tier);
-      const [nm] = choice(pool);
+      const [nm,eqData] = choice(pool);
       addItem(P, nm, 1);
+      // v30: 装备词缀
+      if(typeof rollEquipAffix==="function"){
+        const aff = rollEquipAffix(eqData.tier||1);
+        if(aff){
+          if(!P.equipAffixes) P.equipAffixes = {};
+          P.equipAffixes[nm] = aff;
+          log(`✦ 装备【${nm}】附带词缀「${aff.nm}」！（${EQUIP_AFFIXES.find(a=>a.id===aff.id)?.desc||""}${aff.val}）`, "epic");
+        }
+      }
       P.stats.kill_noEquip = 0;
     }
     // v4：天材地宝（延寿丹）按境界 & 秘境加成掉落
@@ -9743,14 +9874,21 @@ function refresh(){
           const cur = info.base + (info.grow||0)*(P.relicLv||0);
           parts.push(`+${cur} 攻`);
         }
-        stat.textContent = parts.join(" / ") || info.desc;
+        const aff = (key!=="relic" && typeof getEquipAffix==="function") ? getEquipAffix(nm) : null;
+        if(aff){
+          const affMeta = EQUIP_AFFIXES.find(a=>a.id===aff.id);
+          parts.push(`<span style="color:${aff.color||'#e8c547'}">「${aff.nm}」${affMeta?affMeta.desc:""}${aff.val}</span>`);
+        }
+        stat.innerHTML = parts.join(" / ") || info.desc;
         sl.appendChild(stat);
       }
       sl.onclick = ()=>{
         if(key==="relic"){
           log("本命法宝已与你气机相连，不可卸下。","hint");return;
         }
-        showModal(`<h3>🔧 装 备 操 作</h3><p>【${nm}】${eLv>0?" +"+eLv:""}</p>
+        const _aff = typeof getEquipAffix==="function" ? getEquipAffix(nm) : null;
+        const _affTxt = _aff ? ` <span style="color:${_aff.color||'#e8c547'}">「${_aff.nm}」</span>` : "";
+        showModal(`<h3>🔧 装 备 操 作</h3><p>【${nm}】${eLv>0?" +"+eLv:""}${_affTxt}</p>
           <div class="btns"><button id="eq-off">卸 下</button><button id="eq-enh" class="primary">⚒ 强 化</button><button id="eq-x">取 消</button></div>`);
         $("eq-off").onclick=()=>{closeModal();unequipSlot(key);};
         $("eq-enh").onclick=()=>{closeModal();openEnhance(key);};
@@ -9781,7 +9919,9 @@ function refresh(){
       div.className = "item";
       const info = EQUIPS[k]||RELICS[k];
       const tag = EQUIPS[k]?`[${info.slot}]`:"[本命]";
-      div.innerHTML = `<span>${tag} ${k}<div class="desc">${info.desc}</div></span><span class="qty">×${P.bag[k]}</span>`;
+      const _bAff = (EQUIPS[k] && typeof getEquipAffix==="function") ? getEquipAffix(k) : null;
+      const _bAffTxt = _bAff ? ` <span style="color:${_bAff.color||'#e8c547'}">「${_bAff.nm}」</span>` : "";
+      div.innerHTML = `<span>${tag} ${k}${_bAffTxt}<div class="desc">${info.desc}</div></span><span class="qty">×${P.bag[k]}</span>`;
       div.onclick = ()=>{
         if(EQUIPS[k]) equipItem(k);
         else {
@@ -10515,6 +10655,8 @@ function loadGame(){
     if(!d.enlighten) d.enlighten = {};
     if(!d.cave) d.cave = {};
     if(!d.destiny) d.destiny = [];
+    if(!d.friends) d.friends = {};
+    if(!d.equipAffixes) d.equipAffixes = {};
     // v4 寿元迁移：移除强制拉满逻辑（避免覆盖新机制），仅做异常兜底
     if(d.lifespan===undefined || d.lifespan<=0){
       d.lifespan = 80 + (d.realmIdx||0)*30;
@@ -10756,6 +10898,7 @@ if($("btn-cave")) $("btn-cave").onclick = openCave;
 if($("btn-treasure")) $("btn-treasure").onclick = openTreasureExplore;
 if($("btn-destiny")) $("btn-destiny").onclick = openDestinyPanel;
 if($("btn-reincshop")) $("btn-reincshop").onclick = openReincarnationShop;
+if($("btn-friends")) $("btn-friends").onclick = openFriendsPanel;
 $("btn-calendar").onclick= openCalendar;
 // v5：夙愿入口（按钮 + 状态行）
 $("btn-quest").onclick   = openQuestPanel;
