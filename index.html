@@ -511,6 +511,8 @@
         <button id="btn-engrave">✴ 铭 刻</button>
         <button id="btn-divine">🔮 推 演</button>
         <button id="btn-boss">👹 妖 王</button>
+        <button id="btn-trial">⚡ 试 炼</button>
+        <button id="btn-wheel">🎡 转 盘</button>
       </div>
 
       <!-- 第 3 组：故事 / 工具 -->
@@ -9124,6 +9126,55 @@ function doDivine(id){
   refresh(); saveGame(true);
 }
 
+// v40 · 气运转盘
+const WHEEL_PRIZES = [
+  {nm:"灵石×50",   w:25, fn:p=>{ addItem(p,"灵石",50); }},
+  {nm:"灵石×200",  w:12, fn:p=>{ addItem(p,"灵石",200); }},
+  {nm:"聚气丹×3",  w:15, fn:p=>{ addItem(p,"聚气丹",3); }},
+  {nm:"凝神丹×2",  w:10, fn:p=>{ addItem(p,"凝神丹",2); }},
+  {nm:"修为+500",  w:10, fn:p=>{ gainCult(p,500,"转盘"); }},
+  {nm:"道心+10",   w:8,  fn:p=>{ p.dx=Math.min(p.maxDx,p.dx+10); }},
+  {nm:"气运+1",    w:5,  fn:p=>{ p.yun=(p.yun||0)+1; recalcStats(p); }},
+  {nm:"悟道茶×2",  w:6,  fn:p=>{ addItem(p,"悟道茶",2); }},
+  {nm:"破障丹",    w:3,  fn:p=>{ addItem(p,"破障丹",1); }},
+  {nm:"蟠桃",      w:2,  fn:p=>{ addItem(p,"蟠桃",1); }},
+  {nm:"空转",      w:4,  fn:()=>{}},
+];
+function openWheel(){
+  if(P.inBattle){ log("战斗中。","hint"); return; }
+  const today = new Date().toDateString();
+  const used = P._wheelDate === today;
+  const cost = 30 + P.realmIdx * 5;
+  const streak = P.checkin ? P.checkin.streak || 0 : 0;
+  const bonusTxt = streak >= 7 ? "（连续签到7天+：奖励翻倍！）" : "";
+  showModal(`<h3>🎡 气 运 转 盘</h3>
+    <p style="font-size:12px;color:#a89c7c">每日可转一次，消耗 ${cost} 灵石。${bonusTxt}</p>
+    ${used?`<p style="color:#d96a6a">今日已转过，明日再来。</p>`:""}
+    <div class="btns">
+      <button id="wh-spin" class="primary" ${used||(P.bag["灵石"]||0)<cost?"disabled":""}>转！</button>
+      <button onclick="closeModal()">关 闭</button>
+    </div>`);
+  if($("wh-spin")) $("wh-spin").onclick = ()=>{
+    if((P.bag["灵石"]||0)<cost){ log("灵石不足。","hint"); return; }
+    addItem(P,"灵石",-cost);
+    P._wheelDate = today;
+    const totalW = WHEEL_PRIZES.reduce((s,p)=>s+p.w, 0);
+    let r = Math.random() * totalW, pick = WHEEL_PRIZES[0];
+    for(const p of WHEEL_PRIZES){ r -= p.w; if(r <= 0){ pick = p; break; } }
+    closeModal();
+    log(`🎡 转盘停在……【${pick.nm}】！`,"epic");
+    const doubleMul = streak >= 7 ? 2 : 1;
+    if(doubleMul > 1 && pick.nm !== "空转"){
+      log("🎡 签到连击！奖励翻倍！","epic");
+      pick.fn(P); pick.fn(P);
+    } else {
+      pick.fn(P);
+    }
+    SFX.chime();
+    refresh(); saveGame(true);
+  };
+}
+
 /* ==========================================================
  *   v15 · 心魔系统（深化版）
  * ========================================================== */
@@ -10222,6 +10273,92 @@ function applyBossReward(m){
   addChronicle(`击败域外妖王【${m.name}】。`);
 }
 
+// v40 · 天道试炼
+const TRIAL_FLOORS = [
+  {fl:1,  hpMul:0.8,  atkMul:0.6,  reward:{stone:50}},
+  {fl:2,  hpMul:1.0,  atkMul:0.8,  reward:{stone:80, items:{"聚气丹":3}}},
+  {fl:3,  hpMul:1.3,  atkMul:1.0,  reward:{stone:120}},
+  {fl:4,  hpMul:1.6,  atkMul:1.2,  reward:{stone:200, items:{"凝神丹":2}}},
+  {fl:5,  hpMul:2.0,  atkMul:1.5,  reward:{stone:300, items:{"筑基丹":1}}},
+  {fl:6,  hpMul:2.5,  atkMul:1.8,  reward:{stone:500, stat:{ti:1}}},
+  {fl:7,  hpMul:3.2,  atkMul:2.2,  reward:{stone:800, items:{"破障丹":1}}},
+  {fl:8,  hpMul:4.0,  atkMul:2.8,  reward:{stone:1200, stat:{shen:2}}},
+  {fl:9,  hpMul:5.0,  atkMul:3.5,  reward:{stone:2000, items:{"蟠桃":1}}},
+  {fl:10, hpMul:7.0,  atkMul:5.0,  reward:{stone:5000, stat:{dao:3, ti:2, yun:3}}},
+];
+function openTrial(){
+  if(P.inBattle){ log("战斗中。","hint"); return; }
+  if(P.realmIdx < 5){ showModal(`<h3>⚡ 天 道 试 炼</h3><p>需筑基期以上方可入试炼塔。</p><div class="btns"><button onclick="closeModal()">退</button></div>`); return; }
+  const cd = P._trialCd || 0;
+  const cdLeft = Math.max(0, cd - (P.days||0));
+  if(cdLeft > 0){ showModal(`<h3>⚡ 天 道 试 炼</h3><p>试炼冷却中（${cdLeft}天后可再次挑战）。</p><div class="btns"><button onclick="closeModal()">退</button></div>`); return; }
+  const best = P._trialBest || 0;
+  showModal(`<h3>⚡ 天 道 试 炼</h3>
+    <p style="font-size:12px;color:#a89c7c">共10层，每层敌人更强。胜利后可选择继续或收取奖励。战败则一无所获。</p>
+    <p>历史最佳：第 ${best} 层</p>
+    <div class="btns"><button id="trial-go" class="primary">进入试炼</button><button onclick="closeModal()">退出</button></div>`);
+  $("trial-go").onclick = ()=>{
+    closeModal();
+    P._trialCd = (P.days||0) + 100;
+    P._trialFloor = 1;
+    P._trialRewards = [];
+    startTrialFloor();
+  };
+}
+function startTrialFloor(){
+  const fl = P._trialFloor;
+  const fd = TRIAL_FLOORS[fl-1]; if(!fd) return;
+  const baseHp = 200 + P.realmIdx * 100;
+  const baseAtk = 20 + P.realmIdx * 20;
+  const hp = Math.floor(baseHp * fd.hpMul);
+  const atk = Math.floor(baseAtk * fd.atkMul);
+  log(`⚡ 天道试炼·第 ${fl} 层！`,"epic"); SFX.rumble();
+  const m = [`试炼幻影·${fl}层`, P.realmIdx, hp, atk, 0, 0, null];
+  m._trialFloor = fl;
+  startBattle(m);
+  if(P.monster) P.monster._isTrial = true;
+}
+function trialPostBattle(win){
+  const fl = P._trialFloor || 1;
+  if(!win){
+    log(`⚡ 试炼失败！第 ${fl} 层止步，奖励全失。`,"bad");
+    P._trialFloor = 0; P._trialRewards = [];
+    return;
+  }
+  const fd = TRIAL_FLOORS[fl-1];
+  if(!P._trialRewards) P._trialRewards = [];
+  P._trialRewards.push(fd.reward);
+  if(!P._trialBest || fl > P._trialBest) P._trialBest = fl;
+  if(fl >= 10){
+    log(`⚡ 恭喜通关天道试炼！全10层奖励结算！`,"epic");
+    applyTrialRewards();
+    addChronicle("通关天道试炼十层。");
+    return;
+  }
+  const next = fl + 1;
+  confirmBox(`第 ${fl} 层通过！是否挑战第 ${next} 层？（失败则奖励全失）`, ()=>{
+    P._trialFloor = next;
+    startTrialFloor();
+  }, ()=>{
+    log(`⚡ 你选择收取奖励，试炼结束于第 ${fl} 层。`,"epic");
+    applyTrialRewards();
+  });
+}
+function applyTrialRewards(){
+  const rewards = P._trialRewards || [];
+  for(const r of rewards){
+    if(r.stone) addItem(P,"灵石",r.stone);
+    if(r.items) for(const [k,v] of Object.entries(r.items)) addItem(P,k,v);
+    if(r.stat) for(const [k,v] of Object.entries(r.stat)){
+      P[k] = (P[k]||0) + v;
+      log(`✦ 试炼奖励：${k} +${v}（永久）`,"epic");
+    }
+  }
+  recalcStats(P);
+  P._trialFloor = 0; P._trialRewards = [];
+  refresh(); saveGame(true);
+}
+
 // v37 · 战斗姿态
 const BATTLE_STANCES = [
   {id:"balanced", nm:"中庸",  icon:"⚖", atkMul:1.0,  defMul:1.0,  desc:"攻防均衡"},
@@ -10448,6 +10585,10 @@ function endBattle(win){
   setScene("凡 人 修 仙 路","— 一 缕 神 识 自 虚 空 降 临 —","");
   // 恢复按钮
   bindMainButtons();
+  if(m && m._isTrial){
+    if(typeof trialPostBattle==="function") trialPostBattle(win);
+    afterAction(); return;
+  }
   if(win){
     log(`※ 你击败了「${m.name}」！`,"good");
     if(m._worldBoss && typeof applyBossReward==="function") applyBossReward(m);
@@ -12097,6 +12238,8 @@ if($("btn-craft")) $("btn-craft").onclick = ()=>{ if(typeof openCraftPanel==="fu
 if($("btn-engrave")) $("btn-engrave").onclick = ()=>{ if(typeof openEngrave==="function") openEngrave(); };
 if($("btn-divine")) $("btn-divine").onclick = ()=>{ if(typeof openDivine==="function") openDivine(); };
 if($("btn-boss")) $("btn-boss").onclick = ()=>{ if(typeof openBossChallenge==="function") openBossChallenge(); };
+if($("btn-trial")) $("btn-trial").onclick = ()=>{ if(typeof openTrial==="function") openTrial(); };
+if($("btn-wheel")) $("btn-wheel").onclick = ()=>{ if(typeof openWheel==="function") openWheel(); };
 $("btn-calendar").onclick= openCalendar;
 // v5：夙愿入口（按钮 + 状态行）
 $("btn-quest").onclick   = openQuestPanel;
