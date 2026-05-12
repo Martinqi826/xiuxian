@@ -3283,6 +3283,21 @@ function rollTribMod(){
   return TRIBULATION_MODS[Math.floor(Math.random()*TRIBULATION_MODS.length)];
 }
 
+// v31 · 境界被动
+const REALM_PASSIVES = [
+  {idx:4,  id:"qi_shield",   nm:"练气护体", desc:"受击伤害-5%",              defPct:0.05},
+  {idx:5,  id:"foundation",  nm:"筑基凝元", desc:"修炼速度+8%",             cultPct:0.08},
+  {idx:9,  id:"golden_core", nm:"金丹护道", desc:"战斗灵石+15%，暴击+3%",   stonePct:0.15, critAdd:0.03},
+  {idx:12, id:"nascent",     nm:"元婴出窍", desc:"攻击+10%，神通伤害+20%",   atkPct:0.10, skillDmg:0.20},
+  {idx:15, id:"spirit",      nm:"化神意境", desc:"防御+12%，闭关回道心+5",   defPct:0.12, dxRegen:5},
+  {idx:17, id:"unity",       nm:"合体共鸣", desc:"全属性+15，修炼+15%",      allStat:15, cultPct:0.15},
+  {idx:19, id:"tribulation", nm:"渡劫天威", desc:"攻击+20%，暴击+5%，掉率+10%", atkPct:0.20, critAdd:0.05, lootPct:0.10},
+];
+
+function getRealmPassives(realmIdx){
+  return REALM_PASSIVES.filter(rp => realmIdx >= rp.idx);
+}
+
 /* —— 神通（按解锁境界索引） —— */
 const SKILLS = {
   "剑气斩":      {unlock:1,  cult:30,   dmg:1.8, desc:"剑气如虹，伤害 ×1.8，耗 30 修为"},
@@ -5002,6 +5017,17 @@ function recalcStats(p){
     d.crit += equipAffixBonus(p, "crit") * 0.01;
   }
 
+  // v31: 境界被动加成
+  if(typeof getRealmPassives === "function"){
+    const rps = getRealmPassives(p.realmIdx);
+    for(const rp of rps){
+      if(rp.atkPct)  d.atk  = Math.floor(d.atk * (1 + rp.atkPct));
+      if(rp.defPct)  d.def  = Math.floor(d.def * (1 + rp.defPct));
+      if(rp.critAdd) d.crit += rp.critAdd;
+      if(rp.allStat) for(const k of STAT_KEYS) eff[k] += rp.allStat;
+    }
+  }
+
   // 上下限保护
   d.crit  = Math.max(0.02, Math.min(0.85, d.crit));
   d.dodge = Math.max(0,    Math.min(0.60, d.dodge));
@@ -5218,7 +5244,8 @@ function gainCult(p,base,reason){
   const rsMul = typeof reincShopCultMul==="function" ? reincShopCultMul() : 1;
   const fpCult = typeof friendPassive==="function" ? friendPassive("cultAdd") : 0;
   const eaCult = typeof equipAffixBonus==="function" ? equipAffixBonus(p,"cult")*0.01 : 0;
-  const amt=Math.floor(base*rootMul(p)*TECHS[p.tech][0]*gearCultBonus(p)*buff.cultMul*bkMul*altMul*sectMul*weCultMul*tCultMul*(1+dScholar)*wrCultMul*caveMul*rsMul*(1+fpCult+eaCult));
+  const rpCult = typeof getRealmPassives==="function" ? getRealmPassives(p.realmIdx).reduce((s,rp)=>s+(rp.cultPct||0),0) : 0;
+  const amt=Math.floor(base*rootMul(p)*TECHS[p.tech][0]*gearCultBonus(p)*buff.cultMul*bkMul*altMul*sectMul*weCultMul*tCultMul*(1+dScholar)*wrCultMul*caveMul*rsMul*(1+fpCult+eaCult+rpCult));
   const prevCult = p.cult;
   p.cult+=amt;
   const tags = [];
@@ -5365,6 +5392,8 @@ function passDays(p,n){
     }
     if(totalIncome > 0) addItem(p, "灵石", totalIncome);
   }
+  // v31 · 弟子出战任务结算
+  if(typeof tickDiscipleMissions === "function") tickDiscipleMissions(p);
   // v14 · 灵田成熟检测 (v16: 造化神功加速50%)
   if(p.garden && p.garden.length){
     const gardenAccel = (typeof hasTechPassive==="function" && hasTechPassive("gardenBoost")) ? 1.5 : 1;
@@ -5869,6 +5898,11 @@ function actCultivate(){
   if(typeof checkEnlighten === "function") checkEnlighten(P);
 
   gainCult(P, total, `闭关${days}日`);
+  // v31 · 境界被动：闭关回道心
+  if(typeof getRealmPassives === "function"){
+    const dxR = getRealmPassives(P.realmIdx).reduce((s,rp)=>s+(rp.dxRegen||0),0);
+    if(dxR > 0){ P.dx = Math.min(P.maxDx||100, (P.dx||100) + dxR); }
+  }
   // v23 · 功法突变检测
   if(typeof checkTechMutation === "function") checkTechMutation(P);
   // v16 · 功法被动效果
@@ -7142,6 +7176,9 @@ function doBreakthroughSuccess(){
   if(REALM_UNLOCKS[P.realmIdx]){
     log(`★ 新境界解锁：${REALM_UNLOCKS[P.realmIdx]}`,"epic");
   }
+  // v31 · 境界被动解锁通知
+  const newRP = typeof REALM_PASSIVES!=="undefined" ? REALM_PASSIVES.find(rp=>rp.idx===P.realmIdx) : null;
+  if(newRP) log(`✦ 解锁境界被动【${newRP.nm}】：${newRP.desc}`,"epic");
   // v8 · 道侣突破反应
   const bkPartners = (P.partners||[]).filter(x=>!x.deceased && x.fondness >= 30);
   if(bkPartners.length){
@@ -7571,7 +7608,8 @@ function castSkill(name){
     if(m.combo > 1) log(`连击 \u00D7${m.combo} (+${Math.min(80, m.combo*8)}%)`, "hint");
     const breakMul = m.breakRounds > 0 ? 2 : 1;
     const att = attackerOf(P, sk.ele?{attEl:sk.ele}:null);
-    const d = calcDamage(att, monsterDefender(m), {mul:sk.dmg * comboMul * breakMul});
+    const rpSkill = typeof getRealmPassives==="function" ? getRealmPassives(P.realmIdx).reduce((s,rp)=>s+(rp.skillDmg||0),0) : 0;
+    const d = calcDamage(att, monsterDefender(m), {mul:sk.dmg * comboMul * breakMul * (1+rpSkill)});
     // 克制元素 → 破绽条（神通+2）
     const skEle = sk.ele || pickAttackElement(P);
     if(skEle && m.ele && OVERCOME[skEle] === m.ele) addBreakGauge(m, 2);
@@ -8506,6 +8544,52 @@ const DISCIPLE_APTITUDES = [
 function discipleAptitude(){
   return DISCIPLE_APTITUDES[Math.floor(Math.random()*DISCIPLE_APTITUDES.length)];
 }
+// v31 · 弟子出战任务
+const DISCIPLE_MISSIONS = [
+  {id:"patrol",  nm:"巡山", dur:3,  minLv:1,  reward:{stone:50},           desc:"巡视宗门领地，清扫低阶妖兽"},
+  {id:"gather",  nm:"采药", dur:5,  minLv:3,  reward:{stone:80, items:{"聚灵草":2}}, desc:"深入灵山采集灵草药材"},
+  {id:"escort",  nm:"护送", dur:7,  minLv:5,  reward:{stone:150,contrib:30},desc:"护送商队往返坊市"},
+  {id:"hunt",    nm:"猎妖", dur:10, minLv:8,  reward:{stone:300,items:{"凝神丹":2},contrib:50}, desc:"追猎高阶妖兽，斩妖除魔"},
+  {id:"explore", nm:"探秘", dur:15, minLv:12, reward:{stone:500,items:{"破障丹":1,"蟠桃":1},contrib:100}, desc:"探索未知秘境残骸"},
+];
+
+function dispatchDisciple(discIdx, missionIdx){
+  const d = (P.disciples||[])[discIdx];
+  const m = DISCIPLE_MISSIONS[missionIdx];
+  if(!d || !m) return;
+  if(d.level < m.minLv){ log(`弟子【${d.name}】等级不足（需Lv.${m.minLv}）。`,"bad"); return; }
+  if(d.onMission){ log(`弟子【${d.name}】正在执行任务。`,"hint"); return; }
+  d.onMission = {mid: missionIdx, startDay: P.days, dur: m.dur};
+  log(`📤 弟子【${d.name}】出发执行「${m.nm}」（${m.dur}天）`,"good");
+  addChronicle(`派遣弟子【${d.name}】执行「${m.nm}」任务。`);
+  refresh(); saveGame(true);
+  renderSectPanel();
+}
+
+function tickDiscipleMissions(p){
+  if(!p.disciples) return;
+  for(const d of p.disciples){
+    if(!d.onMission) continue;
+    const elapsed = (p.days||0) - d.onMission.startDay;
+    if(elapsed >= d.onMission.dur){
+      const m = DISCIPLE_MISSIONS[d.onMission.mid];
+      if(m){
+        const lvBonus = 1 + (d.level - m.minLv) * 0.1;
+        const aptBonus = d.apt === "diligent" ? 1.5 : 1;
+        const mul = lvBonus * aptBonus;
+        if(m.reward.stone) addItem(p, "灵石", Math.floor(m.reward.stone * mul));
+        if(m.reward.contrib) p.contrib = (p.contrib||0) + Math.floor(m.reward.contrib * mul);
+        if(m.reward.items){
+          for(const [k,v] of Object.entries(m.reward.items)) addItem(p, k, v);
+        }
+        d.level = Math.min(30, d.level + 1);
+        log(`📥 弟子【${d.name}】完成「${m.nm}」！灵石+${Math.floor((m.reward.stone||0)*mul)}${m.reward.contrib?`，贡献+${Math.floor(m.reward.contrib*mul)}`:""}，弟子升级→Lv.${d.level}`,"good");
+      }
+      d.onMission = null;
+    }
+  }
+}
+
 function disciplePassive(key){
   if(!P.disciples) return 0;
   return P.disciples.filter(d=>d.apt===key).length;
@@ -8635,9 +8719,14 @@ function renderSectPanel(){
       const income = Math.floor((5 + d.level * 3) * incomeMul);
       const aptInfo = DISCIPLE_APTITUDES.find(a=>a.id===d.apt);
       const aptTag = aptInfo ? `<span style="color:${aptInfo.color};font-size:10px">【${aptInfo.nm}】</span>` : "";
-      const gradBtn = d.level >= 15 ? `<button class="sm" data-grad="${i}" style="color:#d4b46a">出师</button>` : "";
-      return `<div class="shop-row"><div><div class="nm">${d.name} ${aptTag}</div><div class="ds">Lv.${d.level} · 灵石/日 ×${income}</div></div>
-        <div>${gradBtn}<button class="sm" data-dismiss="${i}">逐出</button></div></div>`;
+      const gradBtn = d.level >= 15 && !d.onMission ? `<button class="sm" data-grad="${i}" style="color:#d4b46a">出师</button>` : "";
+      const missionStatus = d.onMission ? (()=>{
+        const m = DISCIPLE_MISSIONS[d.onMission.mid];
+        const left = Math.max(0, d.onMission.dur - ((P.days||0) - d.onMission.startDay));
+        return `<span style="color:#e8c547;font-size:10px">⏳「${m?m.nm:"?"}」剩${left}天</span>`;
+      })() : `<button class="sm" data-dispatch="${i}" style="font-size:10px">📤 派遣</button>`;
+      return `<div class="shop-row"><div><div class="nm">${d.name} ${aptTag}</div><div class="ds">Lv.${d.level} · 灵石/日 ×${income} ${d.onMission?"":""}${missionStatus}</div></div>
+        <div>${gradBtn}${d.onMission?"":"<button class='sm' data-dismiss='"+i+"'>逐出</button>"}</div></div>`;
     }).join("") || `<div style="color:#a89c7c;font-size:11px">暂无弟子。</div>`;
     discHtml = `<h2 style="color:#7fc7a3;font-size:13px;letter-spacing:3px;margin-top:10px">门 下 弟 子 (${disciples.length}/${mxDisc})</h2>
       ${discRows}
@@ -8690,6 +8779,23 @@ function renderSectPanel(){
     b.onclick = ()=>{
       closeModal();
       graduateDisciple(+b.dataset.grad);
+    };
+  });
+  // v31 · 弟子派遣
+  document.querySelectorAll(".modal [data-dispatch]").forEach(b=>{
+    b.onclick = ()=>{
+      const di = +b.dataset.dispatch;
+      const d = (P.disciples||[])[di]; if(!d) return;
+      const rows = DISCIPLE_MISSIONS.map((m,mi)=>{
+        const ok = d.level >= m.minLv;
+        return `<div class="shop-row"><div><div class="nm">${m.nm}</div><div class="ds">${m.desc}（${m.dur}天·需Lv.${m.minLv}）</div></div>
+          <button class="sm" data-dm="${mi}" ${ok?"":"disabled"}>派遣</button></div>`;
+      }).join("");
+      showModal(`<h3>📤 派遣【${d.name}】</h3>${rows}<div class="btns"><button id="dm-back">返回</button></div>`);
+      document.querySelectorAll(".modal [data-dm]").forEach(mb=>{
+        mb.onclick = ()=>{ closeModal(); dispatchDisciple(di, +mb.dataset.dm); };
+      });
+      if($("dm-back")) $("dm-back").onclick = ()=>{ closeModal(); renderSectPanel(); };
     };
   });
   if($("btn-recruit")) $("btn-recruit").onclick = ()=>{
@@ -9299,7 +9405,8 @@ function endBattle(win){
     }
     const dgRichMul = (m.fromDungeon && P.curDungeon?.mod?.flag==="richLoot") ? 2 : 1;
     const fpStoneMul = typeof friendPassive==="function" ? friendPassive("stoneMul") : 0;
-    const tStoneMul = 1 + (typeof talentStat==="function" ? talentStat(P,"stoneMul") : 0) + fpStoneMul;
+    const rpStone = typeof getRealmPassives==="function" ? getRealmPassives(P.realmIdx).reduce((s,rp)=>s+(rp.stonePct||0),0) : 0;
+    const tStoneMul = 1 + (typeof talentStat==="function" ? talentStat(P,"stoneMul") : 0) + fpStoneMul + rpStone;
     const wrSrMul = typeof worldRuleMul==="function" ? worldRuleMul("srMul") : 1;
     addItem(P,"灵石",Math.floor(m.sr * dgRichMul * tStoneMul * wrSrMul));
     // v4：节气 lootMul 加成掉落概率（小满+10%）
@@ -9311,7 +9418,8 @@ function endBattle(win){
     const dgTreasureMul = (fromDg && P.curDungeon?.mod?.flag==="treasure") ? 1.8 : 1;
     const rsLootMul = typeof reincShopLootMul==="function" ? reincShopLootMul() : 1;
     const eaLoot = typeof equipAffixBonus==="function" ? equipAffixBonus(P,"loot")*0.01 : 0;
-    const lootMul = (buff.lootMul || 1) * (weEff.lootMul || 1) * (1 + tDropAdd + dLucky + eaLoot) * wrLootMul * dgTreasureMul * rsLootMul;
+    const rpLoot = typeof getRealmPassives==="function" ? getRealmPassives(P.realmIdx).reduce((s,rp)=>s+(rp.lootPct||0),0) : 0;
+    const lootMul = (buff.lootMul || 1) * (weEff.lootMul || 1) * (1 + tDropAdd + dLucky + eaLoot + rpLoot) * wrLootMul * dgTreasureMul * rsLootMul;
     // 25% 丹药 / 5% 灵草 / 2% 装备
     if(Math.random()<0.25*lootMul){
       addItem(P,choice(["金创药","聚气丹","凝神丹","回元丹"]),1);
@@ -10062,8 +10170,21 @@ function renderStatsPanel(){
       <div style="color:#d4b46a;font-size:12px;letter-spacing:2px;margin-bottom:4px">⚖ 天道法则</div>
       <div style="font-size:11px;line-height:1.6">${wrTags}</div></div>`;
   }
+  // v31: 境界被动
+  let rpHtml = "";
+  if(typeof getRealmPassives === "function"){
+    const rps = getRealmPassives(P.realmIdx);
+    if(rps.length){
+      const rpTags = rps.map(rp=>`<span style="color:#e8c547;font-size:11px">【${rp.nm}】${rp.desc}</span>`).join("<br>");
+      const nextRP = REALM_PASSIVES.find(rp=>rp.idx > P.realmIdx);
+      const nextHint = nextRP ? `<div style="color:#666;font-size:10px;margin-top:2px">下一被动：${REALMS[nextRP.idx]?.[0]||""}【${nextRP.nm}】</div>` : "";
+      rpHtml = `<div style="margin-top:8px;border-top:1px dashed rgba(212,180,106,.2);padding-top:6px">
+        <div style="color:#d4b46a;font-size:12px;letter-spacing:2px;margin-bottom:4px">🔰 境界被动</div>
+        <div style="line-height:1.6">${rpTags}</div>${nextHint}</div>`;
+    }
+  }
   return `<div style="background:rgba(0,0,0,.2);padding:6px;border:1px solid rgba(255,230,180,.15);border-radius:4px">
-    ${rows}${der}${karmaBar}${elTag}${statsHtml}${wrHtml}</div>`;
+    ${rows}${der}${karmaBar}${elTag}${statsHtml}${wrHtml}${rpHtml}</div>`;
 }
 
 function afterAction(){

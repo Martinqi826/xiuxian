@@ -3,7 +3,7 @@
 ## 项目概述
 
 单文件浏览器修仙挂机游戏。**零依赖**（纯 HTML+CSS+JS），双击 `index.html` 即玩。
-当前 ~12036 行，所有逻辑在一个 `<script>` 块内。存档用 localStorage。
+当前 ~12157 行，所有逻辑在一个 `<script>` 块内。存档用 localStorage。
 
 ## 技术架构
 
@@ -92,6 +92,8 @@ L8950-9900   DEV面板 + 帮助弹窗
 | `TRIBULATION_MODS` | 6 种天劫词缀 |
 | `WANDERING_NPCS` | 6 种游历NPC（仙友系统） |
 | `EQUIP_AFFIXES` | 6 种装备词缀 |
+| `REALM_PASSIVES` | 7 个境界被动能力 |
+| `DISCIPLE_MISSIONS` | 5 种弟子出战任务 |
 
 ### P 对象关键字段
 
