@@ -3313,6 +3313,31 @@ const SKILLS = {
   "大乘法相":    {unlock:18, cult:5000, dmg:15,  desc:"现大乘法相 ×15"},
 };
 
+// v34 · 神通进阶
+const SKILL_UPGRADES = {
+  "剑气斩":     {need:20,  to:"剑气斩·破",     boost:{dmg:2.5},  desc:"剑气如虹 ×2.5"},
+  "烈焰咒":     {need:15,  to:"烈焰咒·焚天",   boost:{dmg:3.5},  desc:"焚天烈焰 ×3.5"},
+  "玄冰诀":     {need:15,  to:"玄冰诀·极寒",   boost:{dmg:3.5},  desc:"极寒冰封 ×3.5"},
+  "护体罡气":   {need:12,  to:"护体罡气·金刚",  boost:{shield:0.7},desc:"金刚护体 -70%"},
+  "归元术":     {need:18,  to:"归元术·大还丹",  boost:{hp:0.6},   desc:"回复60%气血"},
+  "金丹真解":   {need:10,  to:"金丹真解·极",   boost:{dmg:5.0},  desc:"金丹极致 ×5.0"},
+  "元婴神雷":   {need:8,   to:"元婴神雷·天罚", boost:{dmg:7.0},  desc:"天罚雷霆 ×7.0"},
+  "化神一念":   {need:6,   to:"化神一念·灭世", boost:{dmg:12.0}, desc:"灭世一念 ×12"},
+};
+
+function trackSkillUse(name){
+  if(!P.skillUse) P.skillUse = {};
+  P.skillUse[name] = (P.skillUse[name]||0) + 1;
+  const up = SKILL_UPGRADES[name];
+  if(up && P.skillUse[name] === up.need){
+    SKILLS[up.to] = {...SKILLS[name], ...up.boost, desc:up.desc};
+    if(SKILL_META[name]) SKILL_META[up.to] = {...SKILL_META[name]};
+    log(`✦✦ 神通【${name}】使用纯熟，进阶为【${up.to}】！${up.desc}`,"epic");
+    addChronicle(`神通【${name}】进阶为【${up.to}】。`);
+    SFX.milestone();
+  }
+}
+
 /* —— 装备（可从坊市/秘境/宗门获取） —— */
 const EQUIPS = {
   // v11: 扩充至 32 件，覆盖 T1-T6 六档（凡/练气/筑基/金丹/元婴/化神+）
@@ -5085,6 +5110,7 @@ function newPlayer(name,rootName,elements){
     friends: {},
     equipAffixes: {},
     leyline: null,
+    skillUse: {},
   };
   recalcStats(p);
   // 初始化后按当前 maxHp/maxMp 满血满蓝
@@ -7917,6 +7943,7 @@ function castSkill(name){
   P.cult -= sk.cult;
   if(mpCost > 0) P.mp = Math.max(0, P.mp - mpCost);
   recordBattleAction(m, "skill");
+  if(typeof trackSkillUse === "function") trackSkillUse(name);
   if(lifeCost > 0){
     P.lifespan -= lifeCost;
     log(`※ 【${name}】代价沉重，折损寿元 ${lifeCost} 年（阳寿 ${P.age}/${P.lifespan}）`,"bad");
@@ -8950,6 +8977,104 @@ function tickDiscipleMissions(p){
   }
 }
 
+// v34 · 宗门大比
+const TOURNEY_OPPONENTS = [
+  {nm:"外门新秀",  atkMul:0.6,  hpMul:0.5,  defMul:0.5},
+  {nm:"内门精英",  atkMul:0.9,  hpMul:0.8,  defMul:0.8},
+  {nm:"核心天骄",  atkMul:1.2,  hpMul:1.1,  defMul:1.0},
+];
+const TOURNEY_REWARDS = [
+  {wins:0, contrib:20,  stone:50,  items:{}},
+  {wins:1, contrib:80,  stone:150, items:{"聚气丹":3}},
+  {wins:2, contrib:200, stone:400, items:{"破障丹":1}},
+  {wins:3, contrib:500, stone:800, items:{"蟠桃":1,"悟道茶":2}, title:"大比魁首"},
+];
+
+function canTourney(){
+  if(!P.sect) return false;
+  if(!P.sectTourney) return true;
+  return (P.days||0) - P.sectTourney.lastDay >= 100;
+}
+
+function openSectTourney(){
+  if(!P.sect){ log("需先加入宗门。","hint"); return; }
+  if(!canTourney()){
+    const next = (P.sectTourney?.lastDay||0) + 100 - (P.days||0);
+    log(`宗门大比冷却中，还需 ${next} 天。`,"hint"); return;
+  }
+  const opponents = TOURNEY_OPPONENTS.map(opp=>{
+    const base = P._d || {atk:10,def:5,maxHp:100};
+    return {
+      name: opp.nm,
+      mhp: Math.floor(base.maxHp * opp.hpMul),
+      hp: Math.floor(base.maxHp * opp.hpMul),
+      atk: Math.floor(base.atk * opp.atkMul),
+      def: Math.floor(base.def * opp.defMul),
+    };
+  });
+  let wins = 0;
+  let round = 0;
+
+  function fightRound(){
+    if(round >= 3){
+      finishTourney(wins);
+      return;
+    }
+    const opp = opponents[round];
+    round++;
+    showModal(`<h3>⚔ 宗门大比 · 第${round}场</h3>
+      <p style="font-size:12px;color:#e8e3d3">对手：<b style="color:#d96a6a">${opp.name}</b><br>
+      气血 ${opp.hp} · 攻 ${opp.atk} · 防 ${opp.def}</p>
+      <div class="btns"><button id="tn-fight" class="primary">⚔ 出战</button><button id="tn-skip">弃权</button></div>`);
+    $("tn-fight").onclick = ()=>{
+      closeModal();
+      let pHp = P.hp;
+      const pAtk = P._d?.atk || P.atk;
+      const pDef = P._d?.def || P.def;
+      let oppHp = opp.hp;
+      const K = 300;
+      let turns = 0;
+      while(pHp > 0 && oppHp > 0 && turns < 30){
+        turns++;
+        const pDmg = Math.max(1, Math.floor(pAtk * (1 - opp.def/(opp.def+K))));
+        oppHp -= pDmg;
+        if(oppHp <= 0) break;
+        const oDmg = Math.max(1, Math.floor(opp.atk * (1 - pDef/(pDef+K))));
+        pHp -= oDmg;
+      }
+      if(oppHp <= 0){
+        wins++;
+        log(`⚔ 大比第${round}场：击败【${opp.name}】！`,"good");
+      }else{
+        log(`⚔ 大比第${round}场：不敌【${opp.name}】。`,"bad");
+      }
+      P.hp = Math.max(1, pHp);
+      setTimeout(fightRound, 200);
+    };
+    $("tn-skip").onclick = ()=>{
+      closeModal();
+      log(`⚔ 大比第${round}场：弃权。`,"hint");
+      setTimeout(fightRound, 100);
+    };
+  }
+
+  function finishTourney(w){
+    const r = TOURNEY_REWARDS[w];
+    P.contrib = (P.contrib||0) + r.contrib;
+    P._totalContrib = (P._totalContrib||0) + r.contrib;
+    addItem(P, "灵石", r.stone);
+    if(r.items) for(const [k,v] of Object.entries(r.items)) addItem(P,k,v);
+    if(!P.sectTourney) P.sectTourney = {};
+    P.sectTourney.lastDay = P.days;
+    const titleText = r.title ? `\n✦✦ 获封【${r.title}】！` : "";
+    log(`🏆 宗门大比结束！${w}/3 胜 · 贡献+${r.contrib}，灵石+${r.stone}${titleText}`,"epic");
+    addChronicle(`参加宗门大比，${w}胜${3-w}负。${r.title||""}`);
+    refresh(); saveGame(true);
+  }
+
+  fightRound();
+}
+
 function disciplePassive(key){
   if(!P.disciples) return 0;
   return P.disciples.filter(d=>d.apt===key).length;
@@ -9102,6 +9227,9 @@ function renderSectPanel(){
     <h2 style="color:#d4b46a;font-size:13px;letter-spacing:3px;margin-top:10px">贡 献 商 店</h2>
     <div class="box left" style="padding:0;border:none;background:none">${shopRows}</div>
     ${discHtml}
+    <div style="margin-top:8px;border-top:1px dashed rgba(212,180,106,.2);padding-top:6px">
+      <button id="btn-tourney" class="primary" style="font-size:12px" ${canTourney()?"":"disabled"}>⚔ 宗门大比${canTourney()?"":" (冷却中)"}</button>
+    </div>
     <div class="btns"><button id="sect-close">离山</button></div>`);
   document.querySelectorAll(".modal [data-task]").forEach(b=>{
     b.onclick = ()=>{
@@ -9172,6 +9300,7 @@ function renderSectPanel(){
     closeModal(); renderSectPanel(); saveGame(true);
   };
   $("sect-close").onclick = closeModal;
+  if($("btn-tourney")) $("btn-tourney").onclick = ()=>{ closeModal(); openSectTourney(); };
 }
 
 /* —— 推进宗门任务 —— */
@@ -11140,6 +11269,7 @@ function loadGame(){
     if(!d.friends) d.friends = {};
     if(!d.equipAffixes) d.equipAffixes = {};
     if(d.leyline === undefined) d.leyline = null;
+    if(!d.skillUse) d.skillUse = {};
     // v4 寿元迁移：移除强制拉满逻辑（避免覆盖新机制），仅做异常兜底
     if(d.lifespan===undefined || d.lifespan<=0){
       d.lifespan = 80 + (d.realmIdx||0)*30;

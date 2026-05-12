@@ -3,7 +3,7 @@
 ## 项目概述
 
 单文件浏览器修仙挂机游戏。**零依赖**（纯 HTML+CSS+JS），双击 `index.html` 即玩。
-当前 ~12520 行，所有逻辑在一个 `<script>` 块内。存档用 localStorage。
+当前 ~12650 行，所有逻辑在一个 `<script>` 块内。存档用 localStorage。
 
 ## 技术架构
 
@@ -97,6 +97,8 @@ L8950-9900   DEV面板 + 帮助弹窗
 | `ADVENTURE_CHAINS` | 5 种江湖事件链（多步叙事） |
 | `LEYLINES` | 6 种灵脉（日常被动加成） |
 | `MEDITATIONS` | 4 种入定冥想事件 |
+| `SKILL_UPGRADES` | 8 种神通进阶路径 |
+| `TOURNEY_OPPONENTS` | 3 种宗门大比对手 |
 
 ### P 对象关键字段
 
@@ -143,6 +145,8 @@ L8950-9900   DEV面板 + 帮助弹窗
   friends: {npcId: {fond,met,bonusApplied}}, // 仙友好感
   equipAffixes: {装备名: {id,nm,stat,val,color}}, // 装备词缀
   leyline: {id,claimDay},          // 占据的灵脉
+  skillUse: {技能名: 使用次数},     // 神通使用统计
+  sectTourney: {lastDay},          // 宗门大比记录
 }
 ```
 
