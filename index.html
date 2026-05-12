@@ -505,6 +505,7 @@
         <button id="btn-destiny">⭐ 天 命</button>
         <button id="btn-reincshop">🌀 轮 回</button>
         <button id="btn-friends">🤝 仙 友</button>
+        <button id="btn-leyline">🌀 灵 脉</button>
       </div>
 
       <!-- 第 3 组：故事 / 工具 -->
@@ -4661,6 +4662,86 @@ const FORTUNE_ENCOUNTERS = [
    }},
 ];
 
+// v33 · 灵脉
+const LEYLINES = [
+  {id:"wood",   nm:"青木灵脉", desc:"每日+3聚灵草",      daily:{items:{"聚灵草":3}},          minRealm:2,  color:"#7fc7a3"},
+  {id:"fire",   nm:"赤炎灵脉", desc:"修炼+5%",          daily:{cultPct:0.05},                minRealm:4,  color:"#d96a6a"},
+  {id:"water",  nm:"玄水灵脉", desc:"每日+30灵石",       daily:{stone:30},                    minRealm:3,  color:"#7ab0d4"},
+  {id:"earth",  nm:"厚土灵脉", desc:"每日+2道心",        daily:{dx:2},                        minRealm:5,  color:"#c9a85c"},
+  {id:"gold",   nm:"庚金灵脉", desc:"每日+50灵石+暴击1%",daily:{stone:50,critBuff:0.01},       minRealm:8,  color:"#e8c547"},
+  {id:"spirit", nm:"太虚灵脉", desc:"每日+2全属性",      daily:{allStat:2},                   minRealm:12, color:"#c0a8d4"},
+];
+
+function tryDiscoverLeyline(){
+  if(P.leyline) return;
+  if(Math.random() > 0.04) return;
+  const pool = LEYLINES.filter(l=>P.realmIdx>=l.minRealm);
+  if(!pool.length) return;
+  const ley = choice(pool);
+  showModal(`<h3>🌀 灵 脉 涌 现</h3>
+    <p style="font-size:12px;color:#e8e3d3;line-height:1.6">你感应到地下一股浓郁灵气——
+    <b style="color:${ley.color}">【${ley.nm}】</b>！<br>${ley.desc}</p>
+    <div class="btns"><button id="ley-claim" class="primary">占据灵脉</button><button id="ley-skip">放弃</button></div>`);
+  $("ley-claim").onclick = ()=>{
+    closeModal();
+    P.leyline = {id:ley.id, claimDay:P.days};
+    log(`✦ 占据【${ley.nm}】！每日获得被动加成。`,"epic");
+    addChronicle(`占据【${ley.nm}】灵脉。`);
+    refresh(); saveGame(true);
+  };
+  $("ley-skip").onclick = closeModal;
+}
+
+function tickLeyline(p, n){
+  if(!p.leyline) return;
+  const ley = LEYLINES.find(l=>l.id===p.leyline.id);
+  if(!ley) { p.leyline=null; return; }
+  const d = ley.daily;
+  if(d.stone) addItem(p,"灵石", d.stone * n);
+  if(d.items) for(const [k,v] of Object.entries(d.items)) addItem(p, k, v * n);
+  if(d.dx) p.dx = Math.min(p.maxDx||100, (p.dx||100) + d.dx * n);
+  if(d.allStat && n>0){
+    for(const k of ["ti","ling","wu","shen","yun","dao"]) p[k] = (p[k]||0) + d.allStat;
+    if(typeof recalcStats==="function") recalcStats(p);
+  }
+  // 争夺：每30天10%被挑战
+  const held = (p.days||0) - p.leyline.claimDay;
+  if(held > 0 && held % 30 === 0 && Math.random() < 0.10){
+    const lost = p.realmIdx < (LEYLINES.indexOf(ley)*2+3);
+    if(lost){
+      log(`⚠ 有强者觊觎你的【${ley.nm}】！你实力不济，灵脉被夺！`,"bad");
+      addChronicle(`灵脉【${ley.nm}】被强者夺走。`);
+      p.leyline = null;
+    }else{
+      log(`⚔ 有修士企图夺你的【${ley.nm}】！你将其击退。`,"good");
+    }
+  }
+}
+
+function openLeylinePanel(){
+  if(!P.leyline){
+    showModal(`<h3>🌀 灵 脉</h3><p style="color:#a89c7c">尚未占据灵脉。历练中有概率发现。</p>
+      <div class="btns"><button onclick="closeModal()">关 闭</button></div>`);
+    return;
+  }
+  const ley = LEYLINES.find(l=>l.id===P.leyline.id);
+  if(!ley){ P.leyline=null; return; }
+  const held = Math.max(0, (P.days||0) - P.leyline.claimDay);
+  showModal(`<h3>🌀 灵 脉</h3>
+    <div class="box left" style="padding:8px">
+      <div style="font-size:14px;color:${ley.color}">【${ley.nm}】</div>
+      <div style="font-size:12px;margin:4px 0">${ley.desc}</div>
+      <div style="font-size:11px;color:#a89c7c">已占据 ${held} 天</div>
+    </div>
+    <div class="btns"><button id="ley-abandon">放弃灵脉</button><button onclick="closeModal()">关 闭</button></div>`);
+  $("ley-abandon").onclick = ()=>{
+    closeModal();
+    log(`你放弃了【${ley.nm}】灵脉。`,"hint");
+    P.leyline = null;
+    refresh(); saveGame(true);
+  };
+}
+
 // v32 · 江湖事件链
 const ADVENTURE_CHAINS = [
   {id:"bandit", nm:"劫道山匪", minRealm:0, steps:[
@@ -5003,6 +5084,7 @@ function newPlayer(name,rootName,elements){
     // —— v30 · 仙友 ——
     friends: {},
     equipAffixes: {},
+    leyline: null,
   };
   recalcStats(p);
   // 初始化后按当前 maxHp/maxMp 满血满蓝
@@ -5419,7 +5501,8 @@ function gainCult(p,base,reason){
   const fpCult = typeof friendPassive==="function" ? friendPassive("cultAdd") : 0;
   const eaCult = typeof equipAffixBonus==="function" ? equipAffixBonus(p,"cult")*0.01 : 0;
   const rpCult = typeof getRealmPassives==="function" ? getRealmPassives(p.realmIdx).reduce((s,rp)=>s+(rp.cultPct||0),0) : 0;
-  const amt=Math.floor(base*rootMul(p)*TECHS[p.tech][0]*gearCultBonus(p)*buff.cultMul*bkMul*altMul*sectMul*weCultMul*tCultMul*(1+dScholar)*wrCultMul*caveMul*rsMul*(1+fpCult+eaCult+rpCult));
+  const leyCult = (p.leyline && LEYLINES.find(l=>l.id===p.leyline.id)?.daily?.cultPct) || 0;
+  const amt=Math.floor(base*rootMul(p)*TECHS[p.tech][0]*gearCultBonus(p)*buff.cultMul*bkMul*altMul*sectMul*weCultMul*tCultMul*(1+dScholar)*wrCultMul*caveMul*rsMul*(1+fpCult+eaCult+rpCult+leyCult));
   const prevCult = p.cult;
   p.cult+=amt;
   const tags = [];
@@ -5568,6 +5651,8 @@ function passDays(p,n){
   }
   // v31 · 弟子出战任务结算
   if(typeof tickDiscipleMissions === "function") tickDiscipleMissions(p);
+  // v33 · 灵脉日产
+  if(typeof tickLeyline === "function") tickLeyline(p, n);
   // v14 · 灵田成熟检测 (v16: 造化神功加速50%)
   if(p.garden && p.garden.length){
     const gardenAccel = (typeof hasTechPassive==="function" && hasTechPassive("gardenBoost")) ? 1.5 : 1;
@@ -6101,6 +6186,12 @@ function actCultivate(){
     if(!alive(P)){ afterAction(); return; }
     // 战斗事件已自行调用 startBattle
     if(P.inBattle){ refresh(); saveGame(true); return; }
+  }
+
+  // v33 · 入定冥想事件
+  if(typeof triggerMeditation === "function" && Math.random() < 0.15){
+    triggerMeditation();
+    if(typeof isModalShowing==="function" && isModalShowing()){ refresh(); saveGame(true); return; }
   }
 
   // —— 闭关后：道心自然恢复 ——
@@ -6645,6 +6736,62 @@ const CHOICE_EVENTS = [
     ]},
 ];
 
+// v33 · 入定冥想
+const MEDITATIONS = [
+  {id:"void", nm:"虚无之境", desc:"你坠入无边虚空，万念俱灭。灵台一片空白。",
+   choices:[
+    {nm:"放空一切", text:"你任由意识飘散……良久，一丝清明自虚空中降临。", R:{wu:2,dx:15}},
+    {nm:"强行凝聚", text:"你拼命聚拢神识——灵台虽定，经脉却隐隐作痛。", R:{cult:300,hpPct:-0.08}},
+   ]},
+  {id:"past", nm:"前尘往事", desc:"闭目中，过往画面纷至沓来——修仙路上的点点滴滴。",
+   choices:[
+    {nm:"回顾修行", text:"你重温每一次突破、每一场战斗，心境愈发沉稳。", R:{dao:2,dx:20}},
+    {nm:"斩断执念", text:"你挥剑斩去过往牵绊，一身轻松。", R:{cult:500,karma:-5}},
+    {nm:"沉浸其中", text:"你在回忆中流连忘返……醒来已过数日。", R:{dayAdd:3,wu:1}},
+   ]},
+  {id:"element", nm:"五行感悟", desc:"灵台中五色光华交织，天地五行之力缓缓涌来。",
+   choices:[
+    {nm:"感悟五行", text:"你细细体悟五行运转之理，灵根与天地共鸣。", R:{cult:400,ling:1}},
+    {nm:"以身试法", test:p=>p.realmIdx>=5, win:"你以肉身承载五行之力，经脉大开！", winR:{ti:3,ling:2,cult:600},
+     lose:"五行之力过于狂暴，你被震退！", loseR:{hpPct:-0.15}},
+   ]},
+  {id:"dao", nm:"道之回响", desc:"虚空中传来低沉的嗡鸣——那是大道的回响。",
+   choices:[
+    {nm:"聆听大道", text:"你凝神谛听……似有天地至理在耳边低语。", R:{dao:3,shen:1,dx:10}},
+    {nm:"追寻道音", test:p=>(p.dao||0)>=20, win:"你循声而入，触碰到一丝道的本源！修为暴涨！",
+     winR:{cult:1000,dao:5}, lose:"道音渐远，你没能跟上。",loseR:{dx:-10}},
+   ]},
+];
+
+function triggerMeditation(){
+  const med = MEDITATIONS[Math.floor(Math.random()*MEDITATIONS.length)];
+  const btns = med.choices.map((ch,ci)=>`<button class="j" data-med="${ci}">${ch.nm}</button>`).join("");
+  showModal(`<h3>🧘 入 定 · ${med.nm}</h3>
+    <p style="font-size:12px;color:#e8e3d3;line-height:1.6">${med.desc}</p>
+    <div class="btns" style="flex-wrap:wrap">${btns}</div>`);
+  document.querySelectorAll(".modal [data-med]").forEach(b=>{
+    b.onclick = ()=>{
+      const ci = +b.dataset.med;
+      const ch = med.choices[ci];
+      closeModal();
+      if(ch.test){
+        const pass = ch.test(P);
+        if(pass){
+          if(ch.win) log(`✦ ${ch.win}`,"good");
+          if(ch.winR) applyChainReward(ch.winR);
+        }else{
+          if(ch.lose) log(`✗ ${ch.lose}`,"bad");
+          if(ch.loseR) applyChainReward(ch.loseR);
+        }
+      }else{
+        if(ch.text) log(`✦ ${ch.text}`,"sys");
+        if(ch.R) applyChainReward(ch.R);
+      }
+      refresh(); saveGame(true);
+    };
+  });
+}
+
 /* ==========================================================
  *  v8 · 事件链（跨多次闭关的连续故事）
  * ========================================================== */
@@ -7064,6 +7211,7 @@ function actAdventure(){
   if(typeof tryFortuneEncounter === "function") tryFortuneEncounter();
   if(typeof tryMeetWanderingNPC === "function") tryMeetWanderingNPC();
   if(typeof tryAdventureChain === "function") tryAdventureChain();
+  if(typeof tryDiscoverLeyline === "function") tryDiscoverLeyline();
   if(Math.random()<0.55){
     // 过滤可触发的奇遇（满足 cond）
     const pool = ADVS.filter(e=>!e.cond || e.cond(P));
@@ -10991,6 +11139,7 @@ function loadGame(){
     if(!d.destiny) d.destiny = [];
     if(!d.friends) d.friends = {};
     if(!d.equipAffixes) d.equipAffixes = {};
+    if(d.leyline === undefined) d.leyline = null;
     // v4 寿元迁移：移除强制拉满逻辑（避免覆盖新机制），仅做异常兜底
     if(d.lifespan===undefined || d.lifespan<=0){
       d.lifespan = 80 + (d.realmIdx||0)*30;
@@ -11233,6 +11382,7 @@ if($("btn-treasure")) $("btn-treasure").onclick = openTreasureExplore;
 if($("btn-destiny")) $("btn-destiny").onclick = openDestinyPanel;
 if($("btn-reincshop")) $("btn-reincshop").onclick = openReincarnationShop;
 if($("btn-friends")) $("btn-friends").onclick = openFriendsPanel;
+if($("btn-leyline")) $("btn-leyline").onclick = ()=>{ if(typeof openLeylinePanel==="function") openLeylinePanel(); };
 $("btn-calendar").onclick= openCalendar;
 // v5：夙愿入口（按钮 + 状态行）
 $("btn-quest").onclick   = openQuestPanel;
