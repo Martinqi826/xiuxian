@@ -3495,6 +3495,31 @@ const RECIPES = {
   "九转还魂丹":{herbs:{"九叶玄参":2,"万年玄参":5,"蟠桃":1},        rate:0.15, lv:6},
 };
 
+// v37 · 秘方
+const RARE_RECIPES = [
+  {id:"dragon_pill",  nm:"龙血丹",   herbs:{"千年灵芝":2,"凝血花":3},  rate:0.40, lv:3,
+   desc:"以龙血炼制，永久+3体魄", effect:p=>{p.ti=(p.ti||0)+3;recalcStats(p);log("体魄 +3（永久）","epic");}, minRealm:5},
+  {id:"spirit_dew",   nm:"灵露仙液", herbs:{"聚灵草":5,"破障花":2},    rate:0.35, lv:3,
+   desc:"天地灵露凝聚，修为+2000", effect:p=>{gainCult(p,2000,"灵露仙液");}, minRealm:7},
+  {id:"soul_elixir",  nm:"凝魂丹",   herbs:{"万年玄参":1,"凝血花":3},  rate:0.30, lv:4,
+   desc:"凝聚魂力，永久+3神识", effect:p=>{p.shen=(p.shen||0)+3;recalcStats(p);log("神识 +3（永久）","epic");}, minRealm:9},
+  {id:"fate_pill",    nm:"转运丹",   herbs:{"破障花":3,"千年灵芝":1},  rate:0.45, lv:3,
+   desc:"逆转气运，永久+5气运", effect:p=>{p.yun=(p.yun||0)+5;recalcStats(p);log("气运 +5（永久）","epic");}, minRealm:6},
+  {id:"longevity",    nm:"不老仙丹", herbs:{"万年玄参":2,"蟠桃":1},    rate:0.20, lv:5,
+   desc:"延寿200年", effect:p=>{p.lifespan+=200;log("寿元 +200 年！","epic");}, minRealm:12},
+];
+
+function tryDiscoverRecipe(){
+  if(Math.random() > 0.02) return;
+  if(!P.rareRecipes) P.rareRecipes = [];
+  const pool = RARE_RECIPES.filter(r=>P.realmIdx>=r.minRealm && !P.rareRecipes.includes(r.id));
+  if(!pool.length) return;
+  const recipe = choice(pool);
+  P.rareRecipes.push(recipe.id);
+  log(`✦✦ 你发现了秘方【${recipe.nm}】！可在炼丹炉中炼制。`,"epic");
+  addChronicle(`发现秘方【${recipe.nm}】。`);
+}
+
 // v18 · 道具合成配方
 const SYNTHESIS = [
   // 丹药升级
@@ -5136,6 +5161,7 @@ function newPlayer(name,rootName,elements){
     equipAffixes: {},
     leyline: null,
     skillUse: {},
+    rareRecipes: [],
   };
   recalcStats(p);
   // 初始化后按当前 maxHp/maxMp 满血满蓝
@@ -6026,7 +6052,7 @@ function attackerOf(p, override){
   const desperateCritAdd = desperate ? 0.25 : 0;
   const desperateCritDmgAdd = desperate ? 0.8 : 0;
   return Object.assign({
-    atk:Math.floor((d.atk+(p._dgAtkBuff||0)+(typeof friendPassive==="function"?friendPassive("atkAdd"):0))*buff.atkMul*desperateAtkMul*(1+(typeof disciplePassive==="function"?disciplePassive("fighter")*0.03:0))),
+    atk:Math.floor((d.atk+(p._dgAtkBuff||0)+(typeof friendPassive==="function"?friendPassive("atkAdd"):0))*buff.atkMul*desperateAtkMul*(1+(typeof disciplePassive==="function"?disciplePassive("fighter")*0.03:0))*(typeof getStance==="function"?getStance().atkMul:1)),
     crit:Math.min(0.95, d.crit + (buff.critAdd||0) + desperateCritAdd),
     critDmg:d.critDmg + desperateCritDmgAdd,
     hit:d.hit, pen:d.pen,
@@ -6039,7 +6065,7 @@ function defenderOf(p, override){
   const d = p._d;
   const buff = getBuff(p);
   return Object.assign({
-    def:Math.floor((d.def+(typeof friendPassive==="function"?friendPassive("defAdd"):0))*buff.defMul),
+    def:Math.floor((d.def+(typeof friendPassive==="function"?friendPassive("defAdd"):0))*buff.defMul*(typeof getStance==="function"?getStance().defMul:1)),
     dodge:d.dodge, defEls:d.defEls, lv:p.realmIdx,
   }, override||{});
 }
@@ -7284,6 +7310,7 @@ function actAdventure(){
   if(typeof tryMeetWanderingNPC === "function") tryMeetWanderingNPC();
   if(typeof tryAdventureChain === "function") tryAdventureChain();
   if(typeof tryDiscoverLeyline === "function") tryDiscoverLeyline();
+  if(typeof tryDiscoverRecipe === "function") tryDiscoverRecipe();
   if(Math.random()<0.55){
     // 过滤可触发的奇遇（满足 cond）
     const pool = ADVS.filter(e=>!e.cond || e.cond(P));
@@ -8319,12 +8346,28 @@ function openAlchemy(){
       <button class="sm" data-rec="${k}" ${canMake?"":"disabled"}>炼制</button>
     </div>`;
   }).join("");
+  let rareRows = "";
+  if(P.rareRecipes && P.rareRecipes.length){
+    const rItems = RARE_RECIPES.filter(r=>P.rareRecipes.includes(r.id));
+    rareRows = `<h4 style="color:#e8c56a;margin:12px 0 4px">✦ 秘方</h4>` + rItems.map(r=>{
+      const herbsTxt = Object.entries(r.herbs).map(([h,n])=>`${h}×${n}（${P.bag[h]||0}）`).join(" ");
+      const canMake = Object.entries(r.herbs).every(([h,n])=>(P.bag[h]||0)>=n);
+      return `<div class="shop-row">
+        <div><div class="nm" style="color:#e8c56a">${r.nm}</div><div class="ds">${r.desc} · ${herbsTxt}</div></div>
+        <div class="pr">成功率 ${Math.floor(r.rate*100)}%</div>
+        <button class="sm" data-rare="${r.id}" ${canMake?"":"disabled"}>炼制</button>
+      </div>`;
+    }).join("");
+  }
   showModal(`<h3>🔥 丹 房</h3>
     <p style="font-size:12px;color:#a89c7c">当前炼丹等级 Lv.${P.alchemyLv}（境界加成 +${Math.floor(P.realmIdx/4)}）。成功率随境界+10%，爆炉有低概率受伤。</p>
-    <div class="box left" style="padding:0;border:none;background:none">${rows}</div>
+    <div class="box left" style="padding:0;border:none;background:none">${rows}${rareRows}</div>
     <div class="btns"><button id="al-close">离开</button></div>`);
   document.querySelectorAll(".modal [data-rec]").forEach(b=>{
     b.onclick = ()=>{ alchemyMake(b.dataset.rec); };
+  });
+  document.querySelectorAll(".modal [data-rare]").forEach(b=>{
+    b.onclick = ()=>{ rareAlchemyMake(b.dataset.rare); };
   });
   $("al-close").onclick = closeModal;
 }
@@ -8372,6 +8415,35 @@ function alchemyMake(name){
     if(P.hp<=0) setTimeout(gameOver,400);
     else openAlchemy();
   }, 600);
+}
+
+function rareAlchemyMake(id){
+  const r = RARE_RECIPES.find(x=>x.id===id);
+  if(!r) return;
+  for(const [h,n] of Object.entries(r.herbs)){
+    for(let i=0;i<n;i++) consume(h);
+  }
+  const buff = getBuff(P);
+  let rate = r.rate + P.realmIdx*0.01 + P.alchemyLv*0.02 + (buff.alchemyAdd||0);
+  if(hasTechPassive("alchemyBoost")) rate += 0.10;
+  if(typeof talentStat==="function") rate += talentStat(P,"alchAdd");
+  rate = Math.min(0.95, rate);
+  log(`丹炉异象！炼制秘方【${r.nm}】，成功率 ${Math.floor(rate*100)}%……`,"epic");
+  setTimeout(()=>{
+    if(Math.random() < rate){
+      r.effect(P);
+      P.stats.alchemy++;
+      addChronicle(`炼成秘方【${r.nm}】。`);
+    } else {
+      const dmg = 30 + P.realmIdx*15;
+      takeDmg(P, dmg);
+      log(`秘方炼制失败！灵材尽毁，丹炉反噬 ${dmg} 伤害。`,"bad");
+    }
+    closeModal();
+    refresh(); saveGame(true);
+    if(P.hp<=0) setTimeout(gameOver,400);
+    else openAlchemy();
+  }, 800);
 }
 
 /* ==========================================================
@@ -9849,6 +9921,22 @@ function setScene(title, sub, cls){
 }
 
 /* ============ 战斗 ============ */
+// v37 · 战斗姿态
+const BATTLE_STANCES = [
+  {id:"balanced", nm:"中庸",  icon:"⚖", atkMul:1.0,  defMul:1.0,  desc:"攻防均衡"},
+  {id:"offensive",nm:"破锋",  icon:"🗡", atkMul:1.25, defMul:0.80, desc:"攻+25% 防-20%"},
+  {id:"defensive",nm:"磐石",  icon:"🛡", atkMul:0.80, defMul:1.25, desc:"防+25% 攻-20%"},
+];
+function getStance(){ return BATTLE_STANCES.find(s=>s.id===(P._stance||"balanced")) || BATTLE_STANCES[0]; }
+function cycleStance(){
+  const cur = P._stance || "balanced";
+  const idx = BATTLE_STANCES.findIndex(s=>s.id===cur);
+  const next = BATTLE_STANCES[(idx+1)%BATTLE_STANCES.length];
+  P._stance = next.id;
+  log(`切换姿态：${next.icon} ${next.nm}（${next.desc}）`,"sys");
+  refreshBattleButtons();
+}
+
 function startBattle(m){
   let [name,lvl,mhp,matk,cr,sr,ele]=m;
   // v3：定位怪物 idx（用于读 MONSTER_META 的 spd/crit/karma）
@@ -10045,11 +10133,17 @@ function refreshBattleButtons(){
   $("btn-auto-cult").textContent = "✨ 施展神通";
   $("btn-auto-cult").classList.remove("auto","active","auto-chip");
   $("btn-auto-cult").onclick = battleSkill;
+  // 用"自动历练"按钮充当姿态切换键
+  const st = getStance();
+  $("btn-auto-adv").textContent = `${st.icon} ${st.nm}`;
+  $("btn-auto-adv").classList.remove("auto","active","auto-chip");
+  $("btn-auto-adv").title = st.desc;
+  $("btn-auto-adv").onclick = cycleStance;
 }
 function endBattle(win){
   const m=P.monster;
   const fromDg = m && m.fromDungeon;
-  P.inBattle=false;P.monster=null;P._nearDeathLine=false;
+  P.inBattle=false;P.monster=null;P._nearDeathLine=false;P._stance="balanced";
   setScene("凡 人 修 仙 路","— 一 缕 神 识 自 虚 空 降 临 —","");
   // 恢复按钮
   bindMainButtons();
@@ -11441,6 +11535,7 @@ function loadGame(){
     if(!d.equipAffixes) d.equipAffixes = {};
     if(d.leyline === undefined) d.leyline = null;
     if(!d.skillUse) d.skillUse = {};
+    if(!d.rareRecipes) d.rareRecipes = [];
     // v4 寿元迁移：移除强制拉满逻辑（避免覆盖新机制），仅做异常兜底
     if(d.lifespan===undefined || d.lifespan<=0){
       d.lifespan = 80 + (d.realmIdx||0)*30;
@@ -11653,6 +11748,9 @@ function bindMainButtons(){
   $("btn-auto-cult").textContent = "♺";
   $("btn-auto-cult").classList.add("auto","auto-chip");
   $("btn-auto-cult").onclick = ()=>autoStart("cult");
+  $("btn-auto-adv").textContent = "♺";
+  $("btn-auto-adv").classList.add("auto","auto-chip");
+  $("btn-auto-adv").onclick = ()=>autoStart("adv");
 }
 $("btn-save").onclick = ()=>saveGame(false);
 $("btn-reset").onclick= ()=>{
