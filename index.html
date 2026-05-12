@@ -508,6 +508,8 @@
         <button id="btn-leyline">🌀 灵 脉</button>
         <button id="btn-prayer">🌌 祈 愿</button>
         <button id="btn-craft">⚒ 炼 器</button>
+        <button id="btn-engrave">✴ 铭 刻</button>
+        <button id="btn-divine">🔮 推 演</button>
       </div>
 
       <!-- 第 3 组：故事 / 工具 -->
@@ -4326,6 +4328,77 @@ function equipAffixBonus(p, stat){
   return total;
 }
 
+// v38 · 装备铭刻（符文）
+const EQUIP_RUNES = [
+  {id:"leech",   nm:"噬血符文", desc:"攻击吸血5%",  cost:150, shard:2, minRealm:3,  color:"#d96a6a"},
+  {id:"thorn",   nm:"荆棘符文", desc:"受击反伤8%",  cost:150, shard:2, minRealm:3,  color:"#a0d070"},
+  {id:"mana",    nm:"灵息符文", desc:"攻击回灵力3%",cost:120, shard:1, minRealm:2,  color:"#7ab0d4"},
+  {id:"sunder",  nm:"破甲符文", desc:"攻击15%概率破防1回合",cost:200, shard:3, minRealm:5, color:"#e8c547"},
+  {id:"shield",  nm:"庇护符文", desc:"受击20%概率生成护盾",cost:200, shard:3, minRealm:5, color:"#c0a8d4"},
+  {id:"execute", nm:"斩杀符文", desc:"目标<30%血额外伤害25%",cost:300, shard:4, minRealm:8, color:"#ff7755"},
+];
+function openEngrave(){
+  if(P.inBattle){ log("战斗中无法铭刻。","hint"); return; }
+  const slots = ["weapon","armor","accessory","mount"];
+  const equipped = slots.filter(s=>P.equips[s]);
+  if(!equipped.length){ showModal(`<h3>✴ 符 文 铭 刻</h3><p>尚未装备任何装备。</p><div class="btns"><button onclick="closeModal()">退</button></div>`); return; }
+  const rows = equipped.map(s=>{
+    const nm = P.equips[s];
+    const cur = P.equipRunes?.[nm];
+    const curTxt = cur ? `<span style="color:${cur.color}">「${cur.nm}」</span>` : "无符文";
+    return `<div class="shop-row"><div><div class="nm">${nm}</div><div class="ds">当前：${curTxt}</div></div>
+      <button class="sm" data-eng="${nm}">铭刻</button></div>`;
+  }).join("");
+  showModal(`<h3>✴ 符 文 铭 刻</h3>
+    <p style="font-size:12px;color:#a89c7c">为装备铭刻符文，赋予战斗特效。每件装备限一枚符文，可覆盖。</p>
+    <div class="box left" style="padding:0;border:none;background:none">${rows}</div>
+    <div class="btns"><button onclick="closeModal()">关 闭</button></div>`);
+  document.querySelectorAll(".modal [data-eng]").forEach(b=>{
+    b.onclick = ()=>{ chooseRune(b.dataset.eng); };
+  });
+}
+function chooseRune(eqName){
+  const eq = EQUIPS[eqName]; if(!eq) return;
+  const tier = eq.tier||1;
+  const avail = EQUIP_RUNES.filter(r=>P.realmIdx>=r.minRealm);
+  if(!avail.length){ log("境界不足，无可用符文。","hint"); return; }
+  const rows = avail.map(r=>{
+    const c = Math.floor(r.cost * (1+tier*0.3));
+    const sh = Math.floor(r.shard * (1+tier*0.2));
+    const canDo = (P.bag["灵石"]||0)>=c && (P.bag["强化石"]||0)>=sh;
+    return `<div class="shop-row"><div><div class="nm" style="color:${r.color}">${r.nm}</div><div class="ds">${r.desc} · ${c}灵石 + ${sh}强化石</div></div>
+      <button class="sm" data-rune="${r.id}" data-eq="${eqName}" ${canDo?"":"disabled"}>铭刻</button></div>`;
+  }).join("");
+  showModal(`<h3>✴ 铭刻【${eqName}】</h3>
+    <div class="box left" style="padding:0;border:none;background:none">${rows}</div>
+    <div class="btns"><button onclick="closeModal()">返 回</button></div>`);
+  document.querySelectorAll(".modal [data-rune]").forEach(b=>{
+    b.onclick = ()=>{
+      const r = EQUIP_RUNES.find(x=>x.id===b.dataset.rune);
+      const eq2 = EQUIPS[b.dataset.eq]; if(!r||!eq2) return;
+      const tier2 = eq2.tier||1;
+      const c = Math.floor(r.cost * (1+tier2*0.3));
+      const sh = Math.floor(r.shard * (1+tier2*0.2));
+      if((P.bag["灵石"]||0)<c||(P.bag["强化石"]||0)<sh){ log("材料不足。","hint"); return; }
+      addItem(P,"灵石",-c); addItem(P,"强化石",-sh);
+      if(!P.equipRunes) P.equipRunes = {};
+      P.equipRunes[b.dataset.eq] = {id:r.id, nm:r.nm, color:r.color};
+      log(`✴ 【${b.dataset.eq}】铭刻「${r.nm}」成功！${r.desc}`,"epic");
+      closeModal(); refresh(); saveGame(true);
+    };
+  });
+}
+function getEquippedRunes(){
+  if(!P||!P.equipRunes) return [];
+  const runes = [];
+  for(const s of ["weapon","armor","accessory","mount"]){
+    const eq = P.equips[s]; if(!eq) continue;
+    const r = P.equipRunes[eq]; if(!r) continue;
+    runes.push(r.id);
+  }
+  return runes;
+}
+
 // v26 · 战斗连招系统
 const COMBO_CHAINS = [
   {id:"破甲斩",  seq:["attack","attack","skill"],  desc:"三连攻势，最后一击神通破防",
@@ -5162,6 +5235,7 @@ function newPlayer(name,rootName,elements){
     leyline: null,
     skillUse: {},
     rareRecipes: [],
+    equipRunes: {},
   };
   recalcStats(p);
   // 初始化后按当前 maxHp/maxMp 满血满蓝
@@ -6119,6 +6193,20 @@ function applyDamageToP(d, src){
     if(typeof vfx === "function") vfx("gold");
   }
   if(hpRatio >= 0.4) P._desperateFlagged = false;  // 回血后重置提示
+  // v38 · 防御符文触发
+  if(!d.isDodge && P.monster && typeof getEquippedRunes==="function"){
+    const rns = getEquippedRunes();
+    if(rns.includes("thorn")){
+      const ref = Math.max(1, Math.floor(dmg * 0.08));
+      P.monster.mhp -= ref;
+      log(`✴ 荆棘符文反伤 ${ref}！`,"good");
+    }
+    if(rns.includes("shield") && Math.random()<0.20){
+      const sh = Math.floor(P.maxHp * 0.05);
+      P.shield = (P.shield||0) + 0.15;
+      log(`✴ 庇护符文！生成护盾（减伤15%）！`,"good");
+    }
+  }
 }
 
 /* 应用伤害到怪物 */
@@ -6164,6 +6252,27 @@ function applyDamageToM(m, d, srcName){
   }
   // v12: 濒死成就标记
   if(P.hp > 0 && P.hp <= P.maxHp*0.01){ if(!P.flags) P.flags={}; P.flags._ach_nearDeath = true; }
+  // v38 · 符文触发（攻击方）
+  if(typeof getEquippedRunes==="function"){
+    const rns = getEquippedRunes();
+    if(rns.includes("leech")){
+      const heal = Math.max(1, Math.floor(d.dmg * 0.05));
+      P.hp = Math.min(P.maxHp, P.hp + heal);
+    }
+    if(rns.includes("mana")){
+      const mp = Math.max(1, Math.floor(d.dmg * 0.03));
+      P.mp = Math.min(P.maxMp, P.mp + mp);
+    }
+    if(rns.includes("sunder") && Math.random()<0.15){
+      m.breakRounds = Math.max(m.breakRounds||0, 1);
+      log("✴ 破甲符文触发！敌方破防1回合！","epic");
+    }
+    if(rns.includes("execute") && m.mhp > 0 && m.mhp < m.maxMhp * 0.3){
+      const extra = Math.floor(d.dmg * 0.25);
+      m.mhp -= extra;
+      log(`✴ 斩杀符文！追加 ${extra} 伤害！`,"epic");
+    }
+  }
   return m.mhp <= 0;
 }
 
@@ -8774,7 +8883,8 @@ function useTalismanInBattle(name){
  * ========================================================== */
 function tryFortuneEncounter(){
   if(!P) return false;
-  const rate = 0.06 + (P.yun||0)*0.002;
+  let rate = 0.06 + (P.yun||0)*0.002;
+  if(P._divineFortune > 0){ rate += 0.15; P._divineFortune--; }
   if(Math.random() >= rate) return false;
   const pool = FORTUNE_ENCOUNTERS.filter(e=>P.realmIdx >= e.minRealm);
   if(!pool.length) return false;
@@ -8901,6 +9011,76 @@ function getWorldEventEffect(){
   if(!P || !P.worldEvent) return {};
   const we = WORLD_EVENTS.find(e=>e.id===P.worldEvent.id);
   return we ? we.effect : {};
+}
+
+// v38 · 天机推演
+const DIVINATIONS = [
+  {id:"combat",  nm:"战机推演", cost:80,  minRealm:1, desc:"预知下次历练遭遇类型"},
+  {id:"break",   nm:"突破天机", cost:200, minRealm:3, desc:"推演突破吉凶，获成功率提示"},
+  {id:"fortune", nm:"机缘卦象", cost:150, minRealm:4, desc:"提升下次历练机缘概率"},
+  {id:"fate",    nm:"天命窥探", cost:300, minRealm:7, desc:"揭示隐藏的修行机缘"},
+];
+function openDivine(){
+  if(P.inBattle){ log("战斗中无法推演。","hint"); return; }
+  const avail = DIVINATIONS.filter(d=>P.realmIdx>=d.minRealm);
+  if(!avail.length){ showModal(`<h3>🔮 天 机 推 演</h3><p>境界尚浅，无法窥探天机。</p><div class="btns"><button onclick="closeModal()">退</button></div>`); return; }
+  const cost = (r)=>Math.floor(r.cost * (1 + P.realmIdx * 0.1));
+  const rows = avail.map(d=>{
+    const c = cost(d);
+    return `<div class="shop-row">
+      <div><div class="nm">${d.nm}</div><div class="ds">${d.desc}</div></div>
+      <div class="pr">${c}灵石</div>
+      <button class="sm" data-div="${d.id}" ${(P.bag["灵石"]||0)>=c?"":"disabled"}>推演</button>
+    </div>`;
+  }).join("");
+  showModal(`<h3>🔮 天 机 推 演</h3>
+    <p style="font-size:12px;color:#a89c7c">消耗灵石窥探天机，获得下次行动指引。</p>
+    <div class="box left" style="padding:0;border:none;background:none">${rows}</div>
+    <div class="btns"><button onclick="closeModal()">关 闭</button></div>`);
+  document.querySelectorAll(".modal [data-div]").forEach(b=>{
+    b.onclick = ()=>{ doDivine(b.dataset.div); };
+  });
+}
+function doDivine(id){
+  const d = DIVINATIONS.find(x=>x.id===id);
+  if(!d) return;
+  const c = Math.floor(d.cost * (1 + P.realmIdx * 0.1));
+  if((P.bag["灵石"]||0)<c){ log("灵石不足。","hint"); return; }
+  addItem(P,"灵石",-c);
+  closeModal();
+  if(id==="combat"){
+    const roll = Math.random();
+    if(roll < 0.55){
+      log("🔮 天机显示：下次历练将遭遇妖兽拦路，宜备丹药兵刃。","epic");
+    }else{
+      log("🔮 天机显示：下次历练将遇奇事，非战斗之行。","epic");
+    }
+    P._divineHint = id;
+  }else if(id==="break"){
+    const baseRate = 0.45 + ({
+      "天灵根":0.15,"变异灵根":0.10,"真灵根":0.08,"异灵根":0.07,"全灵根":0.05,
+      "杂灵根":0.03,"伪灵根":0.01,"废灵根":-0.05
+    }[P.rootName]||0) * 0.05;
+    let hint;
+    if(baseRate>=0.60) hint = "大吉——灵根天赋极佳，突破几无障碍。";
+    else if(baseRate>=0.48) hint = "中吉——天时尚可，备齐破障丹为上。";
+    else hint = "凶——灵根资质有限，须备破障丹、齐装备方可一试。";
+    log(`🔮 突破天机：${hint}`,"epic");
+    P._divineBreak = true;
+  }else if(id==="fortune"){
+    P._divineFortune = 3;
+    log("🔮 机缘卦象已启——接下来3次历练，机缘概率大增！","epic");
+  }else if(id==="fate"){
+    const fates = [
+      ()=>{ addItem(P,"悟道茶",2); log("🔮 天命揭示：一缕茶香自虚空飘来，获得悟道茶×2。","epic"); },
+      ()=>{ const g=rand(100,300); gainCult(P,g,"天机感悟"); log(`🔮 天命揭示：天机运转间，你有所感悟，修为+${g}。`,"epic"); },
+      ()=>{ P.dx=Math.min(P.maxDx,P.dx+20); log("🔮 天命揭示：道心澄明，道心+20。","epic"); },
+      ()=>{ P.yun=(P.yun||0)+2; recalcStats(P); log("🔮 天命揭示：气运流转，气运+2（永久）。","epic"); },
+      ()=>{ addItem(P,"灵石",c*2); log(`🔮 天命揭示：因果循环，灵石倍返+${c*2}。`,"epic"); },
+    ];
+    choice(fates)();
+  }
+  refresh(); saveGame(true);
 }
 
 /* ==========================================================
@@ -11536,6 +11716,7 @@ function loadGame(){
     if(d.leyline === undefined) d.leyline = null;
     if(!d.skillUse) d.skillUse = {};
     if(!d.rareRecipes) d.rareRecipes = [];
+    if(!d.equipRunes) d.equipRunes = {};
     // v4 寿元迁移：移除强制拉满逻辑（避免覆盖新机制），仅做异常兜底
     if(d.lifespan===undefined || d.lifespan<=0){
       d.lifespan = 80 + (d.realmIdx||0)*30;
@@ -11784,6 +11965,8 @@ if($("btn-friends")) $("btn-friends").onclick = openFriendsPanel;
 if($("btn-leyline")) $("btn-leyline").onclick = ()=>{ if(typeof openLeylinePanel==="function") openLeylinePanel(); };
 if($("btn-prayer")) $("btn-prayer").onclick = ()=>{ if(typeof openWeatherPrayer==="function") openWeatherPrayer(); };
 if($("btn-craft")) $("btn-craft").onclick = ()=>{ if(typeof openCraftPanel==="function") openCraftPanel(); };
+if($("btn-engrave")) $("btn-engrave").onclick = ()=>{ if(typeof openEngrave==="function") openEngrave(); };
+if($("btn-divine")) $("btn-divine").onclick = ()=>{ if(typeof openDivine==="function") openDivine(); };
 $("btn-calendar").onclick= openCalendar;
 // v5：夙愿入口（按钮 + 状态行）
 $("btn-quest").onclick   = openQuestPanel;
