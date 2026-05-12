@@ -432,6 +432,7 @@
     <div class="row"><span class="k"><i class="ico">🜍</i>五行</span><span class="v" id="s-elements">—</span></div>
     <div class="row"><span class="k"><i class="ico">📖</i>功法</span><span class="v" id="s-tech">—</span></div>
     <div class="row"><span class="k"><i class="ico">🏯</i>宗门</span><span class="v blue" id="s-sect">散修</span></div>
+    <div class="row"><span class="k"><i class="ico">🗺️</i>地图</span><span class="v" id="s-region" style="font-size:12px;color:#7ec8b4">灵山秘境</span></div>
     <div class="row" id="s-quest-row" style="cursor:pointer" title="点击查看夙愿"><span class="k"><i class="ico">🌙</i>夙愿</span><span class="v" id="s-quest" style="font-size:12px">— 无 —</span></div>
 
     <h2><i class="ico">☯</i>修 为</h2>
@@ -515,6 +516,8 @@
         <button id="btn-wheel">🎡 转 盘</button>
         <button id="btn-constellation">🌟 星 辰</button>
         <button id="btn-faction">🏴 势 力</button>
+        <button id="btn-fusion">🔄 融 合</button>
+        <button id="btn-region">🗺️ 地 图</button>
       </div>
 
       <!-- 第 3 组：故事 / 工具 -->
@@ -4055,6 +4058,111 @@ TECH_META["灭世剑意"]   = {el:"金", mp:12, passive:"bloodthirst"};
 TECH_META["造化圣功"]   = {el:"木", mp:10, passive:"gardenBoost"};
 TECH_META["无上天魔经"] = {el:null, mp:20, passive:"demonic"};
 
+// v43 · 功法融合
+function openTechFusion(){
+  if(P.inBattle){ log("战斗中。","hint"); return; }
+  if(P.realmIdx < 9){ showModal(`<h3>🔄 功 法 融 合</h3><p>需金丹期以上方可融合功法。</p><div class="btns"><button onclick="closeModal()">退</button></div>`); return; }
+  if(P._techFused){ showModal(`<h3>🔄 功 法 融 合</h3><p>本世已融合过功法，不可再次融合。</p><div class="btns"><button onclick="closeModal()">退</button></div>`); return; }
+  const cur = P.tech;
+  const curData = TECHS[cur];
+  const cost = 10000 + P.realmIdx * 2000;
+  const stoneCost = 500;
+  const others = Object.keys(TECHS).filter(k=>k!==cur && k!=="引气诀");
+  const rows = others.map(k=>{
+    const t = TECHS[k];
+    const fusedMul = Math.round((curData[0]+t[0])/2*100)/100;
+    const fusedAtk = Math.min(40, curData[1]+Math.floor(t[1]*0.5));
+    return `<div class="shop-row">
+      <div><div class="nm">${k}</div><div class="ds">×${t[0]} 攻+${t[1]} · ${t[2]}</div>
+      <div class="ds" style="color:#e8c56a">融合后：×${fusedMul} 攻+${fusedAtk}</div></div>
+      <button class="sm" data-fuse="${k}" ${P.cult>=cost&&(P.bag["灵石"]||0)>=stoneCost?"":"disabled"}>融合</button>
+    </div>`;
+  }).join("");
+  showModal(`<h3>🔄 功 法 融 合</h3>
+    <p style="font-size:12px;color:#a89c7c">当前：《${cur}》×${curData[0]} 攻+${curData[1]}</p>
+    <p style="font-size:12px;color:#d96a6a">消耗 ${cost} 修为 + ${stoneCost} 灵石。不可逆，每世限一次。</p>
+    <div class="box left" style="padding:0;border:none;background:none">${rows}</div>
+    <div class="btns"><button onclick="closeModal()">取 消</button></div>`);
+  document.querySelectorAll(".modal [data-fuse]").forEach(b=>{
+    b.onclick = ()=>{
+      const other = b.dataset.fuse;
+      const t2 = TECHS[other];
+      if(!t2 || P.cult<cost || (P.bag["灵石"]||0)<stoneCost) return;
+      confirmBox(`确定将《${cur}》与《${other}》融合？此操作不可逆！`,()=>{
+        P.cult -= cost;
+        addItem(P,"灵石",-stoneCost);
+        const fusedName = `${cur.replace(/[诀经功意]/g,"")}·${other.replace(/[诀经功意]/g,"")}融合`;
+        const fusedMul = Math.round((curData[0]+t2[0])/2*100)/100;
+        const fusedAtk = Math.min(40, curData[1]+Math.floor(t2[1]*0.5));
+        TECHS[fusedName] = [fusedMul, fusedAtk, `${cur}与${other}融合之道`];
+        const meta1 = TECH_META[cur]||{};
+        const meta2 = TECH_META[other]||{};
+        TECH_META[fusedName] = {el:meta1.el||meta2.el||null, mp:Math.max(meta1.mp||0,meta2.mp||0)};
+        if(meta1.passive) TECH_META[fusedName].passive = meta1.passive;
+        else if(meta2.passive) TECH_META[fusedName].passive = meta2.passive;
+        P.tech = fusedName;
+        P._techFused = true;
+        closeModal();
+        log(`✦✦ 功法融合成功！《${fusedName}》诞生！（×${fusedMul} 攻+${fusedAtk}）`,"epic");
+        addChronicle(`融合功法《${fusedName}》。`);
+        SFX.chime();
+        recalcStats(P); refresh(); saveGame(true);
+      });
+    };
+  });
+}
+
+// v43 · 历练地图 — 4大历练区域
+const ADV_REGIONS = [
+  {id:"lingshan", nm:"灵山秘境", desc:"灵气浓郁，修为获取+20%", minRealm:0,
+   icon:"🏔️", elemBias:["木","水"], cultMul:1.2, stoneMul:1.0, lootMul:1.0, eventRate:0.6,
+   monsterW:(m,ri)=>{ const el=m[6]; return (el==="木"||el==="水")?3:1; }},
+  {id:"desert", nm:"赤炎荒漠", desc:"灵石丰厚但危机四伏，灵石+30%，怪物攻+15%", minRealm:3,
+   icon:"🏜️", elemBias:["火","土"], cultMul:1.0, stoneMul:1.3, lootMul:1.1, eventRate:0.45,
+   monsterW:(m,ri)=>{ const el=m[6]; return (el==="火"||el==="土")?3:1; },
+   monsterMod:{atkMul:1.15}},
+  {id:"deepsea", nm:"沧溟深海", desc:"装备掉率+20%，遭遇水系妖兽", minRealm:7,
+   icon:"🌊", elemBias:["水","金"], cultMul:1.0, stoneMul:1.0, lootMul:1.2, eventRate:0.55,
+   monsterW:(m,ri)=>{ const el=m[6]; return (el==="水"||el==="金")?4:1; }},
+  {id:"nether", nm:"幽冥界域", desc:"修为+15%，灵石+15%，但怪物HP+25%", minRealm:12,
+   icon:"👻", elemBias:["土","火"], cultMul:1.15, stoneMul:1.15, lootMul:1.1, eventRate:0.5,
+   monsterW:(m,ri)=>{ return m[1]>=ri-2?5:1; },
+   monsterMod:{hpMul:1.25}},
+];
+function getRegion(){ return ADV_REGIONS.find(r=>r.id===(P._advRegion||"lingshan"))||ADV_REGIONS[0]; }
+function openRegionMap(){
+  if(P.inBattle){ log("战斗中。","hint"); return; }
+  const cur = getRegion();
+  const rows = ADV_REGIONS.filter(r=>P.realmIdx>=r.minRealm).map(r=>{
+    const sel = r.id===cur.id;
+    return `<div class="shop-row" style="${sel?"background:rgba(126,200,180,0.15);border-left:3px solid #7ec8b4":""}">
+      <div><div class="nm">${r.icon} ${r.nm}${sel?" ← 当前":""}</div>
+      <div class="ds">${r.desc}</div>
+      <div class="ds" style="color:#999">偏向：${r.elemBias.join("/")}系妖兽</div></div>
+      ${sel?"":`<button class="sm" data-reg="${r.id}">前 往</button>`}
+    </div>`;
+  }).join("");
+  const locked = ADV_REGIONS.filter(r=>P.realmIdx<r.minRealm).map(r=>{
+    return `<div class="shop-row" style="opacity:0.4"><div><div class="nm">🔒 ${r.nm}</div>
+      <div class="ds">需${REALMS[r.minRealm][0]}解锁</div></div></div>`;
+  }).join("");
+  showModal(`<h3>🗺️ 历 练 地 图</h3>
+    <p style="font-size:12px;color:#a89c7c">选择历练区域，不同区域有不同妖兽分布与收益加成。</p>
+    <div class="box left" style="padding:0;border:none;background:none">${rows}${locked}</div>
+    <div class="btns"><button onclick="closeModal()">关 闭</button></div>`);
+  document.querySelectorAll(".modal [data-reg]").forEach(b=>{
+    b.onclick = ()=>{
+      P._advRegion = b.dataset.reg;
+      const r = getRegion();
+      closeModal();
+      log(`🗺️ 前往${r.icon}【${r.nm}】— ${r.desc}`,"good");
+      addChronicle(`转修至${r.nm}。`);
+      SFX.chime();
+      saveGame(true);
+    };
+  });
+}
+
 // v24 · 天道法则 — 每一世随机抽取的全局修饰规则
 const WORLD_RULES = [
   {id:"barren",  nm:"灵气枯竭", desc:"修炼速度 -20%，掉率 +30%",  cultMul:0.80, lootMul:1.30, color:"#d96a6a"},
@@ -5289,6 +5397,7 @@ function newPlayer(name,rootName,elements){
     weaponKills: {},
     equipSpirits: {},
     factionRep: {},
+    _advRegion: "lingshan",
   };
   recalcStats(p);
   // 初始化后按当前 maxHp/maxMp 满血满蓝
@@ -7511,7 +7620,9 @@ function actAdventure(){
   if(typeof tryDiscoverLeyline === "function") tryDiscoverLeyline();
   if(typeof tryDiscoverRecipe === "function") tryDiscoverRecipe();
   if(typeof gainFactionRep === "function") gainFactionRep("rogue",1);
-  if(Math.random()<0.55){
+  const _region = (typeof getRegion==="function") ? getRegion() : null;
+  if(_region) P._advRegion = _region.id;
+  if(Math.random()< (_region ? _region.eventRate : 0.55)){
     // 过滤可触发的奇遇（满足 cond）
     const pool = ADVS.filter(e=>!e.cond || e.cond(P));
     const ev=choice(pool);
@@ -7558,17 +7669,20 @@ function actAdventure(){
     delete P._advAltMul;
     afterAction();
   }else{
-    // 战斗 — v10：权重偏向同级怪物（越接近玩家等级越常见）
+    // 战斗 — v10：权重偏向同级怪物 + v43区域偏向
     delete P._advAltMul;
     const cands=MONSTERS.filter(m=>m[1]<=P.realmIdx+2);
     const weighted = cands.map(m => {
       const gap = Math.max(0, P.realmIdx - m[1]);
-      return { m, w: gap <= 2 ? 4 : gap <= 5 ? 2 : 1 };
+      let w = gap <= 2 ? 4 : gap <= 5 ? 2 : 1;
+      if(_region && _region.monsterW) w *= _region.monsterW(m, P.realmIdx);
+      return { m, w };
     });
     const totalW = weighted.reduce((s,x) => s+x.w, 0);
     let roll = Math.random() * totalW;
     let picked = weighted[0].m;
     for(const x of weighted){ roll -= x.w; if(roll <= 0){ picked = x.m; break; } }
+    if(_region) P._advRegionBattle = _region.id;
     startBattle(picked);
   }
 }
@@ -10655,6 +10769,15 @@ function startBattle(m){
     mhp  = Math.floor(mhp * worldRuleMul("monHpMul"));
     matk = Math.floor(matk * worldRuleMul("monAtkMul"));
   }
+  // v43 · 区域怪物修饰
+  if(P._advRegionBattle && typeof getRegion==="function"){
+    const regMod = getRegion().monsterMod;
+    if(regMod){
+      if(regMod.hpMul) mhp = Math.floor(mhp * regMod.hpMul);
+      if(regMod.atkMul) matk = Math.floor(matk * regMod.atkMul);
+    }
+    delete P._advRegionBattle;
+  }
   P.inBattle=true;
   P.monster={name,lvl,mhp,maxMhp:mhp,matk,cr,sr,ele:ele||null,rounds:0,idx,
     breakGauge:0, breakMax:3+Math.floor(idx/2), breakRounds:0,
@@ -10845,7 +10968,8 @@ function endBattle(win){
     if(m._worldBoss && typeof applyBossReward==="function") applyBossReward(m);
     const wrCrMul = typeof worldRuleMul==="function" ? worldRuleMul("crMul") : 1;
     const dgFrenzyMul = (fromDg && P.curDungeon?.mod?.flag==="frenzy") ? 1.6 : 1;
-    gainCult(P,Math.floor(m.cr * wrCrMul * dgFrenzyMul),"斩妖");
+    const regCultMul = (P._advRegionBattle && typeof getRegion==="function") ? getRegion().cultMul||1 : 1;
+    gainCult(P,Math.floor(m.cr * wrCrMul * dgFrenzyMul * regCultMul),"斩妖");
     // v27: 轮回词缀 — 击杀回血15%
     if(fromDg && P.curDungeon?.mod?.flag==="lifesteal"){
       const h=Math.floor(P.maxHp*0.15); P.hp=Math.min(P.maxHp,P.hp+h);
@@ -10856,7 +10980,8 @@ function endBattle(win){
     const rpStone = typeof getRealmPassives==="function" ? getRealmPassives(P.realmIdx).reduce((s,rp)=>s+(rp.stonePct||0),0) : 0;
     const tStoneMul = 1 + (typeof talentStat==="function" ? talentStat(P,"stoneMul") : 0) + fpStoneMul + rpStone;
     const wrSrMul = typeof worldRuleMul==="function" ? worldRuleMul("srMul") : 1;
-    addItem(P,"灵石",Math.floor(m.sr * dgRichMul * tStoneMul * wrSrMul));
+    const regStoneMul = (P._advRegionBattle && typeof getRegion==="function") ? getRegion().stoneMul||1 : 1;
+    addItem(P,"灵石",Math.floor(m.sr * dgRichMul * tStoneMul * wrSrMul * regStoneMul));
     // v4：节气 lootMul 加成掉落概率（小满+10%）
     const buff = getBuff(P);
     const weEff = typeof getWorldEventEffect==="function" ? getWorldEventEffect() : {};
@@ -10867,7 +10992,8 @@ function endBattle(win){
     const rsLootMul = typeof reincShopLootMul==="function" ? reincShopLootMul() : 1;
     const eaLoot = typeof equipAffixBonus==="function" ? equipAffixBonus(P,"loot")*0.01 : 0;
     const rpLoot = typeof getRealmPassives==="function" ? getRealmPassives(P.realmIdx).reduce((s,rp)=>s+(rp.lootPct||0),0) : 0;
-    const lootMul = (buff.lootMul || 1) * (weEff.lootMul || 1) * (1 + tDropAdd + dLucky + eaLoot + rpLoot) * wrLootMul * dgTreasureMul * rsLootMul;
+    const regLootMul = (P._advRegionBattle && typeof getRegion==="function") ? getRegion().lootMul||1 : 1;
+    const lootMul = (buff.lootMul || 1) * (weEff.lootMul || 1) * (1 + tDropAdd + dLucky + eaLoot + rpLoot) * wrLootMul * dgTreasureMul * rsLootMul * regLootMul;
     // 25% 丹药 / 5% 灵草 / 2% 装备
     if(Math.random()<0.25*lootMul){
       addItem(P,choice(["金创药","聚气丹","凝神丹","回元丹"]),1);
@@ -11282,6 +11408,7 @@ function refresh(){
   $("s-root").textContent = `${P.rootName} ×${rootMul(P)}`;
   $("s-root").style.color = ROOTS[P.rootName].color;
   $("s-sect").textContent = P.sect || "散修";
+  if($("s-region") && typeof getRegion==="function"){ const _r=getRegion(); $("s-region").textContent = _r.icon+" "+_r.nm; }
   // v5：夙愿状态行
   if($("s-quest")){
     if(P.quest && QUESTS[P.quest]){
@@ -12244,6 +12371,7 @@ function loadGame(){
     if(!d.weaponKills) d.weaponKills = {};
     if(!d.equipSpirits) d.equipSpirits = {};
     if(!d.factionRep) d.factionRep = {};
+    if(!d._advRegion) d._advRegion = "lingshan";
     // v4 寿元迁移：移除强制拉满逻辑（避免覆盖新机制），仅做异常兜底
     if(d.lifespan===undefined || d.lifespan<=0){
       d.lifespan = 80 + (d.realmIdx||0)*30;
@@ -12499,6 +12627,8 @@ if($("btn-trial")) $("btn-trial").onclick = ()=>{ if(typeof openTrial==="functio
 if($("btn-wheel")) $("btn-wheel").onclick = ()=>{ if(typeof openWheel==="function") openWheel(); };
 if($("btn-constellation")) $("btn-constellation").onclick = ()=>{ if(typeof openConstellation==="function") openConstellation(); };
 if($("btn-faction")) $("btn-faction").onclick = ()=>{ if(typeof openFactionPanel==="function") openFactionPanel(); };
+if($("btn-fusion")) $("btn-fusion").onclick = ()=>{ if(typeof openTechFusion==="function") openTechFusion(); };
+if($("btn-region")) $("btn-region").onclick = ()=>{ if(typeof openRegionMap==="function") openRegionMap(); };
 $("btn-calendar").onclick= openCalendar;
 // v5：夙愿入口（按钮 + 状态行）
 $("btn-quest").onclick   = openQuestPanel;
