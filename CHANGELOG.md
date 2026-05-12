@@ -4,6 +4,29 @@
 
 ---
 
+## [v41] — 2026-05-12 · 星辰图谱 + 秘境词缀扩展
+
+### 动机
+
+修为缺少长期消耗出口（累积后无用）；秘境词缀只有9种，需要更多环境变化。
+
+### 改动
+
+**星辰图谱**
+- `CONSTELLATION` 3条路径×5级：杀伐(攻/暴击/穿透)、守御(防/血/闪避/受击回血)、辅运(修炼/掉率/寿元/全属性)
+- 消耗修为解锁节点（500~25000递增），提供永久被动
+- 集成 `recalcStats`（atkPct/defPct/hpPct/critAdd/critDmgAdd/dodgeAdd/penAdd/allStat）
+- 集成 `gainCult`（cultPct）、`doBreakthroughSuccess`（bkLife）、`applyDamageToP`（onHitHeal）
+- 🌟星辰 按钮 + `openConstellation` 交互
+
+**秘境词缀扩展**
+- 新增4种词缀：毒雾(每层-5%血)、灵潮(修炼+50%/怪物防+30%)、暗域(暴击-10%但暴伤+50%)、圣光(每层+15%真元+5%闪避)
+- `DUNGEON_MODS` 从9种增至13种
+- 毒雾/圣光在 `dungeonNextFloor` 触发
+- 暗域/圣光闪避在 `attackerOf` 的crit/critDmg中生效
+
+---
+
 ## [v40] — 2026-05-12 · 天道试炼 + 气运转盘
 
 ### 动机

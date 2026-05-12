@@ -513,6 +513,7 @@
         <button id="btn-boss">👹 妖 王</button>
         <button id="btn-trial">⚡ 试 炼</button>
         <button id="btn-wheel">🎡 转 盘</button>
+        <button id="btn-constellation">🌟 星 辰</button>
       </div>
 
       <!-- 第 3 组：故事 / 工具 -->
@@ -3899,6 +3900,10 @@ const DUNGEON_MODS = [
   {nm:"荒芜",  desc:"无随机事件，但每层灵石 +50", apply:null, flag:"barren"},
   {nm:"轮回",  desc:"击杀怪物恢复 15% 气血",   apply:null, flag:"lifesteal"},
   {nm:"藏宝",  desc:"掉率 +80%，但怪物双倍血量", apply:(m)=>{m.mhp=Math.floor(m.mhp*2);m.hp=m.mhp}, flag:"treasure"},
+  {nm:"毒雾",  desc:"每层中毒损失5%气血",        apply:null, flag:"poison"},
+  {nm:"灵潮",  desc:"修炼速度+50%，怪物防御+30%", apply:(m)=>{m._defBuff=0.3}, flag:"spiritTide"},
+  {nm:"暗域",  desc:"暴击率-10%，但暴击伤害+50%", apply:null, flag:"darkZone"},
+  {nm:"圣光",  desc:"每层回复15%真元，闪避+5%",   apply:null, flag:"holyLight"},
 ];
 
 /* v12 · 仙榜 */
@@ -5279,6 +5284,7 @@ function newPlayer(name,rootName,elements){
     equipRunes: {},
     teachings: {},
     _bossCd: {},
+    constellation: {attack:0, defense:0, support:0},
   };
   recalcStats(p);
   // 初始化后按当前 maxHp/maxMp 满血满蓝
@@ -5476,6 +5482,19 @@ function recalcStats(p){
       if(rp.critAdd) d.crit += rp.critAdd;
       if(rp.allStat) for(const k of STAT_KEYS) eff[k] += rp.allStat;
     }
+  }
+
+  // v41: 星辰图谱加成
+  if(typeof getConstellationEffects === "function"){
+    const ce = getConstellationEffects();
+    if(ce.atkPct)    d.atk  = Math.floor(d.atk * (1 + ce.atkPct));
+    if(ce.defPct)    d.def  = Math.floor(d.def * (1 + ce.defPct));
+    if(ce.hpPct)     d.maxHp = Math.floor(d.maxHp * (1 + ce.hpPct));
+    if(ce.critAdd)   d.crit += ce.critAdd;
+    if(ce.critDmgAdd)d.critDmg += ce.critDmgAdd;
+    if(ce.dodgeAdd)  d.dodge += ce.dodgeAdd;
+    if(ce.penAdd)    d.pen += Math.floor(ce.penAdd * 100);
+    if(ce.allStat)   for(const k of STAT_KEYS) eff[k] += ce.allStat;
   }
 
   // 上下限保护
@@ -5696,7 +5715,8 @@ function gainCult(p,base,reason){
   const eaCult = typeof equipAffixBonus==="function" ? equipAffixBonus(p,"cult")*0.01 : 0;
   const rpCult = typeof getRealmPassives==="function" ? getRealmPassives(p.realmIdx).reduce((s,rp)=>s+(rp.cultPct||0),0) : 0;
   const leyCult = (p.leyline && LEYLINES.find(l=>l.id===p.leyline.id)?.daily?.cultPct) || 0;
-  const amt=Math.floor(base*rootMul(p)*TECHS[p.tech][0]*gearCultBonus(p)*buff.cultMul*bkMul*altMul*sectMul*weCultMul*tCultMul*(1+dScholar)*wrCultMul*caveMul*rsMul*(1+fpCult+eaCult+rpCult+leyCult));
+  const cstCult = typeof getConstellationEffects==="function" ? (getConstellationEffects().cultPct||0) : 0;
+  const amt=Math.floor(base*rootMul(p)*TECHS[p.tech][0]*gearCultBonus(p)*buff.cultMul*bkMul*altMul*sectMul*weCultMul*tCultMul*(1+dScholar)*wrCultMul*caveMul*rsMul*(1+fpCult+eaCult+rpCult+leyCult+cstCult));
   const prevCult = p.cult;
   p.cult+=amt;
   const tags = [];
@@ -6170,8 +6190,8 @@ function attackerOf(p, override){
   const desperateCritDmgAdd = desperate ? 0.8 : 0;
   return Object.assign({
     atk:Math.floor((d.atk+(p._dgAtkBuff||0)+(typeof friendPassive==="function"?friendPassive("atkAdd"):0))*buff.atkMul*desperateAtkMul*(1+(typeof disciplePassive==="function"?disciplePassive("fighter")*0.03:0))*(typeof getStance==="function"?getStance().atkMul:1)),
-    crit:Math.min(0.95, d.crit + (buff.critAdd||0) + desperateCritAdd),
-    critDmg:d.critDmg + desperateCritDmgAdd + (typeof teachingVal==="function"?teachingVal("critDmgAdd"):0),
+    crit:Math.min(0.95, d.crit + (buff.critAdd||0) + desperateCritAdd + (P.curDungeon?.mod?.flag==="darkZone"?-0.10:0) + (P.curDungeon?.mod?.flag==="holyLight"?0.05:0)),
+    critDmg:d.critDmg + desperateCritDmgAdd + (typeof teachingVal==="function"?teachingVal("critDmgAdd"):0) + (P.curDungeon?.mod?.flag==="darkZone"?0.50:0),
     hit:d.hit, pen:d.pen,
     attEl:d.attEl, lv:p.realmIdx,
     _desperate: desperate,  // 暴露给调用方做 log
@@ -6249,6 +6269,11 @@ function applyDamageToP(d, src){
       P.shield = (P.shield||0) + 0.15;
       log(`✴ 庇护符文！生成护盾（减伤15%）！`,"good");
     }
+  }
+  // v41 · 星辰受击回血
+  if(!d.isDodge && typeof getConstellationEffects==="function"){
+    const ohh = getConstellationEffects().onHitHeal||0;
+    if(ohh > 0){ const h=Math.max(1,Math.floor(P.maxHp*ohh)); P.hp=Math.min(P.maxHp,P.hp+h); }
   }
 }
 
@@ -7705,7 +7730,8 @@ function doBreakthroughSuccess(){
   // v8：突破满真元（爆发感）
   P.mp = P.maxMp;
   // v10：延寿减半，寿元更稀缺（原 30+idx*10，现 15+idx*5）
-  const lifeGain = 15 + P.realmIdx * 5 + (typeof teachingVal==="function"?teachingVal("bkLifeAdd"):0);
+  const cstBkLife = typeof getConstellationEffects==="function" ? (getConstellationEffects().bkLife||0) : 0;
+  const lifeGain = 15 + P.realmIdx * 5 + (typeof teachingVal==="function"?teachingVal("bkLifeAdd"):0) + cstBkLife;
   P.lifespan += lifeGain;
   P.dx = P.maxDx = 100 + P.realmIdx*10;
   // v8：突破余韵 — 30天内修为 ×1.5
@@ -9175,6 +9201,79 @@ function openWheel(){
   };
 }
 
+// v41 · 星辰图谱
+const CONSTELLATION = {
+  attack:[
+    {id:"a1",nm:"锐星",  desc:"攻击+5%",   cost:500,   effect:{atkPct:0.05}},
+    {id:"a2",nm:"破星",  desc:"暴击+3%",   cost:1500,  effect:{critAdd:0.03}},
+    {id:"a3",nm:"焰星",  desc:"暴击伤害+25%",cost:4000, effect:{critDmgAdd:0.25}},
+    {id:"a4",nm:"杀星",  desc:"攻击+10%",  cost:10000, effect:{atkPct:0.10}},
+    {id:"a5",nm:"灭星",  desc:"伤害穿透+8%",cost:25000, effect:{penAdd:0.08}},
+  ],
+  defense:[
+    {id:"d1",nm:"盾星",  desc:"防御+5%",    cost:500,   effect:{defPct:0.05}},
+    {id:"d2",nm:"厚星",  desc:"气血+8%",    cost:1500,  effect:{hpPct:0.08}},
+    {id:"d3",nm:"铁星",  desc:"闪避+3%",    cost:4000,  effect:{dodgeAdd:0.03}},
+    {id:"d4",nm:"磐星",  desc:"防御+10%",   cost:10000, effect:{defPct:0.10}},
+    {id:"d5",nm:"恒星",  desc:"受击回血2%", cost:25000, effect:{onHitHeal:0.02}},
+  ],
+  support:[
+    {id:"s1",nm:"慧星",  desc:"修炼+5%",    cost:500,   effect:{cultPct:0.05}},
+    {id:"s2",nm:"运星",  desc:"掉率+5%",    cost:1500,  effect:{lootPct:0.05}},
+    {id:"s3",nm:"寿星",  desc:"突破+30寿元", cost:4000,  effect:{bkLife:30}},
+    {id:"s4",nm:"福星",  desc:"修炼+10%",   cost:10000, effect:{cultPct:0.10}},
+    {id:"s5",nm:"道星",  desc:"全属性+5",   cost:25000, effect:{allStat:5}},
+  ],
+};
+function getConstellationEffects(){
+  if(!P||!P.constellation) return {};
+  const eff = {};
+  for(const [path, nodes] of Object.entries(CONSTELLATION)){
+    const lv = P.constellation[path] || 0;
+    for(let i=0;i<lv;i++){
+      for(const [k,v] of Object.entries(nodes[i].effect)){
+        eff[k] = (eff[k]||0) + v;
+      }
+    }
+  }
+  return eff;
+}
+function openConstellation(){
+  if(P.inBattle){ log("战斗中。","hint"); return; }
+  if(!P.constellation) P.constellation = {attack:0, defense:0, support:0};
+  const pathNames = {attack:"⚔ 杀伐之道", defense:"🛡 守御之道", support:"✦ 辅运之道"};
+  let html = `<h3>🌟 星 辰 图 谱</h3><p style="font-size:12px;color:#a89c7c">消耗修为点亮星辰，获永久被动。需按顺序解锁。</p>`;
+  for(const [path, nodes] of Object.entries(CONSTELLATION)){
+    const lv = P.constellation[path] || 0;
+    const nodeHtml = nodes.map((n,i)=>{
+      const lit = i < lv;
+      const next = i === lv;
+      const canBuy = next && P.cult >= n.cost;
+      const style = lit ? "color:#e8c56a" : next ? "color:#fff" : "color:#555";
+      return `<span style="${style};margin:0 4px">${lit?"★":"☆"} ${n.nm}(${n.desc})</span>` +
+        (next ? ` <button class="sm" data-cpath="${path}" ${canBuy?"":"disabled"}>${n.cost}修为</button>` : "");
+    }).join("");
+    html += `<div style="margin:8px 0"><b>${pathNames[path]}</b> Lv.${lv}/5<br>${nodeHtml}</div>`;
+  }
+  html += `<div class="btns"><button onclick="closeModal()">关 闭</button></div>`;
+  showModal(html);
+  document.querySelectorAll(".modal [data-cpath]").forEach(b=>{
+    b.onclick = ()=>{
+      const path = b.dataset.cpath;
+      const lv = P.constellation[path] || 0;
+      if(lv >= 5) return;
+      const node = CONSTELLATION[path][lv];
+      if(P.cult < node.cost){ log("修为不足。","hint"); return; }
+      P.cult -= node.cost;
+      P.constellation[path] = lv + 1;
+      log(`🌟 点亮【${node.nm}】！${node.desc}`,"epic");
+      recalcStats(P);
+      closeModal(); refresh(); saveGame(true);
+      openConstellation();
+    };
+  });
+}
+
 /* ==========================================================
  *   v15 · 心魔系统（深化版）
  * ========================================================== */
@@ -10126,6 +10225,17 @@ function dungeonNextFloor(){
   if(dgMod && dgMod.flag==="barren"){
     addItem(P,"灵石",50);
     log("荒芜之地，拾得散落灵石 ×50。","good");
+  }
+  // v41: 新词缀效果
+  if(dgMod && dgMod.flag==="poison"){
+    const d=Math.max(1,Math.floor(P.maxHp*0.05));
+    P.hp=Math.max(1,P.hp-d);
+    log(`☠ 毒雾弥漫，你受到 ${d} 毒伤。`,"bad");
+  }
+  if(dgMod && dgMod.flag==="holyLight"){
+    const m=Math.floor(P.maxMp*0.15);
+    P.mp=Math.min(P.maxMp,P.mp+m);
+    log(`✦ 圣光洗礼，真元恢复 ${m}。`,"good");
   }
   // v18: 互动层间事件（非首层、非Boss层，且本层未处理过）
   if(dg.floor > 1 && dg.floor < dg.def.floors && !dg._choiceDone){
@@ -11987,6 +12097,7 @@ function loadGame(){
     if(!d.equipRunes) d.equipRunes = {};
     if(!d._bossCd) d._bossCd = {};
     if(!d.teachings) d.teachings = {};
+    if(!d.constellation) d.constellation = {attack:0, defense:0, support:0};
     // v4 寿元迁移：移除强制拉满逻辑（避免覆盖新机制），仅做异常兜底
     if(d.lifespan===undefined || d.lifespan<=0){
       d.lifespan = 80 + (d.realmIdx||0)*30;
@@ -12240,6 +12351,7 @@ if($("btn-divine")) $("btn-divine").onclick = ()=>{ if(typeof openDivine==="func
 if($("btn-boss")) $("btn-boss").onclick = ()=>{ if(typeof openBossChallenge==="function") openBossChallenge(); };
 if($("btn-trial")) $("btn-trial").onclick = ()=>{ if(typeof openTrial==="function") openTrial(); };
 if($("btn-wheel")) $("btn-wheel").onclick = ()=>{ if(typeof openWheel==="function") openWheel(); };
+if($("btn-constellation")) $("btn-constellation").onclick = ()=>{ if(typeof openConstellation==="function") openConstellation(); };
 $("btn-calendar").onclick= openCalendar;
 // v5：夙愿入口（按钮 + 状态行）
 $("btn-quest").onclick   = openQuestPanel;
