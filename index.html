@@ -4661,6 +4661,180 @@ const FORTUNE_ENCOUNTERS = [
    }},
 ];
 
+// v32 · 江湖事件链
+const ADVENTURE_CHAINS = [
+  {id:"bandit", nm:"劫道山匪", minRealm:0, steps:[
+    {text:"山路遇一伙山匪拦路，为首之人面相凶恶。", choices:[
+      {nm:"硬闯",test:p=>p.realmIdx>=2, win:"你一剑劈出，匪徒四散。",lose:"匪徒人多势众，你受了些伤。",
+       winR:{stone:30,cult:100}, loseR:{hpPct:-0.2}},
+      {nm:"交买路钱",cost:{stone:20}, text:"你掏出灵石，匪首满意放行。"},
+      {nm:"绕路",text:"你绕了一大圈避开匪窝。",R:{dayAdd:2}},
+    ]},
+    {text:"山匪的据点被你发现了——", choices:[
+      {nm:"突袭据点",test:p=>p.realmIdx>=3, win:"你杀入匪窝，缴获大量物资！",lose:"匪窝暗器机关重重，你仓皇退去。",
+       winR:{stone:80,items:{"金创药":3}}, loseR:{hpPct:-0.15}},
+      {nm:"通报官府",text:"你记下位置，向附近城镇通报。",R:{karma:5,stone:20}},
+    ]},
+    {text:"山匪头子竟是一名落魄修士——", choices:[
+      {nm:"收服",test:p=>p.realmIdx>=4, win:"他感你实力惊人，俯首称臣。指引你一处藏宝。",
+       winR:{items:{"凝神丹":2,"灵石":100}}, lose:"他拼死一搏后逃了。"},
+      {nm:"放走",text:"你叹息一声，任他离去。修仙路上各有苦衷。",R:{karma:10,dx:10}},
+    ]},
+  ]},
+  {id:"ghost", nm:"古墓幽魂", minRealm:3, steps:[
+    {text:"夜宿荒庙，半夜鬼火闪烁，一缕幽魂现身。", choices:[
+      {nm:"对话",text:"幽魂诉说身世——她生前是一名丹师，死后执念未消。",R:{wu:1}},
+      {nm:"驱散",test:p=>p.realmIdx>=5, win:"你以法力驱散怨灵，获得其遗留灵物。",
+       winR:{items:{"破障丹":1}}, lose:"怨灵反噬！你道心受损。",loseR:{dx:-15}},
+    ]},
+    {text:"幽魂指引你进入古墓深处——", choices:[
+      {nm:"深入",test:p=>p.realmIdx>=4, win:"墓室中藏有一具丹炉和数枚古丹！",
+       winR:{items:{"筑基丹":1,"凝神丹":3},cult:300}, lose:"墓中阵法触发，你被弹出。",loseR:{hpPct:-0.1}},
+      {nm:"仅取外间",text:"你只取了墓门旁的灵石，不敢深入。",R:{stone:50}},
+    ]},
+    {text:"古墓深处——你看到一座丹师的灵位。", choices:[
+      {nm:"叩拜",text:"你诚心叩拜。幽魂感动，传授你一段炼丹口诀。",R:{wu:2,dao:1}},
+      {nm:"取走丹炉",text:"你带走丹炉。有用，但总觉得心里不太安稳。",R:{items:{"悟道茶":2},karma:-5}},
+    ]},
+  ]},
+  {id:"merchant", nm:"神秘商队", minRealm:2, steps:[
+    {text:"路遇一支商队，为首的商人笑容可掬地邀你同行。", choices:[
+      {nm:"同行",text:"一路上商人与你畅谈各地风土人情。",R:{stone:15,wu:1}},
+      {nm:"婉拒",text:"你独自上路，不久却在前方发现商队遗落的包裹。",R:{items:{"聚气丹":2}}},
+    ]},
+    {text:"商队遭遇妖兽袭击！", choices:[
+      {nm:"出手相助",test:p=>p.realmIdx>=3, win:"你击退妖兽，商人感激不尽！",
+       winR:{stone:100,karma:10}, lose:"妖兽太强，你护住商人但自己受了伤。",loseR:{hpPct:-0.2,karma:5}},
+      {nm:"趁乱离开",text:"你悄悄离开，不愿蹚这趟浑水。",R:{karma:-3}},
+    ]},
+    {text:"商人取出一件珍藏之物——", choices:[
+      {nm:"购买(200灵石)",cost:{stone:200}, text:"你花重金购得一件上品宝物！",R:{items:{"蟠桃":1}}},
+      {nm:"以物易物",cost:{items:{"破障花":3}}, text:"商人对你的灵草很感兴趣，以宝换草。",R:{items:{"万年灵芝精":1}}},
+      {nm:"谢绝",text:"你微微摇头。商人也不勉强。"},
+    ]},
+  ]},
+  {id:"trial", nm:"仙家试炼", minRealm:5, steps:[
+    {text:"天空裂开一道金光，一方古老石碑从云中降落。上书：「仙家试炼，敢有入者？」", choices:[
+      {nm:"踏入",text:"你毫不犹豫地踏入金光之中。",R:{dx:5}},
+      {nm:"观望",text:"你在旁观望——石碑渐渐消散。你拾到碑下一枚灵石。",R:{stone:30}},
+    ]},
+    {text:"第一关——心境试炼。你面前出现种种幻象。", choices:[
+      {nm:"斩断心魔",test:p=>(p.dx||100)>=60, win:"道心坚定，幻象碎裂！",
+       winR:{dx:20,cult:500}, lose:"心魔侵蚀，你跌坐在地。",loseR:{dx:-30}},
+      {nm:"闭目不看",text:"你闭目静心，幻象自行消散。虽未得大机缘，也未失道心。",R:{dx:5}},
+    ]},
+    {text:"第二关——力量试炼。一尊石像缓缓活化！", choices:[
+      {nm:"全力出击",test:p=>p.atk>=100, win:"你一击碎石！试炼通过！仙音阵阵，天降奖励！",
+       winR:{ti:3,ling:3,shen:2,items:{"天劫真血":1},cult:1000}, lose:"石像太硬，你力竭而退。",loseR:{hpPct:-0.3}},
+      {nm:"以巧胜力",test:p=>p.realmIdx>=8, win:"你找到石像的弱点，精准一击！",
+       winR:{wu:3,dao:2,cult:800}, lose:"石像没有弱点可言……",loseR:{hpPct:-0.15}},
+    ]},
+  ]},
+  {id:"beast", nm:"灵兽求救", minRealm:4, steps:[
+    {text:"林中传来幼兽的哀鸣，一只受伤的白狐倒在树下。", choices:[
+      {nm:"救治",cost:{items:{"金创药":1}}, text:"你用金创药为白狐疗伤，它感激地蹭了蹭你。",R:{karma:8}},
+      {nm:"不管",text:"修仙之路，各安天命。你转身离去。"},
+    ]},
+    {text:"白狐引你来到一处密林深处——", choices:[
+      {nm:"跟随",text:"白狐带你穿过一片迷雾。前方豁然开朗！",R:{cult:200}},
+      {nm:"止步",text:"你不再深入，白狐失望地叫了两声。"},
+    ]},
+    {text:"密林尽头是一株散发灵光的古树，树下堆满灵草。", choices:[
+      {nm:"采集灵草",text:"你采集了一批珍稀灵草！白狐在旁高兴地绕圈。",
+       R:{items:{"千年灵芝":2,"破障花":3,"凝血花":3},karma:5}},
+      {nm:"坐树下修炼",text:"你在古树下入定，灵气充沛无比！",
+       R:{cult:800,dx:10}},
+    ]},
+  ]},
+];
+
+function tryAdventureChain(){
+  if(P._advChain) return;
+  if(Math.random() > 0.05) return;
+  const pool = ADVENTURE_CHAINS.filter(c=>P.realmIdx>=c.minRealm);
+  if(!pool.length) return;
+  const chain = choice(pool);
+  P._advChain = {id:chain.id, step:0};
+  processAdventureChainStep();
+}
+
+function processAdventureChainStep(){
+  const chain = ADVENTURE_CHAINS.find(c=>c.id===P._advChain?.id);
+  if(!chain) { P._advChain=null; return; }
+  const stepIdx = P._advChain.step;
+  if(stepIdx >= chain.steps.length){ P._advChain=null; return; }
+  const step = chain.steps[stepIdx];
+  const btns = step.choices.map((ch,ci)=>{
+    let costText = "";
+    if(ch.cost){
+      if(ch.cost.stone) costText = `(${ch.cost.stone}灵石)`;
+      if(ch.cost.items) costText = `(${Object.entries(ch.cost.items).map(([k,v])=>`${k}×${v}`).join(",")})`;
+    }
+    return `<button class="j" data-achain="${ci}">${ch.nm}${costText}</button>`;
+  }).join("");
+  showModal(`<h3>🌀 ${chain.nm}</h3><p style="font-size:12px;color:#e8e3d3;line-height:1.6">${step.text}</p>
+    <div class="btns" style="flex-wrap:wrap">${btns}</div>`);
+  document.querySelectorAll(".modal [data-achain]").forEach(b=>{
+    b.onclick = ()=>{
+      const ci = +b.dataset.achain;
+      const ch = step.choices[ci];
+      closeModal();
+      applyAdventureChoice(chain, ch);
+    };
+  });
+}
+
+function applyAdventureChoice(chain, ch){
+  if(ch.cost){
+    if(ch.cost.stone && (P.bag["灵石"]||0)<ch.cost.stone){ log("灵石不足。","bad"); P._advChain=null; return; }
+    if(ch.cost.items){
+      for(const [k,v] of Object.entries(ch.cost.items)){
+        if((P.bag[k]||0)<v){ log(`${k}不足。`,"bad"); P._advChain=null; return; }
+      }
+      for(const [k,v] of Object.entries(ch.cost.items)) addItem(P,k,-v);
+    }
+    if(ch.cost.stone) addItem(P,"灵石",-ch.cost.stone);
+  }
+  if(ch.test){
+    const pass = ch.test(P);
+    if(pass){
+      if(ch.win) log(`✦ ${ch.win}`,"good");
+      if(ch.winR) applyChainReward(ch.winR);
+    }else{
+      if(ch.lose) log(`✗ ${ch.lose}`,"bad");
+      if(ch.loseR) applyChainReward(ch.loseR);
+    }
+  }else{
+    if(ch.text) log(`✦ ${ch.text}`,"sys");
+    if(ch.R) applyChainReward(ch.R);
+  }
+  P._advChain.step++;
+  if(P._advChain.step < chain.steps.length){
+    setTimeout(()=>processAdventureChainStep(), 100);
+  }else{
+    log(`—— 「${chain.nm}」事件结束 ——`,"hint");
+    addChronicle(`经历「${chain.nm}」事件。`);
+    P._advChain = null;
+    refresh(); saveGame(true);
+  }
+}
+
+function applyChainReward(r){
+  if(r.stone) addItem(P,"灵石",r.stone);
+  if(r.cult) gainCult(P,r.cult,"事件奖励");
+  if(r.items) for(const [k,v] of Object.entries(r.items)) addItem(P,k,v);
+  if(r.karma) { P.karma = Math.max(-100,Math.min(100,(P.karma||0)+r.karma)); log(`业力 ${r.karma>0?"+":""}${r.karma}`,"hint"); }
+  if(r.dx) { P.dx = Math.max(0,Math.min(P.maxDx||100,(P.dx||100)+r.dx)); }
+  if(r.hpPct) { const dmg = Math.floor(Math.abs(r.hpPct)*P.maxHp); P.hp = Math.max(1,P.hp-dmg); log(`受伤 -${dmg} 气血`,"bad"); }
+  if(r.dayAdd) passDays(P,r.dayAdd);
+  if(r.ti) { P.ti=(P.ti||0)+r.ti; log(`体魄 +${r.ti}（永久）`,"good"); }
+  if(r.ling) { P.ling=(P.ling||0)+r.ling; log(`灵力 +${r.ling}（永久）`,"good"); }
+  if(r.wu) { P.wu=(P.wu||0)+r.wu; log(`悟性 +${r.wu}（永久）`,"good"); }
+  if(r.shen) { P.shen=(P.shen||0)+r.shen; log(`神识 +${r.shen}（永久）`,"good"); }
+  if(r.dao) { P.dao=(P.dao||0)+r.dao; log(`道行 +${r.dao}（永久）`,"good"); }
+  if(r.ti||r.ling||r.wu||r.shen||r.dao) recalcStats(P);
+}
+
 // v16 · 悬赏令模板
 const BOUNTY_TEMPLATES = [
   {type:"kill",  desc:p=>`击杀 ${3+p.realmIdx} 只妖兽`,  target:p=>3+p.realmIdx,
@@ -6889,6 +7063,7 @@ function actAdventure(){
   // v16：机缘触发（独立于其他事件）
   if(typeof tryFortuneEncounter === "function") tryFortuneEncounter();
   if(typeof tryMeetWanderingNPC === "function") tryMeetWanderingNPC();
+  if(typeof tryAdventureChain === "function") tryAdventureChain();
   if(Math.random()<0.55){
     // 过滤可触发的奇遇（满足 cond）
     const pool = ADVS.filter(e=>!e.cond || e.cond(P));
@@ -7790,6 +7965,43 @@ function openSalvagePanel(){
     b.onclick = ()=>{ closeModal(); salvageEquip(b.dataset.salv); openSalvagePanel(); };
   });
   $("salv-close").onclick = closeModal;
+}
+
+// v32 · 装备重铸
+function openReforge(nm){
+  const info = EQUIPS[nm]; if(!info) return;
+  const curAff = getEquipAffix(nm);
+  const cost = info.tier * 100;
+  const matCost = Math.max(1, Math.floor(info.tier / 2));
+  const curDesc = curAff ? `当前词缀：<span style="color:${curAff.color||'#e8c547'}">「${curAff.nm}」${EQUIP_AFFIXES.find(a=>a.id===curAff.id)?.desc||""}${curAff.val}</span>` : "当前无词缀";
+  showModal(`<h3>🔄 装 备 重 铸</h3>
+    <div class="box left" style="padding:8px">
+      <div style="font-size:14px;color:#d4b46a">【${nm}】</div>
+      <div style="font-size:12px;margin:4px 0">${curDesc}</div>
+      <div style="font-size:12px;color:#a89c7c;margin-top:6px">重铸将随机${curAff?"替换":"附加"}词缀</div>
+      <div style="font-size:12px">消耗：<b style="color:#d4b46a">${cost} 灵石</b> + <b style="color:#7fc7a3">强化石 ×${matCost}</b></div>
+      <div style="font-size:11px;color:#666;margin-top:2px">持有灵石 ${P.bag["灵石"]||0}，强化石 ${P.bag["强化石"]||0}</div>
+    </div>
+    <div class="btns">
+      <button id="rf-go" class="primary" ${(P.bag["灵石"]||0)>=cost&&(P.bag["强化石"]||0)>=matCost?"":"disabled"}>🔄 重铸</button>
+      <button id="rf-close">取消</button>
+    </div>`);
+  $("rf-go").onclick = ()=>{
+    if((P.bag["灵石"]||0)<cost||(P.bag["强化石"]||0)<matCost){ log("材料不足。","hint"); return; }
+    addItem(P,"灵石",-cost);
+    addItem(P,"强化石",-matCost);
+    closeModal();
+    const affix = EQUIP_AFFIXES[Math.floor(Math.random()*EQUIP_AFFIXES.length)];
+    const valIdx = Math.min(affix.val.length-1, info.tier-1);
+    const newAff = {id:affix.id, nm:affix.nm, stat:affix.stat, val:affix.val[valIdx], color:affix.color};
+    if(!P.equipAffixes) P.equipAffixes = {};
+    P.equipAffixes[nm] = newAff;
+    log(`🔄 重铸【${nm}】→ 词缀「${newAff.nm}」${EQUIP_AFFIXES.find(a=>a.id===newAff.id)?.desc||""}${newAff.val}！`,"epic");
+    SFX.hit();
+    recalcStats(P);
+    refresh(); saveGame(true);
+  };
+  $("rf-close").onclick = closeModal;
 }
 
 /* —— 本命法宝：祭炼（消耗 5000 灵石 + 一枚） —— */
@@ -9997,9 +10209,10 @@ function refresh(){
         const _aff = typeof getEquipAffix==="function" ? getEquipAffix(nm) : null;
         const _affTxt = _aff ? ` <span style="color:${_aff.color||'#e8c547'}">「${_aff.nm}」</span>` : "";
         showModal(`<h3>🔧 装 备 操 作</h3><p>【${nm}】${eLv>0?" +"+eLv:""}${_affTxt}</p>
-          <div class="btns"><button id="eq-off">卸 下</button><button id="eq-enh" class="primary">⚒ 强 化</button><button id="eq-x">取 消</button></div>`);
+          <div class="btns"><button id="eq-off">卸 下</button><button id="eq-enh" class="primary">⚒ 强 化</button><button id="eq-reforge">🔄 重铸</button><button id="eq-x">取 消</button></div>`);
         $("eq-off").onclick=()=>{closeModal();unequipSlot(key);};
         $("eq-enh").onclick=()=>{closeModal();openEnhance(key);};
+        $("eq-reforge").onclick=()=>{closeModal();openReforge(nm);};
         $("eq-x").onclick=closeModal;
       };
     }else{
