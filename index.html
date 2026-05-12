@@ -522,6 +522,8 @@
         <button id="btn-insights">💡 心 法</button>
         <button id="btn-forbidden">⛧ 禁 术</button>
         <button id="btn-rumors">📜 传 闻</button>
+        <button id="btn-petexp">🐾 远 征</button>
+        <button id="btn-spar">⚔ 切 磋</button>
       </div>
 
       <!-- 第 3 组：故事 / 工具 -->
@@ -4420,6 +4422,119 @@ function openRumors(){
       closeModal(); openRumors();
     };
   }
+}
+
+// v46 · 灵兽远征 — 派遣灵宠外出探索获取资源
+const PET_EXPEDITIONS = [
+  {id:"herb_valley", nm:"百草谷", desc:"采集灵草", duration:30, minPetLv:1,
+   loot:()=>{const herbs=["聚灵草","凝血花","破障花"]; return [{nm:choice(herbs),n:rand(1,3)},{nm:"灵石",n:rand(20,60)}]; }},
+  {id:"stone_mine", nm:"灵石矿脉", desc:"开采灵石", duration:20, minPetLv:1,
+   loot:()=>[{nm:"灵石",n:rand(50,150)},{nm:"强化石",n:Math.random()<0.3?1:0}]},
+  {id:"monster_lair", nm:"妖兽巢穴", desc:"猎杀妖兽", duration:45, minPetLv:5,
+   loot:()=>{const r=[{nm:"灵石",n:rand(80,200)}]; if(Math.random()<0.2) r.push({nm:choice(["金创药","聚气丹","凝神丹"]),n:rand(1,2)}); return r;}},
+  {id:"ancient_ruin", nm:"上古遗迹", desc:"探索遗迹", duration:60, minPetLv:10,
+   loot:()=>{const r=[{nm:"灵石",n:rand(150,400)}]; if(Math.random()<0.15) r.push({nm:"强化石",n:rand(1,3)}); if(Math.random()<0.1) r.push({nm:"悟道茶",n:1}); return r;}},
+];
+function openPetExpedition(){
+  const pet = typeof activePet==="function" ? activePet() : null;
+  if(!pet){ showModal(`<h3>🐾 灵兽远征</h3><p>需先拥有灵宠。</p><div class="btns"><button onclick="closeModal()">关闭</button></div>`); return; }
+  if(P._petExpedition && P._petExpedition.endDay > (P.days||0)){
+    const remain = P._petExpedition.endDay - (P.days||0);
+    showModal(`<h3>🐾 灵兽远征</h3><p>${pet.name} 正在【${P._petExpedition.nm}】远征中……</p><p style="color:#a89c7c">剩余 ${remain} 日</p><div class="btns"><button onclick="closeModal()">关闭</button></div>`);
+    return;
+  }
+  if(P._petExpedition && P._petExpedition.endDay <= (P.days||0)){
+    const exp = P._petExpedition;
+    const tmpl = PET_EXPEDITIONS.find(e=>e.id===exp.id);
+    const loot = tmpl ? tmpl.loot() : [{nm:"灵石",n:30}];
+    let msg = `${pet.name} 从【${exp.nm}】归来！<br>`;
+    for(const item of loot){
+      if(item.n>0){ addItem(P,item.nm,item.n); msg += `${item.nm}×${item.n} `; }
+    }
+    if(typeof gainPetExp==="function") gainPetExp(pet, 10+Math.floor(Math.random()*20));
+    P._petExpedition = null;
+    log(`🐾 ${pet.name}远征归来！`,"good");
+    showModal(`<h3>🐾 远征归来</h3><p>${msg}</p><div class="btns"><button onclick="closeModal()">收取</button></div>`);
+    return;
+  }
+  const rows = PET_EXPEDITIONS.filter(e=>pet.lv>=e.minPetLv).map(e=>{
+    return `<div class="shop-row">
+      <div><div class="nm">${e.nm}</div><div class="ds">${e.desc}（${e.duration}日）</div></div>
+      <button class="sm" data-exp="${e.id}">派 遣</button>
+    </div>`;
+  }).join("");
+  const locked = PET_EXPEDITIONS.filter(e=>pet.lv<e.minPetLv).map(e=>{
+    return `<div class="shop-row" style="opacity:0.4"><div><div class="nm">🔒 ${e.nm}</div><div class="ds">灵宠${e.minPetLv}级解锁</div></div></div>`;
+  }).join("");
+  showModal(`<h3>🐾 灵兽远征</h3>
+    <p style="font-size:12px;color:#a89c7c">派遣${pet.name}（Lv.${pet.lv}）外出探索，归来时带回战利品。</p>
+    <div class="box left" style="padding:0;border:none;background:none">${rows}${locked}</div>
+    <div class="btns"><button onclick="closeModal()">取 消</button></div>`);
+  document.querySelectorAll(".modal [data-exp]").forEach(b=>{
+    b.onclick = ()=>{
+      const tmpl = PET_EXPEDITIONS.find(e=>e.id===b.dataset.exp);
+      if(!tmpl) return;
+      P._petExpedition = {id:tmpl.id, nm:tmpl.nm, endDay:(P.days||0)+tmpl.duration};
+      closeModal();
+      log(`🐾 ${pet.name}出发前往【${tmpl.nm}】，预计${tmpl.duration}日后归来。`,"good");
+      addChronicle(`派遣${pet.name}远征${tmpl.nm}。`);
+      saveGame(true);
+    };
+  });
+}
+
+// v46 · 道友切磋 — 与仙友系统的NPC切磋获取经验
+function openSpar(){
+  if(P.inBattle){ log("战斗中。","hint"); return; }
+  if(!P.friends || !Object.keys(P.friends).length){
+    showModal(`<h3>⚔ 道友切磋</h3><p>尚无结识的仙友。历练时有机会遇见。</p><div class="btns"><button onclick="closeModal()">关闭</button></div>`);
+    return;
+  }
+  if(P._sparCd && P._sparCd > (P.days||0)){
+    const remain = P._sparCd - (P.days||0);
+    showModal(`<h3>⚔ 道友切磋</h3><p>切磋需恢复，剩余 ${remain} 日。</p><div class="btns"><button onclick="closeModal()">关闭</button></div>`);
+    return;
+  }
+  const npcs = (typeof WANDERING_NPCS!=="undefined") ? WANDERING_NPCS : [];
+  const rows = Object.entries(P.friends).map(([npcId, data])=>{
+    const npc = npcs.find(n=>n.id===npcId);
+    if(!npc) return "";
+    const fond = data.fond||0;
+    return `<div class="shop-row">
+      <div><div class="nm">${npc.nm}</div><div class="ds">好感${fond} · ${npc.desc}</div></div>
+      <button class="sm" data-spar="${npcId}">切 磋</button>
+    </div>`;
+  }).join("");
+  showModal(`<h3>⚔ 道友切磋</h3>
+    <p style="font-size:12px;color:#a89c7c">与道友切磋武艺，胜负皆有收获。冷却15日。</p>
+    <div class="box left" style="padding:0;border:none;background:none">${rows}</div>
+    <div class="btns"><button onclick="closeModal()">取 消</button></div>`);
+  document.querySelectorAll(".modal [data-spar]").forEach(b=>{
+    b.onclick = ()=>{
+      const npcId = b.dataset.spar;
+      const npc = npcs.find(n=>n.id===npcId);
+      if(!npc) return;
+      closeModal();
+      const fond = P.friends[npcId]?.fond || 0;
+      const npcPower = P.atk * (0.6 + Math.random()*0.8);
+      const myPower = P.atk * (0.8 + Math.random()*0.4);
+      const win = myPower > npcPower;
+      P._sparCd = (P.days||0) + 15;
+      passDays(P,2);
+      if(win){
+        const cultReward = 50 + P.realmIdx * 30;
+        gainCult(P, cultReward, "切磋");
+        log(`⚔ 切磋胜！${npc.nm}拱手认输。修为 +${cultReward}`,"good");
+        if(fond<100){ P.friends[npcId].fond = Math.min(100, fond+3); }
+      } else {
+        const dxReward = 3 + Math.floor(P.realmIdx/3);
+        P.dx = Math.min(P.maxDx, P.dx + dxReward);
+        log(`⚔ 切磋负。${npc.nm}指点你的不足之处。道心 +${dxReward}`,"sys");
+        if(fond<100){ P.friends[npcId].fond = Math.min(100, fond+5); }
+      }
+      afterAction();
+    };
+  });
 }
 
 // v24 · 天道法则 — 每一世随机抽取的全局修饰规则
@@ -12932,6 +13047,8 @@ if($("btn-codex")) $("btn-codex").onclick = ()=>{ if(typeof openCodex==="functio
 if($("btn-insights")) $("btn-insights").onclick = ()=>{ if(typeof openInsights==="function") openInsights(); };
 if($("btn-forbidden")) $("btn-forbidden").onclick = ()=>{ if(typeof openForbiddenArts==="function") openForbiddenArts(); };
 if($("btn-rumors")) $("btn-rumors").onclick = ()=>{ if(typeof openRumors==="function") openRumors(); };
+if($("btn-petexp")) $("btn-petexp").onclick = ()=>{ if(typeof openPetExpedition==="function") openPetExpedition(); };
+if($("btn-spar")) $("btn-spar").onclick = ()=>{ if(typeof openSpar==="function") openSpar(); };
 $("btn-calendar").onclick= openCalendar;
 // v5：夙愿入口（按钮 + 状态行）
 $("btn-quest").onclick   = openQuestPanel;

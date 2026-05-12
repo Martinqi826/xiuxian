@@ -3,7 +3,7 @@
 ## 项目概述
 
 单文件浏览器修仙挂机游戏。**零依赖**（纯 HTML+CSS+JS），双击 `index.html` 即玩。
-当前 ~14069 行，所有逻辑在一个 `<script>` 块内。存档用 localStorage。
+当前 ~14186 行，所有逻辑在一个 `<script>` 块内。存档用 localStorage。
 
 ## 技术架构
 
@@ -116,6 +116,7 @@ L8950-9900   DEV面板 + 帮助弹窗
 | `COMBAT_INSIGHTS` | 6 种战斗心法领悟（击杀解锁） |
 | `FORBIDDEN_ARTS` | 5 种禁术（高代价主动技） |
 | `RUMOR_TEMPLATES` | 4 种江湖传闻任务模板 |
+| `PET_EXPEDITIONS` | 4 种灵兽远征目的地 |
 
 ### P 对象关键字段
 
