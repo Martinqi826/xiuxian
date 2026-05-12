@@ -507,6 +507,7 @@
         <button id="btn-friends">🤝 仙 友</button>
         <button id="btn-leyline">🌀 灵 脉</button>
         <button id="btn-prayer">🌌 祈 愿</button>
+        <button id="btn-craft">⚒ 炼 器</button>
       </div>
 
       <!-- 第 3 组：故事 / 工具 -->
@@ -3777,6 +3778,17 @@ const ACHIEVEMENTS = [
   {id:"combo_10",    nm:"连击无双", desc:"单场战斗达成 10 连击",      reward:"灵石×300",  check:p=>p.flags?._ach_combo10},
   {id:"lifespan_500",nm:"长生久视", desc:"寿元超过 500 年",           reward:"蟠桃×1",    check:p=>(p.lifespan||0)>=500},
   {id:"bestiary_all",nm:"万兽通览", desc:"图鉴收录全部 15 种妖兽",    reward:"混沌蛋×1",  check:p=>MONSTERS.every(m=>(p.petDex||{})[m[0]]>0)},
+  // v36 · 新系统成就
+  {id:"cave_lv3",    nm:"洞天福地", desc:"洞府任一设施达 3 级",        reward:"灵石×500",  check:p=>p.cave&&Object.values(p.cave).some(v=>v>=3)},
+  {id:"friend_3",    nm:"广结善缘", desc:"结交 3 位挚友",              reward:"悟道茶×2",  check:p=>p.friends&&Object.values(p.friends).filter(f=>f.fond>=60).length>=3},
+  {id:"affix_3",     nm:"词缀收藏", desc:"装备栏有 3 件带词缀的装备",   reward:"强化石×5",  check:p=>{if(!p.equipAffixes)return false;let c=0;for(const s of["weapon","armor","accessory","mount"])if(p.equips[s]&&p.equipAffixes[p.equips[s]])c++;return c>=3;}},
+  {id:"leyline",     nm:"灵脉之主", desc:"占据灵脉超过 100 天",        reward:"灵石×1000", check:p=>p.leyline&&((p.days||0)-p.leyline.claimDay)>=100},
+  {id:"destiny_3",   nm:"天命所归", desc:"完成 3 个天命目标",           reward:"蟠桃×2",    check:p=>(p.destiny||[]).filter(d=>d.done).length>=3},
+  {id:"reborn_3",    nm:"轮回不息", desc:"累计 3 次轮回",              reward:"灵石×2000", check:p=>{try{const L=JSON.parse(localStorage.getItem("xiuxian_lineage")||"{}");return(L.runs||0)>=3;}catch(e){return false;}}},
+  {id:"tourney_win", nm:"大比魁首", desc:"宗门大比全胜",               reward:"灵石×1500", check:p=>p.flags?._ach_tourneyPerfect},
+  {id:"skill_up",    nm:"神通大成", desc:"进阶一个神通",               reward:"灵石×800",  check:p=>p.skillUse&&Object.keys(SKILL_UPGRADES).some(k=>(p.skillUse[k]||0)>=SKILL_UPGRADES[k].need)},
+  {id:"treasure_all",nm:"寻宝达人", desc:"完成所有 4 种藏宝图",        reward:"万年灵芝精×1",check:p=>p.flags?._treasure_copper&&p.flags?._treasure_silver&&p.flags?._treasure_gold&&p.flags?._treasure_jade},
+  {id:"meditation",  nm:"禅定入微", desc:"触发 10 次入定冥想",          reward:"悟道茶×3",  check:p=>(p.stats?.meditation||0)>=10},
 ];
 
 /* v22 · 天赋系统 — 累计里程碑解锁永久被动 */
@@ -4433,6 +4445,8 @@ function startTreasureHunt(mapId){
 function treasureStep(tm, idx){
   if(idx >= tm.steps.length){
     log("✦ 宝藏探索完毕！满载而归。","epic");
+    if(!P.flags) P.flags={};
+    P.flags["_treasure_"+tm.id] = true;
     SFX.milestone();
     passDays(P, 2);
     afterAction();
@@ -6821,6 +6835,7 @@ const MEDITATIONS = [
 ];
 
 function triggerMeditation(){
+  P.stats = P.stats||{}; P.stats.meditation = (P.stats.meditation||0)+1;
   const med = MEDITATIONS[Math.floor(Math.random()*MEDITATIONS.length)];
   const btns = med.choices.map((ch,ci)=>`<button class="j" data-med="${ci}">${ch.nm}</button>`).join("");
   showModal(`<h3>🧘 入 定 · ${med.nm}</h3>
@@ -8210,6 +8225,72 @@ function openReforge(nm){
   $("rf-close").onclick = closeModal;
 }
 
+// v36 · 炼器系统
+const CRAFT_RECIPES = [
+  {result:"玄铁剑",     cost:{stone:200,  shard:3},  minRealm:2},
+  {result:"赤炎刀",     cost:{stone:600,  shard:6},  minRealm:5},
+  {result:"碧水寒枪",   cost:{stone:1500, shard:10}, minRealm:9},
+  {result:"噬魂幡",     cost:{stone:3000, shard:15}, minRealm:12},
+  {result:"乌金甲",     cost:{stone:800,  shard:5},  minRealm:4},
+  {result:"冰蚕丝袍",   cost:{stone:1800, shard:12}, minRealm:9},
+  {result:"星辰锁子甲", cost:{stone:4000, shard:20}, minRealm:13},
+  {result:"聚灵玉佩",   cost:{stone:500,  shard:4},  minRealm:3},
+  {result:"夺魄铃",     cost:{stone:1200, shard:8},  minRealm:7},
+  {result:"血玉扳指",   cost:{stone:2500, shard:14}, minRealm:10},
+  {result:"踏云靴",     cost:{stone:400,  shard:3},  minRealm:2},
+  {result:"金翅大鹏",   cost:{stone:2000, shard:12}, minRealm:8},
+];
+
+function openCraftPanel(){
+  if(P.inBattle){ log("战斗中不可。","hint"); return; }
+  const recipes = CRAFT_RECIPES.filter(r=>P.realmIdx>=r.minRealm);
+  if(!recipes.length){
+    showModal(`<h3>⚒ 炼 器</h3><p style="color:#a89c7c">境界不足，无可炼制之物。</p>
+      <div class="btns"><button onclick="closeModal()">关 闭</button></div>`);
+    return;
+  }
+  const rows = recipes.map((r,i)=>{
+    const info = EQUIPS[r.result];
+    const canCraft = (P.bag["灵石"]||0)>=r.cost.stone && (P.bag["强化石"]||0)>=r.cost.shard;
+    return `<div class="shop-row">
+      <div><div class="nm">${r.result}</div><div class="ds">${info?info.desc:""}</div></div>
+      <div style="font-size:11px;white-space:nowrap">${r.cost.stone}石 + ${r.cost.shard}强化石</div>
+      <button class="sm" data-craft="${i}" ${canCraft?"":"disabled"}>炼制</button>
+    </div>`;
+  }).join("");
+  showModal(`<h3>⚒ 炼 器</h3>
+    <p style="font-size:11px;color:#a89c7c">持有灵石 ${P.bag["灵石"]||0} · 强化石 ${P.bag["强化石"]||0}</p>
+    <div style="max-height:50vh;overflow-y:auto">${rows}</div>
+    <div class="btns"><button id="craft-close">关 闭</button></div>`);
+  document.querySelectorAll(".modal [data-craft]").forEach(b=>{
+    b.onclick = ()=>{
+      const r = recipes[+b.dataset.craft];
+      if((P.bag["灵石"]||0)<r.cost.stone||(P.bag["强化石"]||0)<r.cost.shard) return;
+      addItem(P,"灵石",-r.cost.stone);
+      addItem(P,"强化石",-r.cost.shard);
+      addItem(P, r.result, 1);
+      // 25% chance to get affix
+      if(typeof rollEquipAffix === "function"){
+        const aff = rollEquipAffix(EQUIPS[r.result]?.tier||1);
+        if(aff){
+          if(!P.equipAffixes) P.equipAffixes = {};
+          P.equipAffixes[r.result] = aff;
+          log(`⚒ 炼制【${r.result}】成功！附带词缀「${aff.nm}」！`,"epic");
+        }else{
+          log(`⚒ 炼制【${r.result}】成功！`,"good");
+        }
+      }else{
+        log(`⚒ 炼制【${r.result}】成功！`,"good");
+      }
+      SFX.hit();
+      P.stats = P.stats||{}; P.stats.craft = (P.stats.craft||0)+1;
+      closeModal(); openCraftPanel();
+      refresh(); saveGame(true);
+    };
+  });
+  $("craft-close").onclick = closeModal;
+}
+
 /* —— 本命法宝：祭炼（消耗 5000 灵石 + 一枚） —— */
 function refineRelic(name){
   if(!RELICS[name]){log("非法宝。","hint");return}
@@ -9137,6 +9218,7 @@ function openSectTourney(){
     if(r.items) for(const [k,v] of Object.entries(r.items)) addItem(P,k,v);
     if(!P.sectTourney) P.sectTourney = {};
     P.sectTourney.lastDay = P.days;
+    if(w===3){ if(!P.flags) P.flags={}; P.flags._ach_tourneyPerfect=true; }
     const titleText = r.title ? `\n✦✦ 获封【${r.title}】！` : "";
     log(`🏆 宗门大比结束！${w}/3 胜 · 贡献+${r.contrib}，灵石+${r.stone}${titleText}`,"epic");
     addChronicle(`参加宗门大比，${w}胜${3-w}负。${r.title||""}`);
@@ -11603,6 +11685,7 @@ if($("btn-reincshop")) $("btn-reincshop").onclick = openReincarnationShop;
 if($("btn-friends")) $("btn-friends").onclick = openFriendsPanel;
 if($("btn-leyline")) $("btn-leyline").onclick = ()=>{ if(typeof openLeylinePanel==="function") openLeylinePanel(); };
 if($("btn-prayer")) $("btn-prayer").onclick = ()=>{ if(typeof openWeatherPrayer==="function") openWeatherPrayer(); };
+if($("btn-craft")) $("btn-craft").onclick = ()=>{ if(typeof openCraftPanel==="function") openCraftPanel(); };
 $("btn-calendar").onclick= openCalendar;
 // v5：夙愿入口（按钮 + 状态行）
 $("btn-quest").onclick   = openQuestPanel;
