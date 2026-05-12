@@ -3,7 +3,7 @@
 ## 项目概述
 
 单文件浏览器修仙挂机游戏。**零依赖**（纯 HTML+CSS+JS），双击 `index.html` 即玩。
-当前 ~13104 行，所有逻辑在一个 `<script>` 块内。存档用 localStorage。
+当前 ~13234 行，所有逻辑在一个 `<script>` 块内。存档用 localStorage。
 
 ## 技术架构
 
@@ -105,6 +105,7 @@ L8950-9900   DEV面板 + 帮助弹窗
 | `BATTLE_STANCES` | 3 种战斗姿态（攻防切换） |
 | `DIVINATIONS` | 4 种天机推演（占卜预知） |
 | `EQUIP_RUNES` | 6 种装备符文（战斗特效） |
+| `WORLD_BOSSES` | 5 种域外妖王（Boss挑战） |
 
 ### P 对象关键字段
 

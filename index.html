@@ -510,6 +510,7 @@
         <button id="btn-craft">⚒ 炼 器</button>
         <button id="btn-engrave">✴ 铭 刻</button>
         <button id="btn-divine">🔮 推 演</button>
+        <button id="btn-boss">👹 妖 王</button>
       </div>
 
       <!-- 第 3 组：故事 / 工具 -->
@@ -2719,6 +2720,7 @@ function checkPetEvolve(pet){
 /* —— 灵宠喂经验 —— */
 function gainPetExp(pet, exp){
   if(!pet) return;
+  if(typeof teachingVal==="function") exp = Math.floor(exp * (1 + teachingVal("petExpMul")));
   pet.exp += exp;
   const cap = petLvCap();
   while(pet.exp >= petExpToNext(pet.lv) && pet.lv < cap){
@@ -4228,17 +4230,23 @@ function triggerEnlightenChoice(p){
 // v30 · 仙友系统
 const WANDERING_NPCS = [
   {id:"herbalist", nm:"采药老翁",  desc:"深山隐居的炼丹散修", minRealm:0,
-   gift:"聚气丹", bonus:{alchemyAdd:0.02}, bonusDesc:"炼丹成功率+2%"},
+   gift:"聚气丹", bonus:{alchemyAdd:0.02}, bonusDesc:"炼丹成功率+2%",
+   teach:{nm:"百草辨识", desc:"炼丹爆炉率-50%", cost:300, stat:"alchSafe"}},
   {id:"swordsman", nm:"游侠剑客", desc:"四方云游的剑道修士", minRealm:2,
-   gift:"金创药",  bonus:{atkAdd:5},       bonusDesc:"攻击+5"},
+   gift:"金创药",  bonus:{atkAdd:5},       bonusDesc:"攻击+5",
+   teach:{nm:"剑心通明", desc:"暴击伤害+20%", cost:400, stat:"critDmgAdd", val:0.2}},
   {id:"merchant",  nm:"行商散人", desc:"坊市间辗转的灵石商", minRealm:3,
-   gift:"灵石",    bonus:{stoneMul:0.05},  bonusDesc:"灵石掉率+5%"},
+   gift:"灵石",    bonus:{stoneMul:0.05},  bonusDesc:"灵石掉率+5%",
+   teach:{nm:"商道心经", desc:"坊市购物9折", cost:500, stat:"shopDiscount"}},
   {id:"scholar",   nm:"书痴道人", desc:"痴迷经卷的老学究",   minRealm:5,
-   gift:"悟道茶",  bonus:{cultAdd:0.03},   bonusDesc:"修炼速度+3%"},
+   gift:"悟道茶",  bonus:{cultAdd:0.03},   bonusDesc:"修炼速度+3%",
+   teach:{nm:"博闻强识", desc:"闭关事件中获益翻倍", cost:600, stat:"cultEventBonus"}},
   {id:"beast",     nm:"驭兽仙姑", desc:"与灵兽相伴的女修",   minRealm:8,
-   gift:"凝血花",  bonus:{petAtkMul:0.1},  bonusDesc:"灵宠攻击+10%"},
+   gift:"凝血花",  bonus:{petAtkMul:0.1},  bonusDesc:"灵宠攻击+10%",
+   teach:{nm:"万兽真言", desc:"灵宠经验+30%", cost:800, stat:"petExpMul", val:0.3}},
   {id:"elder",     nm:"太虚老人", desc:"不知几千岁的神秘高人",minRealm:12,
-   gift:"破障丹",  bonus:{defAdd:8,lifeAdd:20}, bonusDesc:"防御+8，寿元+20"},
+   gift:"破障丹",  bonus:{defAdd:8,lifeAdd:20}, bonusDesc:"防御+8，寿元+20",
+   teach:{nm:"寿无极", desc:"每次突破+50寿元", cost:1500, stat:"bkLifeAdd", val:50}},
 ];
 
 function tryMeetWanderingNPC(){
@@ -4280,19 +4288,50 @@ function friendPassive(key){
 
 function openFriendsPanel(){
   if(!P.friends || !Object.keys(P.friends).length){ log("尚未结识仙友。","hint"); return; }
+  if(!P.teachings) P.teachings = {};
   const rows = WANDERING_NPCS.map(npc=>{
     const f = P.friends[npc.id];
     if(!f) return "";
     const isFriend = f.fond >= 60;
+    const canTeach = f.fond >= 80 && npc.teach && !P.teachings[npc.id];
+    const taught = P.teachings[npc.id];
+    let teachHtml = "";
+    if(taught) teachHtml = `<span style="color:#e8c56a;font-size:11px"> · 已传授「${npc.teach.nm}」</span>`;
+    else if(canTeach) teachHtml = `<button class="sm" data-teach="${npc.id}" style="margin-left:8px" ${(P.bag["灵石"]||0)>=npc.teach.cost?"":"disabled"}>传功(${npc.teach.cost}石)</button>`;
     return `<div class="shop-row">
       <div><div class="nm">${npc.nm} <span style="color:${isFriend?"#7fc7a3":"#888"};font-size:11px">${isFriend?"挚友":"相识"} (${f.fond}/100)</span></div>
-      <div class="ds">${npc.desc}${isFriend?` · ${npc.bonusDesc}`:""}</div></div>
-      <div class="pr">遇${f.met}次</div>
+      <div class="ds">${npc.desc}${isFriend?` · ${npc.bonusDesc}`:""}</div>
+      ${npc.teach?`<div class="ds" style="font-size:11px;color:#c0a8d4">传功（好感≥80）：「${npc.teach.nm}」${npc.teach.desc}</div>`:""}</div>
+      <div class="pr">遇${f.met}次${teachHtml}</div>
     </div>`;
   }).filter(Boolean).join("");
   showModal(`<h3>🤝 仙 友</h3><div style="text-align:left">${rows}</div>
     <div class="btns"><button id="fr-close">关闭</button></div>`);
+  document.querySelectorAll(".modal [data-teach]").forEach(b=>{
+    b.onclick = ()=>{
+      const npc = WANDERING_NPCS.find(n=>n.id===b.dataset.teach);
+      if(!npc||!npc.teach) return;
+      if((P.bag["灵石"]||0)<npc.teach.cost){ log("灵石不足。","hint"); return; }
+      addItem(P,"灵石",-npc.teach.cost);
+      if(!P.teachings) P.teachings = {};
+      P.teachings[npc.id] = true;
+      log(`✦✦ 【${npc.nm}】传功授业：「${npc.teach.nm}」— ${npc.teach.desc}！`,"epic");
+      addChronicle(`得【${npc.nm}】传授「${npc.teach.nm}」。`);
+      closeModal(); refresh(); saveGame(true);
+    };
+  });
   $("fr-close").onclick = closeModal;
+}
+function hasTeaching(stat){
+  if(!P||!P.teachings) return false;
+  return WANDERING_NPCS.some(n=>n.teach&&n.teach.stat===stat&&P.teachings[n.id]);
+}
+function teachingVal(stat){
+  if(!P||!P.teachings) return 0;
+  for(const n of WANDERING_NPCS){
+    if(n.teach&&n.teach.stat===stat&&P.teachings[n.id]) return n.teach.val||0;
+  }
+  return 0;
 }
 
 // v30 · 装备词缀系统
@@ -5236,6 +5275,8 @@ function newPlayer(name,rootName,elements){
     skillUse: {},
     rareRecipes: [],
     equipRunes: {},
+    teachings: {},
+    _bossCd: {},
   };
   recalcStats(p);
   // 初始化后按当前 maxHp/maxMp 满血满蓝
@@ -6128,7 +6169,7 @@ function attackerOf(p, override){
   return Object.assign({
     atk:Math.floor((d.atk+(p._dgAtkBuff||0)+(typeof friendPassive==="function"?friendPassive("atkAdd"):0))*buff.atkMul*desperateAtkMul*(1+(typeof disciplePassive==="function"?disciplePassive("fighter")*0.03:0))*(typeof getStance==="function"?getStance().atkMul:1)),
     crit:Math.min(0.95, d.crit + (buff.critAdd||0) + desperateCritAdd),
-    critDmg:d.critDmg + desperateCritDmgAdd,
+    critDmg:d.critDmg + desperateCritDmgAdd + (typeof teachingVal==="function"?teachingVal("critDmgAdd"):0),
     hit:d.hit, pen:d.pen,
     attEl:d.attEl, lv:p.realmIdx,
     _desperate: desperate,  // 暴露给调用方做 log
@@ -7662,7 +7703,7 @@ function doBreakthroughSuccess(){
   // v8：突破满真元（爆发感）
   P.mp = P.maxMp;
   // v10：延寿减半，寿元更稀缺（原 30+idx*10，现 15+idx*5）
-  const lifeGain = 15 + P.realmIdx * 5;
+  const lifeGain = 15 + P.realmIdx * 5 + (typeof teachingVal==="function"?teachingVal("bkLifeAdd"):0);
   P.lifespan += lifeGain;
   P.dx = P.maxDx = 100 + P.realmIdx*10;
   // v8：突破余韵 — 30天内修为 ×1.5
@@ -8511,7 +8552,7 @@ function alchemyMake(name){
         P.alchemyLv++;
         log(`※ 炼丹等级提升至 Lv.${P.alchemyLv}！`,"good");
       }
-    } else if(roll < rate+0.1){
+    } else if(roll < rate + (typeof hasTeaching==="function"&&hasTeaching("alchSafe")?0.15:0.1)){
       log("丹药成色不佳，化作一滩污浊……","hint");
     } else {
       // 爆炉
@@ -10101,6 +10142,86 @@ function setScene(title, sub, cls){
 }
 
 /* ============ 战斗 ============ */
+// v39 · 域外妖王
+const WORLD_BOSSES = [
+  {id:"wolf_king",  nm:"千年狼王",  lvl:4,  hp:3000,  atk:80,   ele:"木", cr:200,  sr:100,
+   abil:{id:"howl", nm:"群狼嗥叫", regenPct:0.04}, minRealm:3, reward:{items:{"凝神丹":3},stone:200}},
+  {id:"spider_q",   nm:"蛛后幽罗",  lvl:7,  hp:8000,  atk:200,  ele:"土", cr:500,  sr:300,
+   abil:{id:"web",  nm:"毒丝缠绕", dmgReduce:0.12}, minRealm:6, reward:{items:{"筑基丹":2,"蟠桃":1},stone:500}},
+  {id:"flame_demon",nm:"炎魔赤焱",  lvl:10, hp:20000, atk:450,  ele:"火", cr:1200, sr:600,
+   abil:{id:"rage", nm:"焚天烈焰", rageThreshold:0.4,rageMul:2.5}, minRealm:9, reward:{items:{"破障丹":2},stone:1000,stat:{ti:2}}},
+  {id:"ice_wyrm",   nm:"玄冰蛟龙",  lvl:13, hp:50000, atk:800,  ele:"水", cr:3000, sr:1500,
+   abil:{id:"freeze",nm:"绝对零度", dmgReduce:0.20}, minRealm:12, reward:{items:{"万年灵芝精":1,"天劫真血":1},stone:2000,stat:{shen:3}}},
+  {id:"void_lord",  nm:"虚空界主",  lvl:17, hp:120000,atk:1800, ele:null, cr:8000, sr:5000,
+   abil:{id:"phase",nm:"虚空湮灭", dodgePct:0.25, reflectPct:0.15}, minRealm:16, reward:{items:{"不老仙丹":1},stone:5000,stat:{dao:5}}},
+];
+function openBossChallenge(){
+  if(P.inBattle){ log("战斗中无法挑战。","hint"); return; }
+  const avail = WORLD_BOSSES.filter(b=>P.realmIdx>=b.minRealm);
+  if(!avail.length){ showModal(`<h3>👹 域 外 妖 王</h3><p>境界尚浅，尚无可挑战的妖王。</p><div class="btns"><button onclick="closeModal()">退</button></div>`); return; }
+  const cd = P._bossCd || {};
+  const rows = avail.map(b=>{
+    const cost = Math.floor(100 + b.lvl * 50);
+    const cdLeft = cd[b.id] ? Math.max(0, cd[b.id] - (P.days||0)) : 0;
+    const canDo = (P.bag["灵石"]||0)>=cost && cdLeft<=0;
+    const rewardTxt = [];
+    if(b.reward.stone) rewardTxt.push(`灵石×${b.reward.stone}`);
+    if(b.reward.items) rewardTxt.push(...Object.entries(b.reward.items).map(([k,v])=>`${k}×${v}`));
+    if(b.reward.stat) rewardTxt.push(...Object.entries(b.reward.stat).map(([k,v])=>`永久${k}+${v}`));
+    return `<div class="shop-row">
+      <div><div class="nm" style="color:#ff7755">👹 ${b.nm}</div><div class="ds">Lv.${b.lvl} HP:${b.hp} ATK:${b.atk} ${b.ele?`属${b.ele}`:""} · 【${b.abil.nm}】</div>
+        <div class="ds" style="color:#e8c56a">奖励：${rewardTxt.join("、")}</div></div>
+      <div class="pr">${cdLeft>0?`冷却${cdLeft}天`:`${cost}灵石`}</div>
+      <button class="sm" data-boss="${b.id}" ${canDo?"":"disabled"}>挑战</button>
+    </div>`;
+  }).join("");
+  showModal(`<h3>👹 域 外 妖 王</h3>
+    <p style="font-size:12px;color:#a89c7c">消耗灵石挑战妖王。胜利获丰厚奖励，失败有30天冷却。</p>
+    <div class="box left" style="padding:0;border:none;background:none">${rows}</div>
+    <div class="btns"><button onclick="closeModal()">关 闭</button></div>`);
+  document.querySelectorAll(".modal [data-boss]").forEach(btn=>{
+    btn.onclick = ()=>{
+      const b = WORLD_BOSSES.find(x=>x.id===btn.dataset.boss);
+      if(!b) return;
+      const cost = Math.floor(100 + b.lvl * 50);
+      if((P.bag["灵石"]||0)<cost){ log("灵石不足。","hint"); return; }
+      addItem(P,"灵石",-cost);
+      closeModal();
+      log(`👹 你踏入域外战场，挑战【${b.nm}】！`,"epic");
+      SFX.rumble();
+      const gap = Math.max(0, P.realmIdx - b.lvl);
+      let hp = b.hp, atk = b.atk;
+      if(gap>0){ hp=Math.floor(hp*Math.pow(1.25,gap)); atk=Math.floor(atk*Math.pow(1.18,gap)); }
+      const m = [b.nm, b.lvl, hp, atk, b.cr, b.sr, b.ele];
+      m.isBoss = true;
+      m._bossReward = b.reward;
+      m._bossId = b.id;
+      startBattle(m);
+      if(P.monster){
+        P.monster._bossAbil = b.abil;
+        P.monster._worldBoss = true;
+      }
+    };
+  });
+}
+// v39 · Boss战胜利奖励
+function applyBossReward(m){
+  if(!m._bossReward) return;
+  const r = m._bossReward;
+  if(r.stone) addItem(P,"灵石",r.stone);
+  if(r.items) for(const [k,v] of Object.entries(r.items)) addItem(P,k,v);
+  if(r.stat){
+    for(const [k,v] of Object.entries(r.stat)){
+      P[k] = (P[k]||0) + v;
+      log(`✦ 永久属性提升：${k} +${v}！`,"epic");
+    }
+    recalcStats(P);
+  }
+  if(!P._bossCd) P._bossCd = {};
+  P._bossCd[m._bossId] = (P.days||0) + 30;
+  addChronicle(`击败域外妖王【${m.name}】。`);
+}
+
 // v37 · 战斗姿态
 const BATTLE_STANCES = [
   {id:"balanced", nm:"中庸",  icon:"⚖", atkMul:1.0,  defMul:1.0,  desc:"攻防均衡"},
@@ -10329,6 +10450,7 @@ function endBattle(win){
   bindMainButtons();
   if(win){
     log(`※ 你击败了「${m.name}」！`,"good");
+    if(m._worldBoss && typeof applyBossReward==="function") applyBossReward(m);
     const wrCrMul = typeof worldRuleMul==="function" ? worldRuleMul("crMul") : 1;
     const dgFrenzyMul = (fromDg && P.curDungeon?.mod?.flag==="frenzy") ? 1.6 : 1;
     gainCult(P,Math.floor(m.cr * wrCrMul * dgFrenzyMul),"斩妖");
@@ -10477,6 +10599,11 @@ function endBattle(win){
   }else{
     // 秘境失败：退出
     if(fromDg){ P.curDungeon = null; delete P._dgAtkBuff; }
+    if(m && m._worldBoss && m._bossId){
+      if(!P._bossCd) P._bossCd = {};
+      P._bossCd[m._bossId] = (P.days||0) + 30;
+      log("👹 妖王击退了你……30天后方可再战。","bad");
+    }
   }
   afterAction();
 }
@@ -11717,6 +11844,8 @@ function loadGame(){
     if(!d.skillUse) d.skillUse = {};
     if(!d.rareRecipes) d.rareRecipes = [];
     if(!d.equipRunes) d.equipRunes = {};
+    if(!d._bossCd) d._bossCd = {};
+    if(!d.teachings) d.teachings = {};
     // v4 寿元迁移：移除强制拉满逻辑（避免覆盖新机制），仅做异常兜底
     if(d.lifespan===undefined || d.lifespan<=0){
       d.lifespan = 80 + (d.realmIdx||0)*30;
@@ -11967,6 +12096,7 @@ if($("btn-prayer")) $("btn-prayer").onclick = ()=>{ if(typeof openWeatherPrayer=
 if($("btn-craft")) $("btn-craft").onclick = ()=>{ if(typeof openCraftPanel==="function") openCraftPanel(); };
 if($("btn-engrave")) $("btn-engrave").onclick = ()=>{ if(typeof openEngrave==="function") openEngrave(); };
 if($("btn-divine")) $("btn-divine").onclick = ()=>{ if(typeof openDivine==="function") openDivine(); };
+if($("btn-boss")) $("btn-boss").onclick = ()=>{ if(typeof openBossChallenge==="function") openBossChallenge(); };
 $("btn-calendar").onclick= openCalendar;
 // v5：夙愿入口（按钮 + 状态行）
 $("btn-quest").onclick   = openQuestPanel;
