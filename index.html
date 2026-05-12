@@ -514,6 +514,7 @@
         <button id="btn-trial">⚡ 试 炼</button>
         <button id="btn-wheel">🎡 转 盘</button>
         <button id="btn-constellation">🌟 星 辰</button>
+        <button id="btn-faction">🏴 势 力</button>
       </div>
 
       <!-- 第 3 组：故事 / 工具 -->
@@ -5285,6 +5286,9 @@ function newPlayer(name,rootName,elements){
     teachings: {},
     _bossCd: {},
     constellation: {attack:0, defense:0, support:0},
+    weaponKills: {},
+    equipSpirits: {},
+    factionRep: {},
   };
   recalcStats(p);
   // 初始化后按当前 maxHp/maxMp 满血满蓝
@@ -5495,6 +5499,23 @@ function recalcStats(p){
     if(ce.dodgeAdd)  d.dodge += ce.dodgeAdd;
     if(ce.penAdd)    d.pen += Math.floor(ce.penAdd * 100);
     if(ce.allStat)   for(const k of STAT_KEYS) eff[k] += ce.allStat;
+  }
+
+  // v42: 势力加成
+  if(typeof getFactionBonuses === "function"){
+    const fb = getFactionBonuses();
+    if(fb.atkPct)  d.atk = Math.floor(d.atk * (1 + fb.atkPct));
+    if(fb.defAdd)  d.def += fb.defAdd;
+    if(fb.critAdd) d.crit += fb.critAdd;
+    if(fb.allStat) for(const k of STAT_KEYS) eff[k] += fb.allStat;
+  }
+
+  // v42: 器灵加成
+  if(typeof getSpiritBonus === "function"){
+    const sb2 = getSpiritBonus();
+    if(sb2.atkPct)     d.atk = Math.floor(d.atk * (1 + sb2.atkPct));
+    if(sb2.critAdd)    d.crit += sb2.critAdd;
+    if(sb2.critDmgAdd) d.critDmg += sb2.critDmgAdd;
   }
 
   // 上下限保护
@@ -5716,7 +5737,8 @@ function gainCult(p,base,reason){
   const rpCult = typeof getRealmPassives==="function" ? getRealmPassives(p.realmIdx).reduce((s,rp)=>s+(rp.cultPct||0),0) : 0;
   const leyCult = (p.leyline && LEYLINES.find(l=>l.id===p.leyline.id)?.daily?.cultPct) || 0;
   const cstCult = typeof getConstellationEffects==="function" ? (getConstellationEffects().cultPct||0) : 0;
-  const amt=Math.floor(base*rootMul(p)*TECHS[p.tech][0]*gearCultBonus(p)*buff.cultMul*bkMul*altMul*sectMul*weCultMul*tCultMul*(1+dScholar)*wrCultMul*caveMul*rsMul*(1+fpCult+eaCult+rpCult+leyCult+cstCult));
+  const facCult = typeof getFactionBonuses==="function" ? (getFactionBonuses().cultPct||0) : 0;
+  const amt=Math.floor(base*rootMul(p)*TECHS[p.tech][0]*gearCultBonus(p)*buff.cultMul*bkMul*altMul*sectMul*weCultMul*tCultMul*(1+dScholar)*wrCultMul*caveMul*rsMul*(1+fpCult+eaCult+rpCult+leyCult+cstCult+facCult));
   const prevCult = p.cult;
   p.cult+=amt;
   const tags = [];
@@ -7488,6 +7510,7 @@ function actAdventure(){
   if(typeof tryAdventureChain === "function") tryAdventureChain();
   if(typeof tryDiscoverLeyline === "function") tryDiscoverLeyline();
   if(typeof tryDiscoverRecipe === "function") tryDiscoverRecipe();
+  if(typeof gainFactionRep === "function") gainFactionRep("rogue",1);
   if(Math.random()<0.55){
     // 过滤可触发的奇遇（满足 cond）
     const pool = ADVS.filter(e=>!e.cond || e.cond(P));
@@ -7736,6 +7759,7 @@ function doBreakthroughSuccess(){
   P.dx = P.maxDx = 100 + P.realmIdx*10;
   // v8：突破余韵 — 30天内修为 ×1.5
   P.flags._bkBuff = (P.days||0) + 30;
+  if(typeof gainFactionRep==="function"){ gainFactionRep("orthodox",5); }
   // v8：修为冲刺 — 获得下阶门槛5%作为起手势
   const nextTh = (P.realmIdx < REALMS.length - 1) ? REALMS[P.realmIdx + 1][1] : 0;
   const headStart = Math.floor(nextTh * 0.05);
@@ -10211,6 +10235,7 @@ function dungeonNextFloor(){
     P.curDungeon = null;
     delete P._dgAtkBuff;
     log(`✦ 秘境【${dg.def.n}】通关！`,"epic");
+    if(typeof gainFactionRep==="function") gainFactionRep("ancient",10);
     addChronicle(`通关秘境【${dg.def.n}】${dg.def.floors} 层。`);
     refresh();saveGame(true);
     return;
@@ -10381,6 +10406,122 @@ function applyBossReward(m){
   if(!P._bossCd) P._bossCd = {};
   P._bossCd[m._bossId] = (P.days||0) + 30;
   addChronicle(`击败域外妖王【${m.name}】。`);
+  if(typeof gainFactionRep==="function"){ gainFactionRep("ancient",15); gainFactionRep("demon",5); }
+}
+
+// v42 · 江湖势力
+const FACTIONS = [
+  {id:"orthodox",nm:"正道盟",  desc:"正道联盟，行侠仗义",  color:"#7ab0d4",
+   ranks:[{rep:0,nm:"路人"},{rep:50,nm:"友善"},{rep:150,nm:"敬仰"},{rep:300,nm:"至交"}],
+   bonus:{cultPct:0.05, defAdd:5}, bonusDesc:"修炼+5%，防御+5"},
+  {id:"demon",   nm:"魔道宗",  desc:"魔道中人，嗜杀成性",  color:"#d96a6a",
+   ranks:[{rep:0,nm:"无名"},{rep:50,nm:"凶煞"},{rep:150,nm:"魔尊"},{rep:300,nm:"天魔"}],
+   bonus:{atkPct:0.08, critAdd:0.02}, bonusDesc:"攻击+8%，暴击+2%"},
+  {id:"rogue",   nm:"散修盟",  desc:"逍遥散修，自在无拘",  color:"#e8c56a",
+   ranks:[{rep:0,nm:"散人"},{rep:50,nm:"豪侠"},{rep:150,nm:"宗师"},{rep:300,nm:"盟主"}],
+   bonus:{stoneMul:0.10, lootPct:0.05}, bonusDesc:"灵石+10%，掉率+5%"},
+  {id:"ancient", nm:"上古遗族",desc:"远古血脉传承者",       color:"#c0a8d4",
+   ranks:[{rep:0,nm:"外人"},{rep:80,nm:"族友"},{rep:200,nm:"长老"},{rep:400,nm:"族长"}],
+   bonus:{allStat:3, lifeAdd:50}, bonusDesc:"全属性+3，寿元+50"},
+];
+function getFactionRank(fid){
+  if(!P||!P.factionRep) return 0;
+  const rep = P.factionRep[fid] || 0;
+  const f = FACTIONS.find(x=>x.id===fid);
+  if(!f) return 0;
+  let rank = 0;
+  for(let i=0;i<f.ranks.length;i++) if(rep >= f.ranks[i].rep) rank = i;
+  return rank;
+}
+function getFactionBonuses(){
+  if(!P||!P.factionRep) return {};
+  const eff = {};
+  for(const f of FACTIONS){
+    if(getFactionRank(f.id) >= 2){
+      for(const [k,v] of Object.entries(f.bonus)){
+        eff[k] = (eff[k]||0) + v;
+      }
+    }
+  }
+  return eff;
+}
+function gainFactionRep(fid, amt){
+  if(!P.factionRep) P.factionRep = {};
+  const before = getFactionRank(fid);
+  P.factionRep[fid] = (P.factionRep[fid]||0) + amt;
+  const after = getFactionRank(fid);
+  const f = FACTIONS.find(x=>x.id===fid);
+  if(after > before && f){
+    log(`✦ ${f.nm}声望提升：「${f.ranks[after].nm}」！`,"epic");
+    if(after >= 2){ log(`解锁被动：${f.bonusDesc}`,"good"); recalcStats(P); }
+    if(f.bonus.lifeAdd && after === 2){ P.lifespan += f.bonus.lifeAdd; }
+  }
+}
+function openFactionPanel(){
+  if(!P.factionRep) P.factionRep = {};
+  const rows = FACTIONS.map(f=>{
+    const rep = P.factionRep[f.id] || 0;
+    const rank = getFactionRank(f.id);
+    const rnm = f.ranks[rank].nm;
+    const next = f.ranks[rank+1];
+    const prog = next ? `(${rep}/${next.rep})` : "(满)";
+    const active = rank >= 2;
+    return `<div class="shop-row">
+      <div><div class="nm" style="color:${f.color}">${f.nm}</div>
+      <div class="ds">${f.desc} · ${rnm} ${prog}</div>
+      ${active?`<div class="ds" style="color:#e8c56a">被动：${f.bonusDesc}</div>`:""}</div>
+      <div class="pr" style="color:${f.color}">${rnm}</div>
+    </div>`;
+  }).join("");
+  showModal(`<h3>🏴 江 湖 势 力</h3>
+    <p style="font-size:12px;color:#a89c7c">通过修行积累声望，达到第3阶解锁被动加成。</p>
+    <div class="box left" style="padding:0;border:none;background:none">${rows}</div>
+    <div class="btns"><button onclick="closeModal()">关 闭</button></div>`);
+}
+
+// v42 · 器灵觉醒
+const SPIRIT_STAGES = [
+  {kills:30,  nm:"初醒", atkPct:0.05, desc:"攻击+5%",    dialogue:["……我……在哪……？","你的剑意唤醒了我。"]},
+  {kills:80,  nm:"通灵", atkPct:0.10, critAdd:0.03, desc:"攻击+10%暴击+3%", dialogue:["我能感受到你的杀意。","让我们一起变强。"]},
+  {kills:200, nm:"化灵", atkPct:0.15, critAdd:0.05, critDmgAdd:0.3, desc:"攻击+15%暴击+5%暴伤+30%", dialogue:["你我已合为一体。","天地间，唯有斩杀。"]},
+];
+const SPIRIT_NAMES = ["清风","玄铁子","碧落","赤霄","寒霜","紫电","龙吟","凤鸣","天罡","星辰"];
+function checkSpiritAwaken(){
+  if(!P.equips.weapon) return;
+  const wn = P.equips.weapon;
+  if(!P.weaponKills) P.weaponKills = {};
+  P.weaponKills[wn] = (P.weaponKills[wn]||0) + 1;
+  if(!P.equipSpirits) P.equipSpirits = {};
+  const sp = P.equipSpirits[wn] || {stage:0, name:null};
+  const nextStage = SPIRIT_STAGES[sp.stage];
+  if(!nextStage) return;
+  if(P.weaponKills[wn] >= nextStage.kills){
+    sp.stage++;
+    if(!sp.name) sp.name = choice(SPIRIT_NAMES);
+    P.equipSpirits[wn] = sp;
+    const stageInfo = SPIRIT_STAGES[sp.stage-1];
+    log(`✦✦ 器灵觉醒！【${wn}】中的「${sp.name}」${stageInfo.nm}！`,"epic");
+    log(`「${sp.name}」：${choice(stageInfo.dialogue)}`,"sys");
+    log(`器灵加成：${stageInfo.desc}`,"good");
+    SFX.chime();
+    addChronicle(`【${wn}】器灵「${sp.name}」${stageInfo.nm}觉醒。`);
+    recalcStats(P);
+  }
+}
+function getSpiritBonus(){
+  if(!P||!P.equipSpirits||!P.equips.weapon) return {};
+  const sp = P.equipSpirits[P.equips.weapon];
+  if(!sp || sp.stage <= 0) return {};
+  const eff = {};
+  for(let i=0;i<sp.stage;i++){
+    const s = SPIRIT_STAGES[i];
+    if(s.atkPct) eff.atkPct = (eff.atkPct||0) + s.atkPct;
+    if(s.critAdd) eff.critAdd = (eff.critAdd||0) + s.critAdd;
+    if(s.critDmgAdd) eff.critDmgAdd = (eff.critDmgAdd||0) + s.critDmgAdd;
+  }
+  eff.name = sp.name;
+  eff.stage = sp.stage;
+  return eff;
 }
 
 // v40 · 天道试炼
@@ -10798,6 +10939,8 @@ function endBattle(win){
       }
     }
     P.stats.kill++;
+    if(typeof checkSpiritAwaken==="function") checkSpiritAwaken();
+    if(typeof gainFactionRep==="function"){ gainFactionRep("demon",1); gainFactionRep("rogue",1); }
     // v16: 悬赏令进度
     if(typeof bountyAdvance === "function") bountyAdvance("kill");
     if(typeof dailyAdvance === "function") dailyAdvance("kill");
@@ -12098,6 +12241,9 @@ function loadGame(){
     if(!d._bossCd) d._bossCd = {};
     if(!d.teachings) d.teachings = {};
     if(!d.constellation) d.constellation = {attack:0, defense:0, support:0};
+    if(!d.weaponKills) d.weaponKills = {};
+    if(!d.equipSpirits) d.equipSpirits = {};
+    if(!d.factionRep) d.factionRep = {};
     // v4 寿元迁移：移除强制拉满逻辑（避免覆盖新机制），仅做异常兜底
     if(d.lifespan===undefined || d.lifespan<=0){
       d.lifespan = 80 + (d.realmIdx||0)*30;
@@ -12352,6 +12498,7 @@ if($("btn-boss")) $("btn-boss").onclick = ()=>{ if(typeof openBossChallenge==="f
 if($("btn-trial")) $("btn-trial").onclick = ()=>{ if(typeof openTrial==="function") openTrial(); };
 if($("btn-wheel")) $("btn-wheel").onclick = ()=>{ if(typeof openWheel==="function") openWheel(); };
 if($("btn-constellation")) $("btn-constellation").onclick = ()=>{ if(typeof openConstellation==="function") openConstellation(); };
+if($("btn-faction")) $("btn-faction").onclick = ()=>{ if(typeof openFactionPanel==="function") openFactionPanel(); };
 $("btn-calendar").onclick= openCalendar;
 // v5：夙愿入口（按钮 + 状态行）
 $("btn-quest").onclick   = openQuestPanel;
