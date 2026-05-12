@@ -4,6 +4,30 @@
 
 ---
 
+## [v45] — 2026-05-12 · 禁术系统 + 江湖传闻
+
+### 动机
+
+高境界缺乏"以命搏命"的极限操作空间；悬赏令完成后缺少持续的随机任务来源。
+
+### 改动
+
+**禁术系统**
+- `FORBIDDEN_ARTS`（5种）：焚血秘术(atk+50%/消耗20%HP)/折寿斩(固定3倍ATK伤害/消耗100寿)/噬魂大法(5场修为×2/消耗30道心)/混沌化身(全属性×1.3/消耗50灵力)/逆天改命(永久ATK+10%/消耗500寿+50道心)
+- 按境界阶梯解锁（5/8/10/14/18），各有冷却（30-60日），逆天改命每世一次
+- `attackerOf`/`defenderOf` 整合 `_forbiddenAtkMul`/`_forbiddenDefMul`
+- `gainCult` 整合 `_forbiddenCultMul`（噬魂大法5场计数递减）
+- `recalcStats` 整合 `_permAtkBonus`（逆天改命永久加成）
+- 战斗结束自动清理临时禁术buff
+
+**江湖传闻**
+- `RUMOR_TEMPLATES`（4种）：猎杀悬赏(kill)/采药委托(herb)/秘境探索(adv)/闭关参悟(cult)
+- 每次2-3条传闻，60日有效期，完成奖励灵石/修为/道心
+- `rumorAdvance(unit)` 整合进 `endBattle`(kill)、`actAdventure`(adv)、`actCultivate`(cult)、`addItem`(herb)
+- `openRumors()` 面板展示当前传闻进度，全部完成或过期可刷新
+
+---
+
 ## [v44] — 2026-05-12 · 天机阁 + 心法领悟
 
 ### 动机

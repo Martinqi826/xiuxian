@@ -520,6 +520,8 @@
         <button id="btn-region">🗺️ 地 图</button>
         <button id="btn-codex">📖 图 鉴</button>
         <button id="btn-insights">💡 心 法</button>
+        <button id="btn-forbidden">⛧ 禁 术</button>
+        <button id="btn-rumors">📜 传 闻</button>
       </div>
 
       <!-- 第 3 组：故事 / 工具 -->
@@ -4269,6 +4271,157 @@ function openInsights(){
     <div class="btns"><button onclick="closeModal()">关 闭</button></div>`);
 }
 
+// v45 · 禁术系统 — 高收益高代价主动技
+const FORBIDDEN_ARTS = [
+  {id:"blood_burn", nm:"焚血秘术", desc:"消耗20%当前气血，本场攻击+50%", minRealm:5,
+   cost:{hpPct:0.20}, duration:1, effect:{atkMul:1.5}, cooldown:30},
+  {id:"life_blade", nm:"折寿斩", desc:"消耗100寿元，造成ATK×3的固定伤害", minRealm:8,
+   cost:{life:100}, duration:0, effect:{fixedDmg:3}, cooldown:60},
+  {id:"soul_devour", nm:"噬魂大法", desc:"消耗30道心，击杀获双倍修为（5场）", minRealm:10,
+   cost:{dx:30}, duration:5, effect:{cultMul:2}, cooldown:50},
+  {id:"chaos_form", nm:"混沌化身", desc:"消耗50灵力，全属性×1.3（本场）", minRealm:14,
+   cost:{mp:50}, duration:1, effect:{allMul:1.3}, cooldown:40},
+  {id:"heaven_defy", nm:"逆天改命", desc:"消耗500寿元+50道心，永久ATK+10%", minRealm:18,
+   cost:{life:500, dx:50}, duration:0, effect:{permAtkPct:0.10}, cooldown:0, once:true},
+];
+function getForbiddenCd(id){ return (P._forbiddenCd||{})[id]||0; }
+function useForbiddenArt(id){
+  const art = FORBIDDEN_ARTS.find(a=>a.id===id);
+  if(!art) return;
+  if(P.realmIdx < art.minRealm){ log(`境界不足，需${REALMS[art.minRealm][0]}。`,"hint"); return; }
+  if(art.once && P._forbiddenUsed && P._forbiddenUsed[id]){ log("此禁术每世只可施展一次。","hint"); return; }
+  const cd = getForbiddenCd(id);
+  if(cd > (P.days||0)){ log(`禁术冷却中，需等${cd-(P.days||0)}日。`,"hint"); return; }
+  const c = art.cost;
+  if(c.hpPct && P.hp <= Math.floor(P.maxHp*c.hpPct)){ log("气血不足以施展。","hint"); return; }
+  if(c.life && P.lifespan-P.age < c.life){ log("剩余寿元不足。","hint"); return; }
+  if(c.dx && P.dx < c.dx){ log("道心不足。","hint"); return; }
+  if(c.mp && P.mp < c.mp){ log("灵力不足。","hint"); return; }
+  confirmBox(`施展【${art.nm}】？代价：${art.desc.split("，")[0]}`,()=>{
+    if(c.hpPct) P.hp -= Math.floor(P.hp * c.hpPct);
+    if(c.life) P.lifespan -= c.life;
+    if(c.dx) P.dx = Math.max(0, P.dx - c.dx);
+    if(c.mp) P.mp = Math.max(0, P.mp - c.mp);
+    if(!P._forbiddenCd) P._forbiddenCd = {};
+    if(art.cooldown) P._forbiddenCd[id] = (P.days||0) + art.cooldown;
+    if(art.once){ if(!P._forbiddenUsed) P._forbiddenUsed = {}; P._forbiddenUsed[id] = true; }
+    const e = art.effect;
+    if(e.atkMul && P.inBattle){ P._forbiddenAtkMul = (P._forbiddenAtkMul||1)*e.atkMul; }
+    if(e.allMul && P.inBattle){ P._forbiddenAtkMul = (P._forbiddenAtkMul||1)*e.allMul; P._forbiddenDefMul = (P._forbiddenDefMul||1)*e.allMul; }
+    if(e.fixedDmg && P.inBattle && P.monster){
+      const dmg = Math.floor(P.atk * e.fixedDmg);
+      P.monster.mhp = Math.max(0, P.monster.mhp - dmg);
+      log(`💀【${art.nm}】！造成 ${dmg} 点固定伤害！`,"epic");
+    }
+    if(e.cultMul){ P._forbiddenCultMul = e.cultMul; P._forbiddenCultLeft = e.duration; }
+    if(e.permAtkPct){ P._permAtkBonus = (P._permAtkBonus||0) + e.permAtkPct; recalcStats(P); }
+    log(`⛧ 禁术【${art.nm}】发动！${art.desc}`,"epic");
+    addChronicle(`施展禁术【${art.nm}】。`);
+    SFX.rumble();
+    refresh();
+  });
+}
+function openForbiddenArts(){
+  if(P.inBattle){ log("请在战斗面板使用禁术。","hint"); return; }
+  const rows = FORBIDDEN_ARTS.map(a=>{
+    const locked = P.realmIdx < a.minRealm;
+    const cd = getForbiddenCd(a.id);
+    const onCd = cd > (P.days||0);
+    const used = a.once && P._forbiddenUsed && P._forbiddenUsed[a.id];
+    let status = "";
+    if(locked) status = `🔒 需${REALMS[a.minRealm][0]}`;
+    else if(used) status = "已施展";
+    else if(onCd) status = `冷却${cd-(P.days||0)}日`;
+    return `<div class="shop-row" style="${locked?"opacity:0.4":""}">
+      <div><div class="nm" style="color:#d96a6a">${a.nm}</div>
+      <div class="ds">${a.desc}</div>
+      <div class="ds" style="color:#999">${status||`冷却${a.cooldown}日`}</div></div>
+      ${!locked&&!used&&!onCd?`<button class="sm" data-fart="${a.id}">施 展</button>`:""}
+    </div>`;
+  }).join("");
+  showModal(`<h3>⛧ 禁 术</h3>
+    <p style="font-size:12px;color:#d96a6a">禁术威力强大，但代价沉重。慎用。</p>
+    <div class="box left" style="padding:0;border:none;background:none">${rows}</div>
+    <div class="btns"><button onclick="closeModal()">关 闭</button></div>`);
+  document.querySelectorAll(".modal [data-fart]").forEach(b=>{
+    b.onclick = ()=>{ closeModal(); useForbiddenArt(b.dataset.fart); };
+  });
+}
+
+// v45 · 江湖传闻 — 随机任务板
+const RUMOR_TEMPLATES = [
+  {id:"hunt", nm:"猎杀悬赏", desc:"击杀{n}只妖兽", genTarget:()=>3+Math.floor(Math.random()*5), unit:"kill",
+   reward:(ri)=>({stone:50+ri*30, cult:100+ri*50})},
+  {id:"gather", nm:"采药委托", desc:"收集{n}株灵草", genTarget:()=>2+Math.floor(Math.random()*3), unit:"herb",
+   reward:(ri)=>({stone:80+ri*20})},
+  {id:"explore", nm:"秘境探索", desc:"历练{n}次", genTarget:()=>5+Math.floor(Math.random()*5), unit:"adv",
+   reward:(ri)=>({cult:200+ri*80})},
+  {id:"meditate",nm:"闭关参悟", desc:"闭关{n}次", genTarget:()=>3+Math.floor(Math.random()*3), unit:"cult",
+   reward:(ri)=>({stone:40+ri*25, dx:5+Math.floor(ri/3)})},
+];
+function generateRumors(){
+  const pool = RUMOR_TEMPLATES.slice();
+  const count = 2 + (Math.random()<0.3?1:0);
+  const rumors = [];
+  for(let i=0;i<count&&pool.length;i++){
+    const idx = Math.floor(Math.random()*pool.length);
+    const tmpl = pool.splice(idx,1)[0];
+    const target = tmpl.genTarget();
+    const reward = tmpl.reward(P.realmIdx);
+    rumors.push({id:tmpl.id, nm:tmpl.nm, desc:tmpl.desc.replace("{n}",target),
+      progress:0, target, unit:tmpl.unit, reward, day:(P.days||0)+60});
+  }
+  return rumors;
+}
+function rumorAdvance(unit){
+  if(!P.rumors||!P.rumors.length) return;
+  for(const r of P.rumors){
+    if(r.unit===unit && r.progress<r.target){
+      r.progress++;
+      if(r.progress>=r.target){
+        log(`📜 传闻【${r.nm}】完成！`,"epic");
+        const rw = r.reward;
+        if(rw.stone) addItem(P,"灵石",rw.stone);
+        if(rw.cult) gainCult(P, rw.cult, "传闻");
+        if(rw.dx){ P.dx=Math.min(P.maxDx,P.dx+rw.dx); log(`道心 +${rw.dx}`,"good"); }
+      }
+    }
+  }
+}
+function openRumors(){
+  if(!P.rumors) P.rumors = [];
+  const canRefresh = !P.rumors.length || P.rumors.every(r=>r.progress>=r.target || (P.days||0)>r.day);
+  let rows = P.rumors.map(r=>{
+    const done = r.progress>=r.target;
+    const expired = !done && (P.days||0)>r.day;
+    const pct = Math.min(100, Math.floor(r.progress/r.target*100));
+    const rwText = Object.entries(r.reward).map(([k,v])=>{
+      if(k==="stone") return `灵石×${v}`;
+      if(k==="cult") return `修为×${v}`;
+      if(k==="dx") return `道心+${v}`;
+      return `${k}×${v}`;
+    }).join(" ");
+    return `<div class="shop-row" style="${done?"background:rgba(126,200,180,0.1)":expired?"opacity:0.4":""}">
+      <div><div class="nm">${done?"✓":"○"} ${r.nm} ${expired?"(已过期)":""}</div>
+      <div class="ds">${r.desc} — ${r.progress}/${r.target}</div>
+      <div class="ds" style="color:#e8c56a">${rwText}</div>
+      ${!done&&!expired?`<div style="background:rgba(0,0,0,0.3);border-radius:3px;height:4px;margin-top:3px"><div style="width:${pct}%;height:4px;border-radius:3px;background:#7ec8b4"></div></div>`:""}
+      </div></div>`;
+  }).join("");
+  if(!rows) rows = `<div style="text-align:center;color:#888;padding:20px">暂无传闻</div>`;
+  showModal(`<h3>📜 江 湖 传 闻</h3>
+    <p style="font-size:12px;color:#a89c7c">四方传闻，完成可获丰厚奖赏。每60日刷新。</p>
+    <div class="box left" style="padding:0;border:none;background:none">${rows}</div>
+    <div class="btns">${canRefresh?`<button id="rumor-refresh" class="primary">刷新传闻</button>`:""}<button onclick="closeModal()">关 闭</button></div>`);
+  if(canRefresh && $("rumor-refresh")){
+    $("rumor-refresh").onclick = ()=>{
+      P.rumors = generateRumors();
+      log("📜 新的江湖传闻传来……","sys");
+      closeModal(); openRumors();
+    };
+  }
+}
+
 // v24 · 天道法则 — 每一世随机抽取的全局修饰规则
 const WORLD_RULES = [
   {id:"barren",  nm:"灵气枯竭", desc:"修炼速度 -20%，掉率 +30%",  cultMul:0.80, lootMul:1.30, color:"#d96a6a"},
@@ -5506,6 +5659,8 @@ function newPlayer(name,rootName,elements){
     _advRegion: "lingshan",
     codex: {monsters:[], items:[], regions:[]},
     _lastInsightCheck: 0,
+    _forbiddenCd: {},
+    rumors: [],
   };
   recalcStats(p);
   // 初始化后按当前 maxHp/maxMp 满血满蓝
@@ -5734,6 +5889,9 @@ function recalcStats(p){
     if(sb2.critAdd)    d.crit += sb2.critAdd;
     if(sb2.critDmgAdd) d.critDmg += sb2.critDmgAdd;
   }
+
+  // v45: 禁术永久加成
+  if(p._permAtkBonus) d.atk = Math.floor(d.atk * (1 + p._permAtkBonus));
 
   // v44: 天机阁里程碑
   if(typeof codexMilestoneBonus === "function"){
@@ -5974,7 +6132,9 @@ function gainCult(p,base,reason){
   const cstCult = typeof getConstellationEffects==="function" ? (getConstellationEffects().cultPct||0) : 0;
   const facCult = typeof getFactionBonuses==="function" ? (getFactionBonuses().cultPct||0) : 0;
   const cdxCult = typeof codexMilestoneBonus==="function" ? (codexMilestoneBonus().cult||0) : 0;
-  const amt=Math.floor(base*rootMul(p)*TECHS[p.tech][0]*gearCultBonus(p)*buff.cultMul*bkMul*altMul*sectMul*weCultMul*tCultMul*(1+dScholar)*wrCultMul*caveMul*rsMul*(1+fpCult+eaCult+rpCult+leyCult+cstCult+facCult+cdxCult));
+  const forbCultMul = p._forbiddenCultMul||1;
+  if(p._forbiddenCultLeft && p._forbiddenCultLeft>0){ p._forbiddenCultLeft--; if(p._forbiddenCultLeft<=0) delete p._forbiddenCultMul; }
+  const amt=Math.floor(base*rootMul(p)*TECHS[p.tech][0]*gearCultBonus(p)*buff.cultMul*bkMul*altMul*sectMul*weCultMul*tCultMul*(1+dScholar)*wrCultMul*caveMul*rsMul*(1+fpCult+eaCult+rpCult+leyCult+cstCult+facCult+cdxCult)*forbCultMul);
   const prevCult = p.cult;
   p.cult+=amt;
   const tags = [];
@@ -6067,6 +6227,7 @@ function addItem(p,name,n=1){
   if(n>0 && ITEMS[name] && typeof codexRegister==="function") codexRegister("items", name);
   // v16: herb bounty tracking
   if(HERBS[name] && typeof bountyAdvance === "function") bountyAdvance("herb", name);
+  if(HERBS[name] && typeof rumorAdvance === "function") rumorAdvance("herb");
 }
 function passDays(p,n){
   const d0 = p.days|0;
@@ -6448,7 +6609,7 @@ function attackerOf(p, override){
   const desperateCritAdd = desperate ? 0.25 : 0;
   const desperateCritDmgAdd = desperate ? 0.8 : 0;
   return Object.assign({
-    atk:Math.floor((d.atk+(p._dgAtkBuff||0)+(typeof friendPassive==="function"?friendPassive("atkAdd"):0))*buff.atkMul*desperateAtkMul*(1+(typeof disciplePassive==="function"?disciplePassive("fighter")*0.03:0))*(typeof getStance==="function"?getStance().atkMul:1)),
+    atk:Math.floor((d.atk+(p._dgAtkBuff||0)+(typeof friendPassive==="function"?friendPassive("atkAdd"):0))*buff.atkMul*desperateAtkMul*(1+(typeof disciplePassive==="function"?disciplePassive("fighter")*0.03:0))*(typeof getStance==="function"?getStance().atkMul:1)*(p._forbiddenAtkMul||1)),
     crit:Math.min(0.95, d.crit + (buff.critAdd||0) + desperateCritAdd + (P.curDungeon?.mod?.flag==="darkZone"?-0.10:0) + (P.curDungeon?.mod?.flag==="holyLight"?0.05:0)),
     critDmg:d.critDmg + desperateCritDmgAdd + (typeof teachingVal==="function"?teachingVal("critDmgAdd"):0) + (P.curDungeon?.mod?.flag==="darkZone"?0.50:0),
     hit:d.hit, pen:d.pen,
@@ -6461,7 +6622,7 @@ function defenderOf(p, override){
   const d = p._d;
   const buff = getBuff(p);
   return Object.assign({
-    def:Math.floor((d.def+(typeof friendPassive==="function"?friendPassive("defAdd"):0))*buff.defMul*(typeof getStance==="function"?getStance().defMul:1)),
+    def:Math.floor((d.def+(typeof friendPassive==="function"?friendPassive("defAdd"):0))*buff.defMul*(typeof getStance==="function"?getStance().defMul:1)*(P._forbiddenDefMul||1)),
     dodge:d.dodge, defEls:d.defEls, lv:p.realmIdx,
   }, override||{});
 }
@@ -6704,6 +6865,7 @@ function actCultivate(){
   // v16 · 悬赏令进度
   if(typeof bountyAdvance === "function") bountyAdvance("cult");
   if(typeof dailyAdvance === "function") dailyAdvance("cult");
+  if(typeof rumorAdvance === "function") rumorAdvance("cult");
   passDays(P, days);
   sectTaskAdvance("cult", days);
 
@@ -7725,6 +7887,7 @@ function actAdventure(){
   // P0-1 · 交替奖励：连续闭关 >=3 次后历练 → 双倍收益
   P.advRun = (P.advRun||0) + 1;
   if(typeof dailyAdvance === "function") dailyAdvance("adv");
+  if(typeof rumorAdvance === "function") rumorAdvance("adv");
   let advAltMul = 1;
   if((P.cultRun||0) >= 3){
     advAltMul = 2;
@@ -11084,6 +11247,7 @@ function endBattle(win){
   const m=P.monster;
   const fromDg = m && m.fromDungeon;
   P.inBattle=false;P.monster=null;P._nearDeathLine=false;P._stance="balanced";
+  delete P._forbiddenAtkMul; delete P._forbiddenDefMul;
   setScene("凡 人 修 仙 路","— 一 缕 神 识 自 虚 空 降 临 —","");
   // 恢复按钮
   bindMainButtons();
@@ -11195,6 +11359,7 @@ function endBattle(win){
     P.stats.kill++;
     if(typeof codexRegister==="function") codexRegister("monsters", m.name.replace(/^(血煞·|灵变·|远古·)/,""));
     if(typeof checkNewInsight==="function") checkNewInsight();
+    if(typeof rumorAdvance==="function") rumorAdvance("kill");
     if(typeof checkSpiritAwaken==="function") checkSpiritAwaken();
     if(typeof gainFactionRep==="function"){ gainFactionRep("demon",1); gainFactionRep("rogue",1); }
     // v16: 悬赏令进度
@@ -12504,6 +12669,8 @@ function loadGame(){
     if(!d._advRegion) d._advRegion = "lingshan";
     if(!d.codex) d.codex = {monsters:[], items:[], regions:[]};
     if(!d._lastInsightCheck) d._lastInsightCheck = 0;
+    if(!d._forbiddenCd) d._forbiddenCd = {};
+    if(!d.rumors) d.rumors = [];
     // v4 寿元迁移：移除强制拉满逻辑（避免覆盖新机制），仅做异常兜底
     if(d.lifespan===undefined || d.lifespan<=0){
       d.lifespan = 80 + (d.realmIdx||0)*30;
@@ -12763,6 +12930,8 @@ if($("btn-fusion")) $("btn-fusion").onclick = ()=>{ if(typeof openTechFusion==="
 if($("btn-region")) $("btn-region").onclick = ()=>{ if(typeof openRegionMap==="function") openRegionMap(); };
 if($("btn-codex")) $("btn-codex").onclick = ()=>{ if(typeof openCodex==="function") openCodex(); };
 if($("btn-insights")) $("btn-insights").onclick = ()=>{ if(typeof openInsights==="function") openInsights(); };
+if($("btn-forbidden")) $("btn-forbidden").onclick = ()=>{ if(typeof openForbiddenArts==="function") openForbiddenArts(); };
+if($("btn-rumors")) $("btn-rumors").onclick = ()=>{ if(typeof openRumors==="function") openRumors(); };
 $("btn-calendar").onclick= openCalendar;
 // v5：夙愿入口（按钮 + 状态行）
 $("btn-quest").onclick   = openQuestPanel;
